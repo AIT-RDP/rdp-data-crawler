@@ -1,0 +1,2 @@
+include versioneer.py
+include data_crawler/_version.py
