@@ -1,0 +1,13 @@
+version: 1
+data sources:
+  my_datasource_name:  # Mainly for logging and debugging purpose
+    type: "data_crawler.sources.yr_no.LocationForecast"
+    source parameter:  # Parameters passed on to the data source
+      lat: 46.6199327
+      lon: 14.3164564
+      key: !env-template "${API_USER}:${API_KEY}"
+    polling:  # Polling interval specification
+      frequency: 2h
+      offset: 0s  # Offset starting from epoch
+    redis tags: # Additional Redis tags that will be appended
+      station: "HTL-1"
