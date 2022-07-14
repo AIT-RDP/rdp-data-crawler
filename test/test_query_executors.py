@@ -20,7 +20,7 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
 
     def __init__(self, source_parameters, **kwargs):
         """Stores the configuration and initializes the object"""
-        self._config = source_parameters
+        self.config = source_parameters
         self.fetch_invocations = 0
 
     def fetch_data(self) -> Dict[str, Any]:
@@ -33,12 +33,14 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
 
 
 @pytest.fixture()
-def mockup_service_config():
+def mockup_service_config(appended_test_path):
     """Returns the configuration of a simple mockup service"""
 
     return {
-        "type": "test.test_query_execution:MockupSourceAPI",
-        "source parameter": {},
+        "type": "test_query_executors.MockupSourceAPI",
+        "source parameter": {
+            "key": "<keep it secret>"
+        },
         "polling": {
             "frequency": "0.5s"
         },
@@ -71,3 +73,30 @@ def test_thread_executor_lifecycle(mockup_service_config, redis_pool):
         executor.stop()
 
     executor.join()
+
+
+def test_thread_executor_api_instantiation(mockup_service_config, redis_pool):
+    """Tests the API instantiation function using the mockup API"""
+
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool)
+    assert isinstance(executor.source_api, MockupSourceAPI)
+
+    api:MockupSourceAPI = executor.source_api
+    assert "key" in api.config
+    assert api.config["key"] == "<keep it secret>"
+
+
+def test_thread_executor_invalid_api_name(mockup_service_config, redis_pool):
+    """Tests an invalid API name"""
+
+    mockup_service_config["type"] = "data_crawler.sources.nsa.Prism"
+    with pytest.raises(ModuleNotFoundError, match="data_crawler\\.sources\\.nsa"):
+        executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool)
+
+
+def test_thread_executor_invalid_api_class(mockup_service_config, redis_pool):
+    """Tests an invalid API class"""
+
+    mockup_service_config["type"] = "threading.Thread"
+    with pytest.raises(ModuleNotFoundError, match="Thread"):
+        executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool)

@@ -2,6 +2,8 @@
 Implements the logic to periodically execute API calls in a dedicated context
 """
 
+import importlib
+import inspect
 import threading
 from typing import Optional
 
@@ -35,7 +37,53 @@ class ThreadQueryExecutor:
         self._thread = threading.Thread(target=self._run_timed_execution)
         self._termination_event = threading.Event()
 
-        # TODO: Load and store the source API
+        if source_api is None:
+            source_api = self._resolve_source_api(self._config)
+        self._source_api = source_api
+
+    @staticmethod
+    def _resolve_source_api(executor_config: dict) -> abstract_source.AbstractSourceAPI:
+        """
+        Tries to load ind instantiate the source API
+
+        :param executor_config: The configuration of the entire executor
+        :return: The newly instantiated source API object
+        """
+
+        type_name = executor_config["type"]
+        name_components = str(type_name).split(".")
+        if len(name_components) < 2:
+            raise KeyError(f"The API type configuration '{type_name}' is invalid. Cannot separate the package and "
+                           f"class component separated by dots.")
+
+
+        module_name = ".".join(name_components[:-1])
+        api_module = importlib.import_module(module_name)
+        assert api_module is not None
+
+        api_class: type = getattr(api_module, name_components[-1])
+        if not inspect.isclass(api_class):
+            raise ModuleNotFoundError(f"The specified source API '{type_name}' ({api_class}) is not an class.")
+
+        if not issubclass(api_class, abstract_source.AbstractSourceAPI):
+            raise ModuleNotFoundError(f"The specified source API class '{type_name}' ({api_class}) is not an "
+                                      f"AbstractSourceAPI.")
+
+        api_object = api_class(source_parameters=executor_config["source parameter"])
+        return api_object
+
+    @property
+    def source_api(self) -> abstract_source.AbstractSourceAPI:
+        """
+        Returns the Source API object
+
+        The getter is mostly intended for testing purpose any may not be needed otherwise. It will raise an error in
+        case the thread is already started.
+        """
+
+        if self._thread.is_alive():
+            raise AttributeError("The source_api is accessed while the local executor is already started")
+        return self._source_api
 
     def start(self):
         """

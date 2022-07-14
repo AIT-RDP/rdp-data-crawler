@@ -18,6 +18,9 @@ class AbstractSourceAPI(abc.ABC):
       * source_parameters: Dict, The source-specific parameters listed in the configuration
     """
 
+    def __init__(self, **kwargs):
+        """Just for type checking"""
+
     @abc.abstractmethod
     def fetch_data(self) -> Dict[str, Any]:
         """
