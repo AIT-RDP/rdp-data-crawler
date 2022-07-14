@@ -4,6 +4,7 @@ Test the query executor services
 
 import logging
 import os
+import time
 from typing import Dict, Any
 
 import pytest
@@ -100,3 +101,18 @@ def test_thread_executor_invalid_api_class(mockup_service_config, redis_pool):
     mockup_service_config["type"] = "threading.Thread"
     with pytest.raises(ModuleNotFoundError, match="Thread"):
         executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool)
+
+
+def test_thread_executor_fetch_invocation(mockup_service_config, redis_pool):
+    """Tests whether the API fetch function is correctly invoked"""
+
+    api = MockupSourceAPI(source_parameters={})
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool, source_api=api)
+
+    assert api.fetch_invocations == 0
+
+    executor.start()
+    time.sleep(1.25)
+    executor.stop()
+    executor.join()
+    assert 2 <= api.fetch_invocations <= 4
