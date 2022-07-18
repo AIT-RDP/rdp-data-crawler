@@ -11,3 +11,8 @@ data sources:
       offset: 0s  # Offset starting from epoch
     redis tags: # Additional Redis tags that will be appended
       station: "HTL-1"
+
+redis:
+  host: !env-template "${DATA_CRAWLER_REDIS_HOST}"
+  port: !env-template "${DATA_CRAWLER_REDIS_PORT}"
+  db: !env-template "${DATA_CRAWLER_REDIS_DB}"
