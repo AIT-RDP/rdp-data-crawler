@@ -36,9 +36,6 @@ class GenericHTTPSourceAPI(abstract_source.AbstractSourceAPI, abc.ABC):
         if "expire" in config:
             expiration_time = pd.Timedelta(config["expire"])
             heuristic = cachecontrol.heuristics.ExpiresAfter(seconds=expiration_time.total_seconds())
-            # Rewrite the expiration date:
-            #req_session.mount('http://', cachecontrol.CacheControlAdapter(heuristic=heuristic))
-            #req_session.mount('https://', cachecontrol.CacheControlAdapter(heuristic=heuristic))
         else:
             heuristic = None
 
