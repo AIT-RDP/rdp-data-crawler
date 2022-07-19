@@ -4,11 +4,12 @@ Implements the logic to periodically execute API calls in a dedicated context
 
 import importlib
 import inspect
+import json
 import logging
 import math
 import threading
 import time
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import pandas as pd
 import redis
@@ -61,6 +62,35 @@ class _ExecutionTimer:
             self._logger.warning(f"Skipped {num_skip} queries since the previous queries were too much delayed.")
 
 
+class _RedisDataSink:
+    """Helper class that relays data to a redis stream according to the configuration"""
+
+    def __init__(self, redis_config: dict, redis_pool: redis.ConnectionPool):
+        """
+        Initializes the data sink
+
+        :param redis_config: The executor-specific redis configuration
+        :param redis_pool:  The connection pool to use at the redis client
+        """
+
+        self._client = redis.Redis(connection_pool=redis_pool)
+        self._stream_name = redis_config["stream"]
+        self._tags = redis_config.get("tags", {})
+
+    def push_data(self, message: Dict[str, Any]):
+        """
+        Write the received message to the Redis stream
+
+        :param message: The message as received by the source API
+        """
+
+        message = message.copy()  # To be on the safe side. Remove if it turns out to be a performance bottleneck
+        message.update(self._tags)
+
+        encoded_message = {key: json.dumps(val) for key, val in message.items()}
+        self._client.xadd(self._stream_name, encoded_message)
+
+
 class ThreadQueryExecutor:
     """
     Periodically executes the hosted query and pushes the results to the connected REDIS database
@@ -82,7 +112,6 @@ class ThreadQueryExecutor:
         """
 
         self._config = executor_config
-        self._redis_pool = redis_pool
 
         self._thread = threading.Thread(target=self._run_timed_execution)
         self._termination_event = threading.Event()
@@ -93,6 +122,7 @@ class ThreadQueryExecutor:
 
         self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)
         self._timer = _ExecutionTimer(self._config["polling"], self._logger)
+        self._data_sink = _RedisDataSink(self._config["redis"], redis_pool)
 
     @staticmethod
     def _resolve_source_api(executor_config: dict) -> abstract_source.AbstractSourceAPI:
@@ -178,6 +208,6 @@ class ThreadQueryExecutor:
 
             try:
                 data = self._source_api.fetch_data()
-                # TODO: handle the data and store it to Redis
+                self._data_sink.push_data(data)
             finally:
                 self._timer.operation_done()

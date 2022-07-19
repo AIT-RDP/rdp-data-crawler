@@ -9,8 +9,10 @@ data sources:
     polling:  # Polling interval specification
       frequency: 2h
       offset: 0s  # Offset starting from epoch
-    redis tags: # Additional Redis tags that will be appended
-      station: "HTL-1"
+    redis:
+      stream: "my_observations"
+      tags: # Additional Redis tags that will be appended
+        station: "HTL-1"
 
 redis:
   host: !env-template "${DATA_CRAWLER_REDIS_HOST}"
