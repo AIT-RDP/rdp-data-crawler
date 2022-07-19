@@ -70,7 +70,7 @@ def redis_pool() -> redis.ConnectionPool:
 
     logger.debug(f"Initialize redis pool connecting to host={host}, port={port}, db={db}")
 
-    pool = redis.ConnectionPool(host=host, port=port, db=db)
+    pool = redis.ConnectionPool(host=host, port=port, db=db, decode_responses=True)
     client = redis.Redis(connection_pool=pool)
 
     client.ping()
@@ -158,7 +158,7 @@ def test_thread_executor_redis_export(mockup_service_config, redis_pool, redis_s
     api = MockupSourceAPI(source_parameters={})
     executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool, source_api=api)
 
-    redis_client = redis.Redis(connection_pool=redis_pool, decode_responses=True)
+    redis_client = redis.Redis(connection_pool=redis_pool)
 
     executor.start()
     time.sleep(0.51)
@@ -170,16 +170,16 @@ def test_thread_executor_redis_export(mockup_service_config, redis_pool, redis_s
     assert 2 <= len(messages) <= 3
     assert len(messages) == api.fetch_invocations
 
-    assert messages[0][-1]["source type"] == "mockup-test"
-    assert messages[0][-1]["empty"] == ""
-    assert messages[0][-1]["my-number"] == 0.2
-    assert messages[0][-1]["duplicate"] == "config-key"
-    assert messages[0][-1]["invocations"] == 0
-    assert messages[0][-1]["data"] == "some-test-nonsense"
+    assert messages[0][-1]["source type"] == '"mockup-test"'
+    assert messages[0][-1]["empty"] == '""'
+    assert messages[0][-1]["my-number"] == '0.2'
+    assert messages[0][-1]["duplicate"] == '"config-key"'
+    assert messages[0][-1]["invocations"] == '1'  # Number of invocations including the current one
+    assert messages[0][-1]["data"] == '"some-test-nonsense"'
 
-    assert messages[1][-1]["source type"] == "mockup-test"
-    assert messages[1][-1]["empty"] == ""
-    assert messages[1][-1]["my-number"] == 0.2
-    assert messages[1][-1]["duplicate"] == "config-key"
-    assert messages[1][-1]["invocations"] == 1
-    assert messages[1][-1]["data"] == "some-test-nonsense"
+    assert messages[1][-1]["source type"] == '"mockup-test"'
+    assert messages[1][-1]["empty"] == '""'
+    assert messages[1][-1]["my-number"] == '0.2'
+    assert messages[1][-1]["duplicate"] == '"config-key"'
+    assert messages[1][-1]["invocations"] == '2'
+    assert messages[1][-1]["data"] == '"some-test-nonsense"'
