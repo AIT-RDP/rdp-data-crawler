@@ -175,8 +175,8 @@ class LocationForecast(http_cache.GenericHTTPSourceAPI):
         extractors = [
             # Meta-data
             _DatetimePathExtractor("forecast_time", "properties.meta.updated_at", is_list=False),
-            _PathExtractor("latitude", "geometry.coordinates[0]", is_list=False),
-            _PathExtractor("longitude", "geometry.coordinates[1]", is_list=False),
+            _PathExtractor("longitude", "geometry.coordinates[0]", is_list=False),
+            _PathExtractor("latitude", "geometry.coordinates[1]", is_list=False),
             _PathExtractor("altitude", "geometry.coordinates[2]", is_list=False),
             _DatetimePathExtractor("observation_time", "properties.timeseries[*].time"),
 

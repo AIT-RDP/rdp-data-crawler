@@ -42,8 +42,8 @@ def test_location_forecast_parsing(simplified_base_response: dict, location_fore
 
     assert response_data is not None
     assert response_data["forecast_time"] == "2022-07-20T08:30:39+00:00"
-    assert response_data["latitude"] == 16.4268
-    assert response_data["longitude"] == 48.268
+    assert response_data["longitude"] == 16.4268
+    assert response_data["latitude"] == 48.268
     assert response_data["altitude"] == 159
 
     assert response_data["observation_time"] == [
