@@ -67,12 +67,10 @@ def test_load_config_env_template(minimal_config_file, minimal_env_test_set):
 
     config = cli.load_config(minimal_config_file)
 
-    assert "data sources" in config
-    assert "my_datasource_name" in config["data sources"]
-    assert "source parameter" in config["data sources"]["my_datasource_name"]
-    assert "key" in config["data sources"]["my_datasource_name"]["source parameter"]
+    assert "testing" in config
+    assert "key" in config["testing"]
 
-    assert "nsa:backdoor" == config["data sources"]["my_datasource_name"]["source parameter"]["key"]
+    assert "nsa:backdoor" == config["testing"]["key"]
 
 
 def test_load_env_mockup(mockup_env_file, minimal_env_test_set):

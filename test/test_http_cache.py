@@ -25,7 +25,7 @@ class TimeSourceAPI(http_cache.GenericHTTPSourceAPI):
         super(TimeSourceAPI, self).__init__(**kwargs)
         if "DATA_CRAWLER_CONTACT" not in os.environ:
             raise KeyError("Please put your contact details in the environment variable DATA_CRAWLER_CONTACT.")
-        self.session.headers["User-Agent"] = f"E3-SCHOOL_EMS_Test_Suite {os.environ['DATA_CRAWLER_CONTACT']}"
+        self.session.headers["User-Agent"] = f"E3SchoolEMS_Test_Suite {os.environ['DATA_CRAWLER_CONTACT']}"
 
     def fetch_data(self) -> Dict[str, Any]:
         """Queries the status API and returns the result"""
