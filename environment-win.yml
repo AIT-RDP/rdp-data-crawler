@@ -15,3 +15,4 @@ dependencies:
       - hiredis==2.0
       - python-dotenv==0.20
       - versioneer==0.22  # Not needed for productive use
+      - jsonpath-rw==1.4

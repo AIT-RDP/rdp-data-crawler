@@ -3,9 +3,9 @@ data sources:
   my_datasource_name:  # Mainly for logging and debugging purpose
     type: "data_crawler.sources.yr_no.LocationForecast"
     source parameter:  # Parameters passed on to the data source
-      lat: 46.6199327
-      lon: 14.3164564
-      key: !env-template "${API_USER}:${API_KEY}"
+      latitude: 46.6199327
+      longitude: 14.3164564
+      contact address: !env-template "${DATA_CRAWLER_CONTACT}" # Some e-mail to sent along the user agent (required)
     polling:  # Polling interval specification
       frequency: 2h
       offset: 0s  # Offset starting from epoch
@@ -18,3 +18,6 @@ redis:
   host: !env-template "${DATA_CRAWLER_REDIS_HOST}"
   port: !env-template "${DATA_CRAWLER_REDIS_PORT}"
   db: !env-template "${DATA_CRAWLER_REDIS_DB}"
+
+testing:  # Just for testing the CLI, gracefully ignore it for productive use
+  key: !env-template "${API_USER}:${API_KEY}"
