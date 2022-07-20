@@ -230,7 +230,7 @@
               "symbol_code": "fair_night"
             },
             "details": {
-              "precipitation_amount": 0
+              "precipitation_amount": 0.1
             }
           }
         }

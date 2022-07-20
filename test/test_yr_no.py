@@ -55,6 +55,21 @@ def test_location_forecast_parsing(simplified_base_response: dict, location_fore
     assert response_data["air_temperature_2m"] == [31.0, 34.2, 34.1, 30.6, 28.4, 20.2, 20.6]
     assert response_data["air_pressure_at_sea_level"] == [1020.2, 1018.2, 1017.7, 1014.3, 1014.4, 1013.6, 1013.0]
 
+    assert response_data["dew_point_temperature_2m"] == [11.0, 8.2, 8.2, 17.7, 16.5, 18.5, 18.2]
+    assert response_data["relative_humidity_2m"] == [29.3, 20.4, 20.4, 46.2, 48.8, 91, 86.4]
+    assert response_data["cloud_area_fraction"] == [0.0, 55.5, 75.8, 21.1, 21.9, 100.0, 100.0]
+    assert response_data["cloud_area_fraction_high"] == [0.0, 55.5, 75.8, 10.9, 11.7, 100.0, 100.0]
+    assert response_data["cloud_area_fraction_medium"] == [0.0, 0.0, 0.0, 12.5, 12.5, 60.2, 99.2]
+    assert response_data["cloud_area_fraction_low"] == [0.0, 0.0, 0.0, 0.0, 0.0, 39.1, 92.2]
+
+    assert response_data["wind_direction_10m"] == [142.4, 143.0, 140.8, 24.4, 50.3, 41.4, 6.9]
+    assert response_data["wind_speed_10m"] == [3.5, 4.8, 5.0, 1.5, 1.8, 0.3, 3.5]
+
+    assert response_data["fog_area_fraction"] == [0.0, 0.0, 0.0, 0.0, 0.0, None, None]
+    assert response_data["uv_index"] == [6.2, 5.8, 4.1, 0.1, 0, None, None]
+    assert response_data["precipitation_total_6h"] == [0.0, 0.0, 0.0, 0.0, None, 5.5, None]
+    assert response_data["precipitation_total_1h"] == [0.0, 0.0, 0.0, 0.0, 0.1, None, None]
+
 
 def test_location_forecast_online(location_forecast_base_parameters):
     """Queries the online forecast and does some basic integrity checks"""
