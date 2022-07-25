@@ -2,5 +2,4 @@
 /.eggs
 *.egg-info
 /.env
-.cache-test
-.cache-test-persistent
+/.cache*
