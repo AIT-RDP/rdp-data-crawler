@@ -135,14 +135,19 @@ class LocationForecast(http_cache.GenericHTTPSourceAPI):
         super(LocationForecast, self).__init__(source_parameters=source_parameters, **kwargs)
 
         self._static_request_parameters = {
-            "lat": f"{source_parameters['latitude']:.4}",
-            "lon": f"{source_parameters['longitude']:.4}"
+            "lat": f"{source_parameters['latitude']:.4f}",
+            "lon": f"{source_parameters['longitude']:.4f}"
         }
         if "altitude" in source_parameters:
             self._static_request_parameters["altitude"] = source_parameters["altitude"]
 
         contact = source_parameters["contact address"]
         self.session.headers["User-Agent"] = f"E3SchoolEMS {contact}"
+
+    @property
+    def static_request_parameters(self) -> Dict[str, str]:
+        """Returns a copy of the static request parameters for testing purpose"""
+        return self._static_request_parameters.copy()
 
     def fetch_data(self, raw_forecast=None) -> Dict[str, Any]:
         """
