@@ -80,3 +80,13 @@ def test_location_forecast_online(location_forecast_base_parameters):
     assert response_data is not None
     assert datetime.datetime.fromisoformat(response_data["forecast_time"]) > \
            datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=1)
+
+
+def test_location_forecast_request_parameters(location_forecast_base_parameters):
+    """Tests whether truncation is correctly performed"""
+
+    api = yr_no.LocationForecast(source_parameters=location_forecast_base_parameters)
+    assert "lat" in api.static_request_parameters
+    assert api.static_request_parameters["lat"] == "48.2687"
+    assert "lon" in api.static_request_parameters
+    assert api.static_request_parameters["lon"] == "16.4269"
