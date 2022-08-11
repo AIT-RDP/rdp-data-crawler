@@ -117,7 +117,7 @@ class ThreadQueryExecutor:
         self._termination_event = threading.Event()
 
         if source_api is None:
-            source_api = self._resolve_source_api(self._config)
+            source_api = self._resolve_source_api(self._config, name)
         self._source_api = source_api
 
         self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)
@@ -125,11 +125,12 @@ class ThreadQueryExecutor:
         self._data_sink = _RedisDataSink(self._config["redis"], redis_pool)
 
     @staticmethod
-    def _resolve_source_api(executor_config: dict) -> abstract_source.AbstractSourceAPI:
+    def _resolve_source_api(executor_config: dict, executor_name: str) -> abstract_source.AbstractSourceAPI:
         """
         Tries to load ind instantiate the source API
 
         :param executor_config: The configuration of the entire executor
+        :param executor_name: The executor's name for debugging purposes
         :return: The newly instantiated source API object
         """
 
@@ -151,7 +152,7 @@ class ThreadQueryExecutor:
             raise ModuleNotFoundError(f"The specified source API class '{type_name}' ({api_class}) is not an "
                                       f"AbstractSourceAPI.")
 
-        api_object = api_class(source_parameters=executor_config["source parameter"])
+        api_object = api_class(source_parameters=executor_config["source parameter"], executor_name=executor_name)
         return api_object
 
     @property
