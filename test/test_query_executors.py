@@ -1,0 +1,185 @@
+"""
+Test the query executor services
+"""
+
+import logging
+import os
+import time
+import warnings
+from typing import Dict, Any
+
+import pytest
+import redis
+
+import data_crawler.query_executors as query_executors
+import data_crawler.sources.abc.abstract_source as abstract_sources
+
+logger = logging.getLogger(__name__)
+
+
+class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
+    """Test API source that just counts function invocations"""
+
+    def __init__(self, source_parameters, **kwargs):
+        """Stores the configuration and initializes the object"""
+        self.config = source_parameters
+        self.fetch_invocations = 0
+
+    def fetch_data(self) -> Dict[str, Any]:
+        """Generates some content and returns it"""
+
+        self.fetch_invocations += 1
+        return {
+            "invocations": self.fetch_invocations,
+            "data": "some-test-nonsense",
+            "duplicate": "api-key"
+        }
+
+
+@pytest.fixture()
+def mockup_service_config(appended_test_path):
+    """Returns the configuration of a simple mockup service"""
+
+    return {
+        "type": "test_query_executors.MockupSourceAPI",
+        "source parameter": {
+            "key": "<keep it secret>"
+        },
+        "polling": {
+            "frequency": "0.5s"
+        },
+        "redis": {
+            "stream": "my-stream",
+            "tags": {
+                "source type": "mockup-test",
+                "empty": "",
+                "my-number": 0.2,
+                "duplicate": "config-key"
+            },
+        },
+    }
+
+
+@pytest.fixture()
+def redis_pool() -> redis.ConnectionPool:
+    """Opens a Redis pool and tests the connection"""
+
+    host = os.environ.get("DATA_CRAWLER_REDIS_HOST", "localhost")
+    port = os.environ.get("DATA_CRAWLER_REDIS_PORT", "6379")
+    db = os.environ.get("DATA_CRAWLER_REDIS_DB", "0")
+
+    logger.debug(f"Initialize redis pool connecting to host={host}, port={port}, db={db}")
+
+    pool = redis.ConnectionPool(host=host, port=port, db=db, decode_responses=True)
+    client = redis.Redis(connection_pool=pool)
+
+    client.ping()
+    return pool
+
+
+@pytest.fixture()
+def redis_stream_name(redis_pool) -> str:
+    """Returns the name of a managed REDIS stream"""
+
+    redis_client = redis.Redis(connection_pool=redis_pool)
+    stream_name = "test.stream"
+
+    stream_content = redis_client.xrange(stream_name)  # Read to implicitly create the stream
+    if len(stream_content) == 0:
+        warnings.warn(f"There are already {len(stream_content)} items in the redis stream '{stream_name}'")
+    yield stream_name
+
+    redis_client.xtrim(stream_name, maxlen=0)
+    redis_client.delete(stream_name)  # Delete the stream again
+
+
+def test_thread_executor_lifecycle(mockup_service_config, redis_pool):
+    """Tests the basic lifecycle of a threaded executor"""
+
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool)
+
+    with pytest.raises(AssertionError):
+        executor.join()
+
+    executor.start()
+    executor.stop()
+    with pytest.raises(AssertionError):
+        executor.stop()
+
+    executor.join()
+
+
+def test_thread_executor_api_instantiation(mockup_service_config, redis_pool):
+    """Tests the API instantiation function using the mockup API"""
+
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool)
+    assert isinstance(executor.source_api, MockupSourceAPI)
+
+    api: MockupSourceAPI = executor.source_api
+    assert "key" in api.config
+    assert api.config["key"] == "<keep it secret>"
+
+
+def test_thread_executor_invalid_api_name(mockup_service_config, redis_pool):
+    """Tests an invalid API name"""
+
+    mockup_service_config["type"] = "data_crawler.sources.nsa.Prism"
+    with pytest.raises(ModuleNotFoundError, match="data_crawler\\.sources\\.nsa"):
+        executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool)
+
+
+def test_thread_executor_invalid_api_class(mockup_service_config, redis_pool):
+    """Tests an invalid API class"""
+
+    mockup_service_config["type"] = "threading.Thread"
+    with pytest.raises(ModuleNotFoundError, match="Thread"):
+        executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool)
+
+
+def test_thread_executor_fetch_invocation(mockup_service_config, redis_pool):
+    """Tests whether the API fetch function is correctly invoked"""
+
+    api = MockupSourceAPI(source_parameters={})
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool, source_api=api)
+
+    assert api.fetch_invocations == 0
+
+    executor.start()
+    time.sleep(1.25)
+    executor.stop()
+    executor.join()
+    assert 2 <= api.fetch_invocations <= 4
+
+
+def test_thread_executor_redis_export(mockup_service_config, redis_pool, redis_stream_name):
+    """Tests the executor's capabilities in writing Redis streams"""
+
+    mockup_service_config["redis"]["stream"] = redis_stream_name
+    api = MockupSourceAPI(source_parameters={})
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool, source_api=api)
+
+    redis_client = redis.Redis(connection_pool=redis_pool)
+
+    executor.start()
+    time.sleep(0.51)
+    executor.stop()
+    executor.join()
+
+    messages = redis_client.xrange(redis_stream_name)
+    assert messages is not None
+    assert 2 <= len(messages) <= 3
+    assert len(messages) == api.fetch_invocations
+
+    assert messages[0][-1]["source type"] == '"mockup-test"'
+    assert messages[0][-1]["empty"] == '""'
+    assert messages[0][-1]["my-number"] == '0.2'
+    assert messages[0][-1]["duplicate"] == '"config-key"'
+    assert messages[0][-1]["invocations"] == '1'  # Number of invocations including the current one
+    assert messages[0][-1]["data"] == '"some-test-nonsense"'
+
+    assert messages[1][-1]["source type"] == '"mockup-test"'
+    assert messages[1][-1]["empty"] == '""'
+    assert messages[1][-1]["my-number"] == '0.2'
+    assert messages[1][-1]["duplicate"] == '"config-key"'
+    assert messages[1][-1]["invocations"] == '2'
+    assert messages[1][-1]["data"] == '"some-test-nonsense"'

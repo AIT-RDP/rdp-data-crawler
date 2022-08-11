@@ -1,0 +1,288 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      16.4268,
+      48.268,
+      159
+    ]
+  },
+  "properties": {
+    "meta": {
+      "updated_at": "2022-07-20T08:30:39Z",
+      "units": {
+        "air_pressure_at_sea_level": "hPa",
+        "air_temperature": "celsius",
+        "air_temperature_max": "celsius",
+        "air_temperature_min": "celsius",
+        "cloud_area_fraction": "%",
+        "cloud_area_fraction_high": "%",
+        "cloud_area_fraction_low": "%",
+        "cloud_area_fraction_medium": "%",
+        "dew_point_temperature": "celsius",
+        "fog_area_fraction": "%",
+        "precipitation_amount": "mm",
+        "relative_humidity": "%",
+        "ultraviolet_index_clear_sky": "1",
+        "wind_from_direction": "degrees",
+        "wind_speed": "m/s"
+      }
+    },
+    "timeseries": [
+      {
+        "time": "2022-07-20T09:00:00Z",
+        "data": {
+          "instant": {
+            "details": {
+              "air_pressure_at_sea_level": 1020.2,
+              "air_temperature": 31,
+              "cloud_area_fraction": 0,
+              "cloud_area_fraction_high": 0,
+              "cloud_area_fraction_low": 0,
+              "cloud_area_fraction_medium": 0,
+              "dew_point_temperature": 11,
+              "fog_area_fraction": 0,
+              "relative_humidity": 29.3,
+              "ultraviolet_index_clear_sky": 6.2,
+              "wind_from_direction": 142.4,
+              "wind_speed": 3.5
+            }
+          },
+          "next_12_hours": {
+            "summary": {
+              "symbol_code": "fair_day"
+            }
+          },
+          "next_1_hours": {
+            "summary": {
+              "symbol_code": "clearsky_day"
+            },
+            "details": {
+              "precipitation_amount": 0
+            }
+          },
+          "next_6_hours": {
+            "summary": {
+              "symbol_code": "fair_day"
+            },
+            "details": {
+              "air_temperature_max": 34.2,
+              "air_temperature_min": 32.5,
+              "precipitation_amount": 0
+            }
+          }
+        }
+      },
+      {
+        "time": "2022-07-20T13:00:00Z",
+        "data": {
+          "instant": {
+            "details": {
+              "air_pressure_at_sea_level": 1018.2,
+              "air_temperature": 34.2,
+              "cloud_area_fraction": 55.5,
+              "cloud_area_fraction_high": 55.5,
+              "cloud_area_fraction_low": 0,
+              "cloud_area_fraction_medium": 0,
+              "dew_point_temperature": 8.2,
+              "fog_area_fraction": 0,
+              "relative_humidity": 20.4,
+              "ultraviolet_index_clear_sky": 5.8,
+              "wind_from_direction": 143,
+              "wind_speed": 4.8
+            }
+          },
+          "next_12_hours": {
+            "summary": {
+              "symbol_code": "fair_day"
+            }
+          },
+          "next_1_hours": {
+            "summary": {
+              "symbol_code": "partlycloudy_day"
+            },
+            "details": {
+              "precipitation_amount": 0
+            }
+          },
+          "next_6_hours": {
+            "summary": {
+              "symbol_code": "fair_day"
+            },
+            "details": {
+              "air_temperature_max": 34.1,
+              "air_temperature_min": 28,
+              "precipitation_amount": 0
+            }
+          }
+        }
+      },
+      {
+        "time": "2022-07-20T14:00:00Z",
+        "data": {
+          "instant": {
+            "details": {
+              "air_pressure_at_sea_level": 1017.7,
+              "air_temperature": 34.1,
+              "cloud_area_fraction": 75.8,
+              "cloud_area_fraction_high": 75.8,
+              "cloud_area_fraction_low": 0,
+              "cloud_area_fraction_medium": 0,
+              "dew_point_temperature": 8.2,
+              "fog_area_fraction": 0,
+              "relative_humidity": 20.4,
+              "ultraviolet_index_clear_sky": 4.1,
+              "wind_from_direction": 140.8,
+              "wind_speed": 5
+            }
+          },
+          "next_12_hours": {
+            "summary": {
+              "symbol_code": "fair_day"
+            }
+          },
+          "next_1_hours": {
+            "summary": {
+              "symbol_code": "partlycloudy_day"
+            },
+            "details": {
+              "precipitation_amount": 0
+            }
+          },
+          "next_6_hours": {
+            "summary": {
+              "symbol_code": "clearsky_day"
+            },
+            "details": {
+              "air_temperature_max": 33.7,
+              "air_temperature_min": 26.3,
+              "precipitation_amount": 0
+            }
+          }
+        }
+      },
+      {
+        "time": "2022-07-22T18:00:00Z",
+        "data": {
+          "instant": {
+            "details": {
+              "air_pressure_at_sea_level": 1014.3,
+              "air_temperature": 30.6,
+              "cloud_area_fraction": 21.1,
+              "cloud_area_fraction_high": 10.9,
+              "cloud_area_fraction_low": 0,
+              "cloud_area_fraction_medium": 12.5,
+              "dew_point_temperature": 17.7,
+              "fog_area_fraction": 0,
+              "relative_humidity": 46.2,
+              "ultraviolet_index_clear_sky": 0.1,
+              "wind_from_direction": 24.4,
+              "wind_speed": 1.5
+            }
+          },
+          "next_12_hours": {
+            "summary": {
+              "symbol_code": "partlycloudy_day"
+            }
+          },
+          "next_1_hours": {
+            "summary": {
+              "symbol_code": "fair_day"
+            },
+            "details": {
+              "precipitation_amount": 0
+            }
+          },
+          "next_6_hours": {
+            "summary": {
+              "symbol_code": "partlycloudy_night"
+            },
+            "details": {
+              "air_temperature_max": 28.4,
+              "air_temperature_min": 24.6,
+              "precipitation_amount": 0
+            }
+          }
+        }
+      },
+      {
+        "time": "2022-07-22T19:00:00Z",
+        "data": {
+          "instant": {
+            "details": {
+              "air_pressure_at_sea_level": 1014.4,
+              "air_temperature": 28.4,
+              "cloud_area_fraction": 21.9,
+              "cloud_area_fraction_high": 11.7,
+              "cloud_area_fraction_low": 0,
+              "cloud_area_fraction_medium": 12.5,
+              "dew_point_temperature": 16.5,
+              "fog_area_fraction": 0,
+              "relative_humidity": 48.8,
+              "ultraviolet_index_clear_sky": 0,
+              "wind_from_direction": 50.3,
+              "wind_speed": 1.8
+            }
+          },
+          "next_1_hours": {
+            "summary": {
+              "symbol_code": "fair_night"
+            },
+            "details": {
+              "precipitation_amount": 0.1
+            }
+          }
+        }
+      },
+      {
+        "time": "2022-07-29T06:00:00Z",
+        "data": {
+          "instant": {
+            "details": {
+              "air_pressure_at_sea_level": 1013.6,
+              "air_temperature": 20.2,
+              "cloud_area_fraction": 100,
+              "cloud_area_fraction_high": 100,
+              "cloud_area_fraction_low": 39.1,
+              "cloud_area_fraction_medium": 60.2,
+              "dew_point_temperature": 18.5,
+              "relative_humidity": 91,
+              "wind_from_direction": 41.4,
+              "wind_speed": 0.3
+            }
+          },
+          "next_6_hours": {
+            "summary": {
+              "symbol_code": "heavyrain"
+            },
+            "details": {
+              "air_temperature_max": 23.5,
+              "air_temperature_min": 20.1,
+              "precipitation_amount": 5.5
+            }
+          }
+        }
+      },
+      {
+        "time": "2022-07-29T12:00:00Z",
+        "data": {
+          "instant": {
+            "details": {
+              "air_pressure_at_sea_level": 1013,
+              "air_temperature": 20.6,
+              "cloud_area_fraction": 100,
+              "cloud_area_fraction_high": 100,
+              "cloud_area_fraction_low": 92.2,
+              "cloud_area_fraction_medium": 99.2,
+              "dew_point_temperature": 18.2,
+              "relative_humidity": 86.4,
+              "wind_from_direction": 6.9,
+              "wind_speed": 3.5
+            }
+          }
+        }
+      }
+    ]
+  }
+}

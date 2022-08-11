@@ -1,0 +1,19 @@
+version: 1
+data sources:
+  met.no_location_forecast:  # Mainly for logging and debugging purpose
+    type: "data_crawler.sources.yr_no.LocationForecast"
+    source parameter:  # Parameters passed on to the data source
+      latitude: !env-template "${DATA_CRAWLER_LAT}"
+      longitude: !env-template "${DATA_CRAWLER_LON}"
+      contact address: !env-template "${DATA_CRAWLER_CONTACT}" # Some e-mail to sent along the user agent (required)
+    polling:  # Polling interval specification
+      frequency: 3h
+    redis:
+      stream: "forecasts.met-no"
+      tags: # Additional Redis tags that will be appended
+        station: !env-template "${DATA_CRAWLER_STATION_NAME}"
+
+redis:
+  host: !env-template "${DATA_CRAWLER_REDIS_HOST}"
+  port: !env-template "${DATA_CRAWLER_REDIS_PORT}"
+  db: !env-template "${DATA_CRAWLER_REDIS_DB}"
