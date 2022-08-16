@@ -14,7 +14,7 @@ import data_crawler.sources.yr_no as yr_no
 def simplified_base_response() -> dict:
     """Returns a simplified yr.no base response"""
 
-    file = os.path.join(__file__, "../../data/test/yr.no-reduced.json")
+    file = os.path.join(__file__, "../../../data/test/yr.no-reduced.json")
     file = os.path.abspath(file)
 
     with open(file, "r") as f:

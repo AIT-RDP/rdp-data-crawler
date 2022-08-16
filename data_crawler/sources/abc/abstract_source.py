@@ -16,6 +16,7 @@ class AbstractSourceAPI(abc.ABC):
     arguments are supported:
 
       * source_parameters: Dict, The source-specific parameters listed in the configuration
+      * executor_name: The name of the executor for debugging purpose
     """
 
     def __init__(self, **kwargs):
