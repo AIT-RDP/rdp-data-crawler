@@ -75,14 +75,7 @@ class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
         self._extractors = self._compile_extractors(data_points)
 
         initial_history = pd.to_timedelta(source_parameters.get("initial history", "48h"))
-        self._last_query_ts = self._align_ts_to_data(datetime.datetime.now(tz=datetime.timezone.utc) - initial_history)
-        self._last_query_message = {}
-
-    @staticmethod
-    def _align_ts_to_data(ts: datetime.datetime) -> datetime.datetime:
-        """Aligns the datetime to the data source boundaries (daily)"""
-        ts = ts.astimezone(tz=datetime.timezone.utc)
-        return datetime.datetime(ts.year, ts.month, ts.day, 0, 0, 0, tzinfo=datetime.timezone.utc)  # Floor
+        self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - initial_history
 
     @staticmethod
     def _compile_extractors(data_points: List[str]) -> List[jx.PathExtractor]:
@@ -92,7 +85,8 @@ class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
         dst_extractors = [
             jx.PathExtractor("longitude", "features[*].geometry.coordinates[0]", is_list=False),
             jx.PathExtractor("latitude", "features[*].geometry.coordinates[1]", is_list=False),
-            jx.DatetimePathExtractor("observation_time", "timestamps", is_list=True),
+            jx.PathExtractor("zamg_station_id", "features[*].properties.station", is_list=False),
+            jx.DatetimePathExtractor("observation_time", "timestamps[*]", is_list=True),
         ]
 
         # Dynamically selected features
@@ -114,34 +108,30 @@ class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
         if raw_data is None:
             raw_data = self._fetch_next_raw_result()
 
-        if raw_data is None:
-            self._logger.debug(f"No updated history, return the last message")
+        decoded_message = self._decode_raw_message(raw_data)
+        if len(decoded_message["observation_time"]) > 0:
+            self._last_query_ts = datetime.datetime.fromisoformat(decoded_message["observation_time"][-1])
         else:
-            self._last_query_message = self._decode_raw_message(raw_data)
+            self._logger.warning(f"No new data is available. The last observations are from {self._last_query_ts}.")
 
-        return self._last_query_message
+        return decoded_message
 
     def _fetch_next_raw_result(self) -> Optional[str]:
-        """Fetches the next period or returns None, in case no new data is available"""
+        """Fetches the raw data of the next period"""
 
-        end_ts = self._align_ts_to_data(datetime.datetime.now(tz=datetime.timezone.utc))
-
-        if self._last_query_ts >= end_ts:
-            self._logger.warning(f"No updated data available. Last update: {self._last_query_ts.isoformat()}, Expected "
-                                 f"data boundaries: {end_ts.isoformat()}")
-            return None
+        end_ts = datetime.datetime.now(tz=datetime.timezone.utc)
 
         params = self._static_request_parameters.copy()
         params["start"] = self._last_query_ts.isoformat()
         params["end"] = end_ts.isoformat()
 
+        self._logger.debug(f"Try to fetch new readings starting from {self._last_query_ts.isoformat()} to "
+                           f"{end_ts.isoformat()}")
         response: requests.Response = self.session.get(
             "https://dataset.api.hub.zamg.ac.at/v1/station/historical/klima-v1-10min",
             params=params
         )
         response.raise_for_status()
-
-        self._last_query_ts = end_ts
         return response.json()
 
     def _decode_raw_message(self, raw_data: dict) -> Dict[str, Any]:
