@@ -65,6 +65,26 @@ def test_measurement_station_parsing(measurement_station_parameters, simplified_
     assert response_data["air_pressure"] == [None] * 13
 
 
+def test_measurement_station_drop_missing_observations(measurement_station_parameters, simplified_mea_response):
+    """Tests the functionality that drops missing keys"""
+    measurement_station_parameters["drop missing observations"] = True
+    api = zamg.MeasurementStationData(source_parameters=measurement_station_parameters, executor_name="<test>")
+
+    response_data = api.fetch_data(raw_data=simplified_mea_response)
+    assert response_data is not None
+    required_keys = [
+        "observation_time", "longitude", "latitude", "wind_direction_10m", "wind_speed_10m", "air_temperature_2m",
+        "relative_humidity_2m", "dew_point_temperature_2m", "precipitation_total_10min", "precipitation_flag",
+        "global_horizontal_irradiation"
+    ]
+    for key in required_keys:
+        assert key in response_data
+
+    dropped_keys = ["diffuse_irradiation", "air_pressure"]
+    for key in dropped_keys:
+        assert key not in response_data
+
+
 def test_measurement_station_online(measurement_station_parameters):
     """Tests the online query against the real API endpoint"""
 

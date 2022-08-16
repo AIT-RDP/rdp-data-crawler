@@ -77,6 +77,8 @@ class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
         initial_history = pd.to_timedelta(source_parameters.get("initial history", "48h"))
         self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - initial_history
 
+        self._drop_missing_observations = source_parameters.get("drop missing observations", False)
+
     @staticmethod
     def _compile_extractors(data_points: List[str]) -> List[jx.PathExtractor]:
         """Generates the list of extractors based on the selected data points"""
@@ -114,6 +116,9 @@ class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
         else:
             self._logger.warning(f"No new data is available. The last observations are from {self._last_query_ts}.")
 
+        if self._drop_missing_observations:
+            decoded_message = self._drop_all_none_observations(decoded_message)
+
         return decoded_message
 
     def _fetch_next_raw_result(self) -> Optional[str]:
@@ -139,3 +144,15 @@ class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
 
         redis_forecast = dict(itertools.chain(*[ext.extract_information(raw_data).items() for ext in self._extractors]))
         return redis_forecast
+
+    def _drop_all_none_observations(self, decoded_message: dict) -> dict:
+        """Drops all missing observations and returns the result"""
+
+        dropped_keys = []
+        for obs_key in self._parameter_mapping.values():
+            if obs_key in decoded_message and all(map(lambda x: x is None, decoded_message[obs_key])):
+                dropped_keys.append(obs_key)
+                del decoded_message[obs_key]
+
+        self._logger.debug(f"Dropped the empty keys {dropped_keys} on request.")
+        return decoded_message
