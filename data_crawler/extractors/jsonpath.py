@@ -1,7 +1,7 @@
 """
 Implements helper classes that use jsonpath expressions to extract some information
 """
-
+import datetime
 from typing import Dict, Any
 
 import jsonpath_rw
@@ -79,6 +79,27 @@ class DatetimePathExtractor(PathExtractor):
         """transforms the string representation to a common ISO 8610 format"""
 
         return pd.to_datetime(x).isoformat()
+
+
+class UnixTimeExtractor(PathExtractor):
+    """Converts the unit timestamp into an ISO datetime string"""
+
+    def __init__(self, target_key: str, src_path: str, is_list=True):
+        """
+        Initializes the extractor
+
+        :param target_key: The destination key of all extracted values
+        :param src_path: The JSON Path expression extracting the information
+        :param is_list: A Flag whether the result must be a list of individual values. In case no list is expected, the
+            path must point to a single value.
+        """
+        super(UnixTimeExtractor, self).__init__(target_key, src_path, is_list, self._to_iso)
+
+    @staticmethod
+    def _to_iso(x) -> str:
+        """transforms the unit timestamp representation to a common ISO 8610 format"""
+
+        return datetime.datetime.fromtimestamp(x, tz=datetime.timezone.utc).isoformat()
 
 
 class OptionalPathExtractor(PathExtractor):
