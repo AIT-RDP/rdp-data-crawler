@@ -9,7 +9,7 @@ import data_crawler.sources.zamg as zamg
 
 @pytest.fixture()
 def simplified_mea_response() -> dict:
-    """Returns a simplified yr.no base response"""
+    """Returns a simplified ZAMG measurement station base response"""
 
     file = os.path.join(__file__, "../../../data/test/mea-zamg-reduced.json")
     file = os.path.abspath(file)

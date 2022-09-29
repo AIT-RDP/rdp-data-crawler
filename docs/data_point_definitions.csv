@@ -1,0 +1,36 @@
+﻿Data Point Name;Unit;Datatype;Meta;Description
+observation_time;ISO TS;String;no;The ISO encoded time-zone aware real time instant of the observation or forecasted point
+forecasting_time;ISO TS;String;no;The ISO encoded time-zone aware time of the encoded time the forecast was created
+longitude;°;Float;yes;Longitude, WGS 84
+latitude;°;Float;yes;Latitude, WGS 84
+altitude;m;Float;yes;Altitude above sea level
+air_temperature_2m;°C;Float;no;Air temperature at 2m above ground
+air_temperature_5cm;°C;Float;no;Air temperature at 5cm above ground
+apparent_temperautre;°C;Float;no;Apparent/Feels-Like temperature
+air_pressure;hPa;Float;no;Air pressure at ground level
+air_pressure_at_sea_level;hPa;Float;no;Air pressure at a (hypothetical) sea level
+dew_point_temperature_2m;°C;Float;no;Dew point at 2m above ground
+relative_humidity_2m;%;Float;no;Relative humidity at 2m above ground
+cloud_area_fraction;%;Float;no;Total cloud cover for all heights
+cloud_area_fraction_high;%;Float;no;Cloud cover higher than 5000m above the ground
+cloud_area_fraction_medium;%;Float;no;Cloud cover between 2000 and 5000m above the ground
+cloud_area_fraction_low;%;Float;no;Cloud cover lower than 2000m above the ground
+fog_area_fraction;%;Float;no;Amount of surrounding area covered in fog (horizontal view under a 1000 meters)
+global_horizontal_irradiation;W/m^2;Float;no;Global horizontal irraadiation
+diffuse_irradiation;W/m^2;Float;no;Diffuse Irradiation
+uv_index;1;Float;no;Ultraviolet index 0 (low), 11+ (extreme)
+visibility;km;Float;no;Visibility
+wind_direction_10m;°;Float;no;Direction the wind is coming from (0° is north, 90° east, etc.) at 10m above ground
+wind_direction_gust_10m;°;Float;no;Direction the wind gusts are coming from (0° is north, 90° east, etc.) at 10m above ground
+wind_speed_10m;m/s;Float;no;Wind speed at 10m above the ground
+wind_speed_gust_10m;m/s;Float;no;Wind speed of gusts at 10m above the ground
+precipitation_total_6h;mm;Float;no;Total precipitation amount for a 6h period
+precipitation_total_1h;mm;Float;no;Total precipitation amount for a 1h period
+precipitation_total_10min;mm;Float;no;Total precipitation amount for a 10 minutes period
+precipitation_rate;mm/h;Float;no;Liquid equivalent precipitation rate
+snowfall_rate;mm/h;Float;no;Snowfall rate
+precipitation_flag;1;Bool;no;Flag indicating precipitation
+soil_temperature_10_cm;°C;Float;no;Soil temperature 10cm below ground
+soil_temperature_20_cm;°C;Float;no;Soil temperature 20cm below ground
+soil_temperature_50_cm;°C;Float;no;Soil temperature 50cm below ground
+air_quality_index_epa;1;Float;no;Air quality index [US - EPA standard 0 - +500]
