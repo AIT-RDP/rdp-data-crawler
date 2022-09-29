@@ -1,0 +1,50 @@
+{
+  "data": [
+    {
+      "wind_cdir": "NE",
+      "rh": 71,
+      "pod": "d",
+      "lon": 14.3165,
+      "pres": 948.5,
+      "timezone": "Europe\\/Vienna",
+      "ob_time": "2022-09-28 10:52",
+      "country_code": "AT",
+      "clouds": 48,
+      "ts": 1664362320,
+      "solar_rad": 619.3,
+      "state_code": "02",
+      "city_name": "Klagenfurt Hauptbahnhof",
+      "wind_spd": 1.5,
+      "slp": 1001,
+      "wind_cdir_full": "northeast",
+      "sunrise": "04:58",
+      "app_temp": 12,
+      "dni": 858.14,
+      "vis": 10,
+      "sources": [
+        "LOWK"
+      ],
+      "h_angle": 15,
+      "dewpt": 7.9,
+      "snow": 0,
+      "aqi": 35,
+      "dhi": 105.86,
+      "wind_dir": 40,
+      "elev_angle": 41.06,
+      "ghi": 662.99,
+      "precip": 0,
+      "sunset": "16:49",
+      "lat": 46.6199,
+      "uv": 3.31503,
+      "datetime": "2022-09-28:11",
+      "temp": 13,
+      "weather": {
+        "icon": "c02d",
+        "code": 802,
+        "description": "Scattered clouds"
+      },
+      "station": "LOWK"
+    }
+  ],
+  "count": 1
+}
