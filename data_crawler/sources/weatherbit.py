@@ -177,5 +177,5 @@ class HourlyForecasts(http_cache.GenericHTTPSourceAPI):
         redis_message = dict(itertools.chain(*[ext.extract_information(raw_data).items() for ext in self._extractors]))
 
         # Unfortunately, no forecasting_time is returned. Hence, the query time is taken:
-        redis_message["forecasting_time"] = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+        redis_message["forecast_time"] = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
         return redis_message
