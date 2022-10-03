@@ -6,7 +6,7 @@ latitude;°;Float;yes;Latitude, WGS 84
 altitude;m;Float;yes;Altitude above sea level
 air_temperature_2m;°C;Float;no;Air temperature at 2m above ground
 air_temperature_5cm;°C;Float;no;Air temperature at 5cm above ground
-apparent_temperautre;°C;Float;no;Apparent/Feels-Like temperature
+apparent_temperature;°C;Float;no;Apparent/Feels-Like temperature
 air_pressure;hPa;Float;no;Air pressure at ground level
 air_pressure_at_sea_level;hPa;Float;no;Air pressure at a (hypothetical) sea level
 dew_point_temperature_2m;°C;Float;no;Dew point at 2m above ground
@@ -28,8 +28,10 @@ precipitation_total_6h;mm;Float;no;Total precipitation amount for a 6h period
 precipitation_total_1h;mm;Float;no;Total precipitation amount for a 1h period
 precipitation_total_10min;mm;Float;no;Total precipitation amount for a 10 minutes period
 precipitation_rate;mm/h;Float;no;Liquid equivalent precipitation rate
+snowfall_total_1h;mm;Float;no;Total snowfall amount for a 1h period
 snowfall_rate;mm/h;Float;no;Snowfall rate
 precipitation_flag;1;Bool;no;Flag indicating precipitation
+precipitation_probability;%;Float;no;Probability of observing precipitation
 soil_temperature_10_cm;°C;Float;no;Soil temperature 10cm below ground
 soil_temperature_20_cm;°C;Float;no;Soil temperature 20cm below ground
 soil_temperature_50_cm;°C;Float;no;Soil temperature 50cm below ground
