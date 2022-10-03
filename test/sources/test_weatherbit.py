@@ -89,8 +89,8 @@ def test_weatherbit_hourly_fc_parsing(basic_weatherbit_config, simplified_hourly
     message_data = api.fetch_data(raw_data=simplified_hourly_fc_response)
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 
-    assert now - datetime.timedelta(seconds=2) <= datetime.datetime.fromisoformat(message_data["forecasting_time"])
-    assert datetime.datetime.fromisoformat(message_data["forecasting_time"]) <= now
+    assert now - datetime.timedelta(seconds=2) <= datetime.datetime.fromisoformat(message_data["forecast_time"])
+    assert datetime.datetime.fromisoformat(message_data["forecast_time"]) <= now
 
     assert message_data["observation_time"] == ["2022-09-29T14:00:00+00:00", "2022-09-29T15:00:00+00:00"]
     assert message_data["latitude"] == 48.2687
@@ -125,5 +125,5 @@ def test_weatherbit_hourly_fc_online(basic_weatherbit_config):
     message_data = api.fetch_data()
 
     assert message_data is not None
-    assert datetime.datetime.fromisoformat(message_data["forecasting_time"]) > \
+    assert datetime.datetime.fromisoformat(message_data["forecast_time"]) > \
            datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(hours=3)
