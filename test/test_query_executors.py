@@ -1,7 +1,7 @@
 """
 Test the query executor services
 """
-
+import datetime
 import logging
 import os
 import time
@@ -24,10 +24,12 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
         """Stores the configuration and initializes the object"""
         self.config = source_parameters
         self.fetch_invocations = 0
+        self.last_fetch_ts = None
 
     def fetch_data(self) -> Dict[str, Any]:
         """Generates some content and returns it"""
 
+        self.last_fetch_ts = datetime.datetime.utcnow()
         self.fetch_invocations += 1
         return {
             "invocations": self.fetch_invocations,
@@ -148,7 +150,10 @@ def test_thread_executor_fetch_invocation(mockup_service_config, redis_pool):
     time.sleep(1.25)
     executor.stop()
     executor.join()
+
     assert 2 <= api.fetch_invocations <= 4
+    assert ((api.last_fetch_ts.microsecond < 0.1e6) or (api.last_fetch_ts.microsecond > 0.9e6) or
+            (0.4e6 < api.last_fetch_ts.microsecond < 0.6e6)) # Check alignment
 
 
 def test_thread_executor_redis_export(mockup_service_config, redis_pool, redis_stream_name):
