@@ -74,7 +74,7 @@ class _ExecutionTimer:
         self._next_tick += self._timer_interval + self._rnd.uniform(-self._jitter, self._jitter)
 
         remaining = self.get_remaining_seconds()
-        if remaining > self._timer_interval:  # Skip some queries
+        if remaining > self._timer_interval + 2*self._jitter:  # Skip some queries
             num_skip = math.floor(remaining / self._timer_interval)
             self._next_tick += self._timer_interval * num_skip
             self._logger.warning(f"Skipped {num_skip} queries since the previous queries were too much delayed.")
