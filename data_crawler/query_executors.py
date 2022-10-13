@@ -7,6 +7,7 @@ import inspect
 import json
 import logging
 import math
+import random
 import threading
 import time
 from typing import Optional, Dict, Any
@@ -37,8 +38,13 @@ class _ExecutionTimer:
         # issues with leap seconds. Right now, leap-seconds on June, 30 are not encountered.
         offset_name = timer_config.get("offset", "0s")
         self._offset = pd.Timedelta(offset_name).total_seconds()
+
+        # The uniformly distributed random jitter to apply. (Symmetrically around the offset)
+        self._jitter = pd.Timedelta(timer_config.get("jitter", "0s")).total_seconds()
+        self._rnd = random.Random()
+
         self._logger.debug(f"Set timer interval to {self._timer_interval}s ({freq_name}) aligning to an offset of "
-                           f"{self._offset}s ({offset_name}).")
+                           f"{self._offset}s ({offset_name}) +/-{self._jitter}s.")
 
         self._next_tick = 0.0  # Pre-reset default value to satisfy the linter
         self.reset()
@@ -51,7 +57,7 @@ class _ExecutionTimer:
 
         num_skip = math.floor((date_now - base_date).total_seconds() / self._timer_interval)
         base_date += pd.Timedelta(seconds=num_skip * self._timer_interval)  # Floor to immediately trigger a tick.
-        self._next_tick = base_date.timestamp()
+        self._next_tick = base_date.timestamp() + self._rnd.uniform(-self._jitter, self._jitter)
 
     def get_remaining_seconds(self) -> float:
         """
@@ -65,7 +71,7 @@ class _ExecutionTimer:
     def operation_done(self):
         """Indicates that the operation was just completed and that the time can advance to the next step."""
 
-        self._next_tick += self._timer_interval
+        self._next_tick += self._timer_interval + self._rnd.uniform(-self._jitter, self._jitter)
 
         remaining = self.get_remaining_seconds()
         if remaining > self._timer_interval:  # Skip some queries
