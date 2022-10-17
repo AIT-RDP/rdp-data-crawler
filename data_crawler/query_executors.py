@@ -59,7 +59,7 @@ class _ExecutionTimer:
         num_skip = math.floor((date_now - base_date).total_seconds() / self._timer_interval)
         base_date += pd.Timedelta(seconds=num_skip * self._timer_interval)  # Floor to immediately trigger a tick.
         self._next_tick_nominal = base_date.timestamp()
-        self._next_tick_actual = self._next_tick_nominal + self._rnd.uniform(-self._jitter, self._jitter)
+        self._next_tick_actual = date_now.timestamp() + self._rnd.uniform(0, self._jitter)  # Also jitter the first tick
 
     def get_remaining_seconds(self) -> float:
         """
@@ -77,7 +77,7 @@ class _ExecutionTimer:
         self._next_tick_actual = self._next_tick_nominal + self._rnd.uniform(-self._jitter, self._jitter)
 
         remaining = self.get_remaining_seconds()
-        if remaining > self._timer_interval + 2*self._jitter:  # Skip some queries
+        if remaining > self._timer_interval + 2 * self._jitter:  # Skip some queries
             num_skip = math.floor(remaining / self._timer_interval)
             self._next_tick_actual += self._timer_interval * num_skip
             self._next_tick_nominal += self._timer_interval * num_skip
