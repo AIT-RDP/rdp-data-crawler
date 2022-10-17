@@ -46,7 +46,8 @@ class _ExecutionTimer:
         self._logger.debug(f"Set timer interval to {self._timer_interval}s ({freq_name}) aligning to an offset of "
                            f"{self._offset}s ({offset_name}) +/-{self._jitter}s.")
 
-        self._next_tick = 0.0  # Pre-reset default value to satisfy the linter
+        self._next_tick_actual = 0.0  # Pre-reset default value to satisfy the linter
+        self._next_tick_nominal = 0.0  # Pre-reset default value to satisfy the linter
         self.reset()
 
     def reset(self):
@@ -57,7 +58,8 @@ class _ExecutionTimer:
 
         num_skip = math.floor((date_now - base_date).total_seconds() / self._timer_interval)
         base_date += pd.Timedelta(seconds=num_skip * self._timer_interval)  # Floor to immediately trigger a tick.
-        self._next_tick = base_date.timestamp() + self._rnd.uniform(-self._jitter, self._jitter)
+        self._next_tick_nominal = base_date.timestamp()
+        self._next_tick_actual = self._next_tick_nominal + self._rnd.uniform(-self._jitter, self._jitter)
 
     def get_remaining_seconds(self) -> float:
         """
@@ -66,17 +68,19 @@ class _ExecutionTimer:
         The number may be negative in case it should already be fired
         """
         now = datetime.datetime.utcnow().timestamp()  # Unify with reset function.
-        return self._next_tick - now
+        return self._next_tick_actual - now
 
     def operation_done(self):
         """Indicates that the operation was just completed and that the time can advance to the next step."""
 
-        self._next_tick += self._timer_interval + self._rnd.uniform(-self._jitter, self._jitter)
+        self._next_tick_nominal += self._timer_interval
+        self._next_tick_actual = self._next_tick_nominal + self._rnd.uniform(-self._jitter, self._jitter)
 
         remaining = self.get_remaining_seconds()
         if remaining > self._timer_interval + 2*self._jitter:  # Skip some queries
             num_skip = math.floor(remaining / self._timer_interval)
-            self._next_tick += self._timer_interval * num_skip
+            self._next_tick_actual += self._timer_interval * num_skip
+            self._next_tick_nominal += self._timer_interval * num_skip
             self._logger.warning(f"Skipped {num_skip} queries since the previous queries were too much delayed.")
 
 
