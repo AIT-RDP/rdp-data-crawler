@@ -9,7 +9,7 @@ import logging
 import math
 import random
 import threading
-import time
+import traceback
 from typing import Optional, Dict, Any
 
 import pandas as pd
@@ -74,7 +74,7 @@ class _ExecutionTimer:
         self._next_tick += self._timer_interval + self._rnd.uniform(-self._jitter, self._jitter)
 
         remaining = self.get_remaining_seconds()
-        if remaining > self._timer_interval + 2*self._jitter:  # Skip some queries
+        if remaining > self._timer_interval + 2 * self._jitter:  # Skip some queries
             num_skip = math.floor(remaining / self._timer_interval)
             self._next_tick += self._timer_interval * num_skip
             self._logger.warning(f"Skipped {num_skip} queries since the previous queries were too much delayed.")
@@ -228,5 +228,7 @@ class ThreadQueryExecutor:
             try:
                 data = self._source_api.fetch_data()
                 self._data_sink.push_data(data)
+            except Exception as err:
+                self._logger.error(f"Skip one sample due to a {type(err).__name__}: {err}\n{traceback.format_exc()}")
             finally:
                 self._timer.operation_done()

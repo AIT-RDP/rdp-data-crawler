@@ -31,6 +31,10 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
 
         self.last_fetch_ts = datetime.datetime.utcnow()
         self.fetch_invocations += 1
+
+        if self.config.get("no odd invocations", False) and self.fetch_invocations % 2 == 1:
+            raise ValueError("That's odd.")
+
         return {
             "invocations": self.fetch_invocations,
             "data": "some-test-nonsense",
@@ -153,7 +157,25 @@ def test_thread_executor_fetch_invocation(mockup_service_config, redis_pool):
 
     assert 2 <= api.fetch_invocations <= 4
     assert ((api.last_fetch_ts.microsecond < 0.1e6) or (api.last_fetch_ts.microsecond > 0.9e6) or
-            (0.4e6 < api.last_fetch_ts.microsecond < 0.6e6)) # Check alignment
+            (0.4e6 < api.last_fetch_ts.microsecond < 0.6e6))  # Check alignment
+
+
+def test_thread_executor_fetch_error(mockup_service_config, redis_pool):
+    """Tests whether the API fetch function is correctly invoked"""
+
+    api = MockupSourceAPI(source_parameters={"no odd invocations": True})
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool, source_api=api)
+
+    assert api.fetch_invocations == 0
+
+    executor.start()
+    time.sleep(1.25)
+    executor.stop()
+    executor.join()
+
+    assert 2 <= api.fetch_invocations <= 4
+    assert ((api.last_fetch_ts.microsecond < 0.1e6) or (api.last_fetch_ts.microsecond > 0.9e6) or
+            (0.4e6 < api.last_fetch_ts.microsecond < 0.6e6))  # Check alignment
 
 
 def test_thread_executor_redis_export(mockup_service_config, redis_pool, redis_stream_name):
