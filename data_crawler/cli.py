@@ -128,6 +128,29 @@ def load_env_file(env_file: Optional[str]) -> None:
         dotenv.load_dotenv(env_file)
 
 
+class _ContextLoader(yaml.Loader):
+    """
+    Implements a YAML loader that carries on a context dictionary to easily resolve nested objects
+    """
+
+    def __init__(self, context: dict, *args, **kwargs):
+        """
+        Initializes the loader with the given context
+
+        :param context: The context object passed on to each individual constructor function
+        :param args: The arguments passed on to the yaml loader
+        :param kwargs: The keyword arguments directly passed on to the yaml loader
+        """
+
+        super(_ContextLoader, self).__init__(*args, **kwargs)
+        self._context = context
+
+    @property
+    def context(self) -> dict:
+        """Returns the shared context of the loader"""
+        return self._context
+
+
 def load_config(config_file: str) -> dict:
     """
     Parses the YAML configuration, preprocesses it and returns the resulting structure of dictionaries
@@ -140,14 +163,32 @@ def load_config(config_file: str) -> dict:
         raise FileNotFoundError(f"The main configuration file '{config_file}' is not found")
 
     yaml.add_constructor("!env-template", _load_substitute_env)
+    yaml.add_constructor("!table/csv", _load_table_csv)
 
+    context = dict(base_dir=os.path.dirname(config_file))
     with open(config_file, "r") as f:
-        config = yaml.load(f, Loader=yaml.Loader)
+        config = yaml.load(f, Loader=lambda *arg, **kwargs: _ContextLoader(context, *arg, **kwargs))
 
     if not config.get("version", 1) == 1:
         raise SyntaxError("Invalid configuration version. Only version 1 is supported.")
 
     return config
+
+
+def _load_table_csv(loader, node):
+    """Loads a pandas table from a csv file."""
+    import pandas as pd
+
+    parameters = loader.construct_mapping(node)
+    if "path" not in parameters:
+        raise KeyError(f"The table/csv constructor requires a 'path' attribute but only "
+                       "{list(parameters.keys())} are given.")
+
+    filename = parameters["path"]
+    if not os.path.isabs(filename):
+        filename = os.path.join(loader.context["base_dir"], filename)
+    table = pd.read_csv(filename, sep=parameters.get("sep", ";"))
+    return table
 
 
 def _load_substitute_env(loader, node):
