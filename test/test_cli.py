@@ -73,6 +73,40 @@ def test_load_config_env_template(minimal_config_file, minimal_env_test_set):
     assert "nsa:backdoor" == config["testing"]["key"]
 
 
+@pytest.fixture()
+def table_config_file() -> str:
+    """Returns the path to a minimal configuration"""
+
+    file_path = os.path.join(__file__, "../../data/test/test-config-tables.yml")
+    file_path = os.path.abspath(file_path)
+    return file_path
+
+
+def test_load_config_table_csv(table_config_file):
+    """Test loading an externally provided CSV table"""
+
+    import pandas as pd  # May not be always available
+
+    config = cli.load_config(table_config_file)
+    assert config["standard mapping"]["hello"] == "world"
+
+    reference = pd.DataFrame({
+        "Register_start": [100, 110],
+        "Register_end": [100, 111],
+        "Register_type": ["i", "i"],
+        "Data_type": ["INT16", "SINGLE"],
+        "Name": ["I_L1", "f"],
+        "Unit": ["A", "Hz"],
+        "Scaling": [0.01, 1]
+    })
+
+    assert isinstance(config["table 1"], pd.DataFrame)
+    pd.testing.assert_frame_equal(config["table 1"], reference)
+
+    assert isinstance(config["table 2"], pd.DataFrame)
+    pd.testing.assert_frame_equal(config["table 2"], reference)
+
+
 def test_load_env_mockup(mockup_env_file, minimal_env_test_set):
     """Tests loading the environment file"""
 
