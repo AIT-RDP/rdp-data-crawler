@@ -94,7 +94,7 @@ def test_load_config_table_csv(table_config_file):
         "Register_start": [100, 110],
         "Register_end": [100, 111],
         "Register_type": ["i", "i"],
-        "Data_type": ["INT16", "SINGLE"],
+        "Data_type": ["UINT16", "SINGLE"],
         "Name": ["I_L1", "f"],
         "Unit": ["A", "Hz"],
         "Scaling": [0.01, 1]

@@ -8,3 +8,4 @@ hiredis==2.0.0
 redis==4.3
 python-dotenv==0.20
 jsonpath-rw==1.4
+git+https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler@master
