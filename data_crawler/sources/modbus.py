@@ -45,9 +45,17 @@ class ModbusTCP(abstract_source.AbstractSourceAPI):
             raise ValueError(f"Unknown endian value '{config_value}'")
         return getattr(pymodbus.constants.Endian, config_value)
 
+    def start(self):
+        """Connects to the Modbus server"""
+        self._device.connect()
+
     def fetch_data(self) -> Dict[str, Any]:
         """
         Queries the Modbus TCP device and returns the corresponding message
         """
 
         return self._device.read_registers_as_dict()
+
+    def stop(self):
+        """Disconnects from the Modbus server"""
+        self._device.disconnect()
