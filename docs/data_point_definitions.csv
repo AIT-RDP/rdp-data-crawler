@@ -30,6 +30,7 @@ precipitation_total_10min;mm;Float;no;Total precipitation amount for a 10 minute
 precipitation_rate;mm/h;Float;no;Liquid equivalent precipitation rate
 snowfall_total_1h;mm;Float;no;Total snowfall amount for a 1h period
 snowfall_rate;mm/h;Float;no;Snowfall rate
+snow_depth;mm;Float;no;Vertical depth of any snow cover
 precipitation_flag;1;Bool;no;Flag indicating precipitation
 precipitation_probability;%;Float;no;Probability of observing precipitation
 soil_temperature_10_cm;°C;Float;no;Soil temperature 10cm below ground
