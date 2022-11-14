@@ -23,8 +23,6 @@ test_python_3_10:
     DATA_CRAWLER_REDIS_HOST: "redis"
     DATA_CRAWLER_REDIS_PORT: "6379"
     DATA_CRAWLER_REDIS_DB: 0
-    MODBUS_GIT_USER: ${CI_DEPLOY_USER}
-    MODBUS_GIT_PASSWORD: ${CI_DEPLOY_PASSWORD}
   script:
     - pip install --no-cache-dir -r requirements.txt
     - pip install --no-cache-dir pytest==7.1  # Dedicated testing requirements
@@ -50,9 +48,6 @@ build-images:
   tags:
     - baremetal
     - shell
-  variables:
-    MODBUS_GIT_USER: ${CI_DEPLOY_USER}
-    MODBUS_GIT_PASSWORD: ${CI_DEPLOY_PASSWORD}
   script:
     - docker info
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
