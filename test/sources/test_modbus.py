@@ -2,12 +2,15 @@
 Assesses the Modbus Source API
 """
 import asyncio
+import multiprocessing
 import threading
+import time
 from typing import Tuple
 
 import pandas as pd
 import pymodbus.datastore
 import pymodbus.server.async_io
+import pymodbus.server
 import pytest
 
 import data_crawler.sources.modbus as modbus
@@ -24,10 +27,10 @@ def minimal_modbus_config(mockup_server):
             "Register_start": [100, 110],
             "Register_end": [100, 111],
             "Register_type": ["i", "i"],
-            "Data_type": ["INT16", "SINGLE"],
+            "Data_type": ["UINT16", "UINT32"],
             "Name": ["current_phase_1", "frequency"],
             "Unit": ["A", "Hz"],
-            "Scaling": [0.01, 1]
+            "Scaling": [0.01, 1.0]
         })
     }
 
@@ -36,7 +39,7 @@ def minimal_modbus_config(mockup_server):
 def mockup_server() -> Tuple[str, int]:
     """Spins up a mockup server"""
 
-    context = pymodbus.datastore.ModbusSimulatorContext()
+    sim_context = pymodbus.datastore.ModbusSimulatorContext()
 
     sim_description = dict(
         registers=200,  # The total number of registers
@@ -68,20 +71,22 @@ def mockup_server() -> Tuple[str, int]:
             registers=[]
         )
     )
-    context.load_dict(sim_description, None)
+    sim_context.load_dict(sim_description, None)
+    context = pymodbus.datastore.ModbusServerContext(slaves=sim_context, single=True)
 
     address = "127.0.0.1"
     port = 5502
 
-    # StartTcpServer/StopServer do not properly shut down the servers. Hence, do all the work manually:
-    server = pymodbus.server.async_io.ModbusTcpServer(context, address=(address, port))
-    server_thread = threading.Thread(target=asyncio.run, args=(server.serve_forever(),))
-    server_thread.start()
+    # The server needs to be executed in a dedicated process since threads can't be killed and I was unable to
+    # gracefully stop the server process once it is started. (The start function blocks forever.)
+    server_process = multiprocessing.Process(target=pymodbus.server.StartTcpServer,
+                                             kwargs=dict(context=context, address=(address, port)))
+    server_process.start()
 
     yield address, port
 
-    asyncio.run(server.server_close())
-    server_thread.join()
+    server_process.terminate()
+    server_process.join()
 
 
 def test_modbus_tcp_basic(minimal_modbus_config):
