@@ -8,4 +8,4 @@ hiredis==2.0.0
 redis==4.3
 python-dotenv==0.20
 jsonpath-rw==1.4
-git+https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler@3-port-the-data-crawler-to-pymodbus-3
+git+https://${MODBUS_GIT_USER}:${MODBUS_GIT_PASSWORD}@gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler@3-port-the-data-crawler-to-pymodbus-3
