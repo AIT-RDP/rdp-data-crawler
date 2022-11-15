@@ -1,6 +1,7 @@
 """
 Implements helper classes that use jsonpath expressions to extract some information
 """
+
 import datetime
 from typing import Dict, Any
 
@@ -11,7 +12,7 @@ import pandas as pd
 class PathExtractor:
     """Helper class to define an extraction rule transforming the parsed response"""
 
-    def __init__(self, target_key: str, src_path: str, is_list=True, dst_format=None):
+    def __init__(self, target_key: str, src_path: str, is_list=True, dst_format=None, drop_missing=False):
         """
         Initializes the extractor
 
@@ -21,11 +22,14 @@ class PathExtractor:
             path must point to a single value.
         :param dst_format: A callable that transforms each value to a destination format. In case it is None, no
             transformation will be applied.
+        :param drop_missing: Entirely drops the key-value pair (returning an empty message) if the path expression
+            does not match.
         """
 
         self._target_key = target_key
         self._src_expression = jsonpath_rw.parse(src_path)
-        self._is_list = is_list
+        self._is_list = bool(is_list)
+        self._drop_missing = bool(drop_missing)
         self._dst_format = dst_format
 
     def _extract_raw_results(self, raw_data: dict) -> list:
@@ -50,6 +54,9 @@ class PathExtractor:
 
         if self._dst_format is not None:
             result = list(map(self._dst_format, result))
+
+        if len(result) <= 0 and self._drop_missing:
+            return {}
 
         if not self._is_list:
             if len(result) != 1:

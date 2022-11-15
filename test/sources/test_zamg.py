@@ -85,10 +85,17 @@ def test_measurement_station_drop_missing_observations(measurement_station_param
         assert key not in response_data
 
 
-def test_measurement_station_online(measurement_station_parameters):
+@pytest.mark.parametrize("endpoint,station_id", [
+    ("climate", "20209"),
+    ("tawes", "8989076")
+])
+def test_measurement_station_online(endpoint, station_id, measurement_station_parameters):
     """Tests the online query against the real API endpoint"""
 
     del measurement_station_parameters["data points"]  # Fetch all
+    measurement_station_parameters["endpoint"] = endpoint
+    measurement_station_parameters["station id"] = station_id
+
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     api = zamg.MeasurementStationData(source_parameters=measurement_station_parameters, executor_name="<test>")
 
@@ -114,3 +121,85 @@ def test_measurement_station_online(measurement_station_parameters):
 
     response_data = api.fetch_data()  # Likely no new measurements. Must not raise any exception, though
     assert response_data is not None
+
+
+@pytest.fixture()
+def simplified_tawes_response() -> dict:
+    """Returns a simplified ZAMG measurement station base response"""
+
+    file = os.path.join(__file__, "../../../data/test/tawes-zamg-reduced.json")
+    file = os.path.abspath(file)
+
+    with open(file, "r") as f:
+        data = json.load(f)
+    return data
+
+
+@pytest.fixture()
+def tawes_station_parameters() -> dict:
+    """Returns an exemplary configuration of the station source"""
+
+    return {
+        "station id": "8989076",
+        "endpoint": "TAWES",
+        "data points": ["DD", "FFAM", "GLOW", "P", "RFAM", "RR", "RRM", "TL", "TP", "SCHNEE"],
+        "initial history": "48h"
+    }
+
+
+def test_tawes_station_parsing_default_reduction(tawes_station_parameters, simplified_tawes_response):
+    """Tests the parsing functions in detail using the default reduction and filtering techniques"""
+
+    api = zamg.MeasurementStationData(source_parameters=tawes_station_parameters, executor_name="<test>")
+    response_data = api.fetch_data(raw_data=simplified_tawes_response)
+
+    assert response_data is not None
+    assert response_data["observation_time"] == [
+        "2022-11-14T15:30:00+00:00", "2022-11-14T15:40:00+00:00", "2022-11-14T15:50:00+00:00"
+    ]
+
+    assert response_data["longitude"] == 14.316666666666666
+    assert response_data["latitude"] == 46.61944444444445
+
+    assert response_data["wind_direction_10m"] == [198.0, 203.0, 193.0]
+
+    assert response_data["air_temperature_2m"] == [9.5, 9.4, 9.3]
+
+    assert response_data["dew_point_temperature_2m"] == [6.2, 6.3, 6.4]
+
+    assert response_data["precipitation_total_10min"] == [0.0, 0.1, 0.0]
+    assert response_data["precipitation_flag"] == [10.0, 10.0, 10.0]
+    assert response_data["snow_depth"] == [10.0, 20.0, 30.0]
+
+    assert response_data["air_pressure"] == [None] * 3
+
+
+def test_tawes_station_parsing_full_message(tawes_station_parameters, simplified_tawes_response):
+    """Tests the parsing functions without time stamp reduction"""
+
+    tawes_station_parameters["drop excessive time stamps"] = False
+    tawes_station_parameters["drop missing observations"] = False
+
+    api = zamg.MeasurementStationData(source_parameters=tawes_station_parameters, executor_name="<test>")
+    response_data = api.fetch_data(raw_data=simplified_tawes_response)
+
+    assert response_data is not None
+    assert response_data["observation_time"] == [
+        "2022-11-14T15:30:00+00:00", "2022-11-14T15:40:00+00:00", "2022-11-14T15:50:00+00:00",
+        "2022-11-14T16:00:00+00:00"
+    ]
+
+    assert response_data["longitude"] == 14.316666666666666
+    assert response_data["latitude"] == 46.61944444444445
+
+    assert response_data["wind_direction_10m"] == [198.0, 203.0, 193.0, None]
+
+    assert response_data["air_temperature_2m"] == [9.5, 9.4, 9.3, None]
+
+    assert response_data["dew_point_temperature_2m"] == [6.2, 6.3, 6.4, None]
+
+    assert response_data["precipitation_total_10min"] == [0.0, 0.1, 0.0, None]
+    assert response_data["precipitation_flag"] == [10.0, 10.0, 10.0, None]
+    assert response_data["snow_depth"] == [10.0, 20.0, 30.0, None]
+
+    assert response_data["air_pressure"] == [None] * 4
