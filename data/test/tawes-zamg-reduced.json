@@ -1,1 +1,158 @@
-{"media_type":"application/json","type":"FeatureCollection","version":"v1","timestamps":["2022-11-14T15:30:00+00:00","2022-11-14T15:40:00+00:00","2022-11-14T15:50:00+00:00"],"features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[14.316666666666666,46.61944444444445]},"properties":{"parameters":{"TL":{"name":"Lufttemperatur","unit":"°C","data":[9.5,9.4,9.3]},"TP":{"name":"Taupunktstemperatur gemessen","unit":"°C","data":[6.2,6.3,6.4]},"P":{"name":"Luftdruck","unit":"hPa","data":[null,null,null]},"DD":{"name":"Windrichtung","unit":"°","data":[198.0,203.0,193.0]},"DDX":{"name":"Windrichtung der Windspitze","unit":"°","data":[224.0,222.0,183.0]},"FFX":{"name":"Windspitze","unit":"m/s","data":[1.4,1.7,1.6]},"RR":{"name":"Niederschlag der letzten 10 Minuten","unit":"mm","data":[0.0,0.1,0.0]},"RRM":{"name":"Niederschlagsmelder der letzten 10 Minuten","unit":"min","data":[10.0,10.0,10.0]},"TB1":{"name":"1.Erdbodentemperatu","unit":"°C","data":[null,null,null]},"TB2":{"name":"2.Erdbodentemperatur","unit":"°C","data":[null,null,null]},"TB3":{"name":"3.Erdbodentemperatur","unit":"°C","data":[null,null,null]},"TS":{"name":"5cm Lufttemperatur","unit":"°C","data":[8.8,8.5,8.2]},"SCHNEE":{"name":"Schneehöhe","unit":"cm","data":[1.0,2.0,3.0]}},"station":"8989076"}}]}
+{
+  "media_type": "application/json",
+  "type": "FeatureCollection",
+  "version": "v1",
+  "timestamps": [
+    "2022-11-14T15:30:00+00:00",
+    "2022-11-14T15:40:00+00:00",
+    "2022-11-14T15:50:00+00:00",
+    "2022-11-14T16:00:00+00:00"
+  ],
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          14.316666666666666,
+          46.61944444444445
+        ]
+      },
+      "properties": {
+        "parameters": {
+          "TL": {
+            "name": "Lufttemperatur",
+            "unit": "°C",
+            "data": [
+              9.5,
+              9.4,
+              9.3,
+              null
+            ]
+          },
+          "TP": {
+            "name": "Taupunktstemperatur gemessen",
+            "unit": "°C",
+            "data": [
+              6.2,
+              6.3,
+              6.4,
+              null
+            ]
+          },
+          "P": {
+            "name": "Luftdruck",
+            "unit": "hPa",
+            "data": [
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          "DD": {
+            "name": "Windrichtung",
+            "unit": "°",
+            "data": [
+              198,
+              203,
+              193,
+              null
+            ]
+          },
+          "DDX": {
+            "name": "Windrichtung der Windspitze",
+            "unit": "°",
+            "data": [
+              224,
+              222,
+              183,
+              null
+            ]
+          },
+          "FFX": {
+            "name": "Windspitze",
+            "unit": "m/s",
+            "data": [
+              1.4,
+              1.7,
+              1.6,
+              null
+            ]
+          },
+          "RR": {
+            "name": "Niederschlag der letzten 10 Minuten",
+            "unit": "mm",
+            "data": [
+              0,
+              0.1,
+              0,
+              null
+            ]
+          },
+          "RRM": {
+            "name": "Niederschlagsmelder der letzten 10 Minuten",
+            "unit": "min",
+            "data": [
+              10,
+              10,
+              10,
+              null
+            ]
+          },
+          "TB1": {
+            "name": "1.Erdbodentemperatu",
+            "unit": "°C",
+            "data": [
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          "TB2": {
+            "name": "2.Erdbodentemperatur",
+            "unit": "°C",
+            "data": [
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          "TB3": {
+            "name": "3.Erdbodentemperatur",
+            "unit": "°C",
+            "data": [
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          "TS": {
+            "name": "5cm Lufttemperatur",
+            "unit": "°C",
+            "data": [
+              8.8,
+              8.5,
+              8.2,
+              null
+            ]
+          },
+          "SCHNEE": {
+            "name": "Schneehöhe",
+            "unit": "cm",
+            "data": [
+              1,
+              2,
+              3,
+              null
+            ]
+          }
+        },
+        "station": "8989076"
+      }
+    }
+  ]
+}

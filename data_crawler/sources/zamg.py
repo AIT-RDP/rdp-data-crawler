@@ -122,6 +122,7 @@ class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
         self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - initial_history
 
         self._drop_missing_observations = source_parameters.get("drop missing observations", False)
+        self._drop_excessive_time_stamps = source_parameters.get("drop excessive time stamps", True)
 
     @staticmethod
     def _resolve_endpoint(endpoint_name: str) -> str:
@@ -156,7 +157,8 @@ class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
             dst_extractors.append(jx.PathExtractor(
                 reference.name, f"features[*].properties.parameters.{data_point}.data[*]",
                 # Use early binding for scale (sc), not default late binding taking the last iteration's value!
-                is_list=True, dst_format=lambda x, sc=reference.scaling: (x * sc if x is not None else None)
+                is_list=True, dst_format=lambda x, sc=reference.scaling: (x * sc if x is not None else None),
+                drop_missing=True
             ))
         return dst_extractors
 
@@ -172,6 +174,10 @@ class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
             raw_data = self._fetch_next_raw_result()
 
         decoded_message = self._decode_raw_message(raw_data)
+
+        if self._drop_excessive_time_stamps:
+            decoded_message = self._drop_leading_none_time_stamps(decoded_message)
+
         if len(decoded_message["observation_time"]) > 0:
             self._last_query_ts = datetime.datetime.fromisoformat(decoded_message["observation_time"][-1])
         else:
@@ -214,4 +220,24 @@ class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
                 del decoded_message[obs_key]
 
         self._logger.debug(f"Dropped the empty keys {dropped_keys} on request.")
+        return decoded_message
+
+    def _drop_leading_none_time_stamps(self, decoded_message: dict) -> dict:
+        """Drops all leading time instants that only have associated none values"""
+
+        decoded_message = decoded_message.copy()
+
+        all_ext_keys = {k.name for k in self._local_mapping.values() if k.name in decoded_message}
+        dropped_ts = []
+        while len(decoded_message["observation_time"]) > 0:
+            if any(decoded_message[k][-1] is not None for k in all_ext_keys):
+                break
+
+            dropped_ts += [decoded_message["observation_time"][-1]]
+            decoded_message["observation_time"] = decoded_message["observation_time"][:-1]
+
+            for k in all_ext_keys:
+                decoded_message[k] = decoded_message[k][:-1]
+
+        self._logger.debug(f"Dropped {len(dropped_ts)} empty time instants: {dropped_ts}")
         return decoded_message
