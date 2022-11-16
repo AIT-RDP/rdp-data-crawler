@@ -24,13 +24,23 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
         """Stores the configuration and initializes the object"""
         self.config = source_parameters
         self.fetch_invocations = 0
+        self.start_invocations = 0
+        self.stop_invocations = 0
+
         self.last_fetch_ts = None
+
+    def start(self):
+        """Counts the start and performs some basic checks"""
+        assert self.start_invocations == self.stop_invocations
+        self.start_invocations += 1
 
     def fetch_data(self) -> Dict[str, Any]:
         """Generates some content and returns it"""
 
         self.last_fetch_ts = datetime.datetime.utcnow()
         self.fetch_invocations += 1
+
+        assert self.start_invocations == self.stop_invocations + 1
 
         if self.config.get("no odd invocations", False) and self.fetch_invocations % 2 == 1:
             raise ValueError("That's odd.")
@@ -40,6 +50,11 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
             "data": "some-test-nonsense",
             "duplicate": "api-key"
         }
+
+    def stop(self):
+        """Counts the stop and performs some basic checks"""
+        assert self.start_invocations == self.stop_invocations + 1
+        self.stop_invocations += 1
 
 
 @pytest.fixture()
@@ -124,6 +139,27 @@ def test_thread_executor_api_instantiation(mockup_service_config, redis_pool):
     api: MockupSourceAPI = executor.source_api
     assert "key" in api.config
     assert api.config["key"] == "<keep it secret>"
+
+
+def test_thread_executor_api_lifecycle(mockup_service_config, redis_pool):
+    """Tests the API instantiation function using the mockup API"""
+
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool)
+    assert isinstance(executor.source_api, MockupSourceAPI)
+
+    api: MockupSourceAPI = executor.source_api
+    assert api.fetch_invocations == 0
+    assert api.start_invocations == 0
+    assert api.stop_invocations == 0
+
+    executor.start()
+    time.sleep(0.6)
+    executor.stop()
+    executor.join()
+
+    assert api.fetch_invocations >= 1
+    assert api.start_invocations == 1
+    assert api.stop_invocations == 1
 
 
 def test_thread_executor_invalid_api_name(mockup_service_config, redis_pool):

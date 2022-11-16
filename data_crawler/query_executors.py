@@ -216,6 +216,8 @@ class ThreadQueryExecutor:
         """Executes the queries until termination is signaled"""
 
         self._timer.reset()
+        self._source_api.start()
+
         while True:
             timeout = self._timer.get_remaining_seconds()
             if timeout > 0:
@@ -236,3 +238,5 @@ class ThreadQueryExecutor:
                 self._logger.error(f"Skip one sample due to a {type(err).__name__}: {err}\n{traceback.format_exc()}")
             finally:
                 self._timer.operation_done()
+
+        self._source_api.stop()
