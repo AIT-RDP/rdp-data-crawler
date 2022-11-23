@@ -2,6 +2,7 @@
 Assesses the Modbus Source API
 """
 import asyncio
+import datetime
 import multiprocessing
 import threading
 import time
@@ -24,13 +25,13 @@ def minimal_modbus_config(mockup_server):
         "address": mockup_server[0],
         "port": mockup_server[1],
         "register spec": pd.DataFrame.from_dict({
-            "Register_start": [100, 110],
-            "Register_end": [100, 111],
-            "Register_type": ["i", "i"],
-            "Data_type": ["UINT16", "UINT32"],
-            "Name": ["current_phase_1", "frequency"],
-            "Unit": ["A", "Hz"],
-            "Scaling": [0.01, 1.0]
+            "Register_start": [100, "", 110],
+            "Register_end": [104, "", 111],
+            "Register_type": ["i", "i", "i"],
+            "Data_type": ["UINT16", "DOUBLE", "UINT32"],
+            "Name": ["current_phase_1", "some_energy", "frequency"],
+            "Unit": ["A", "Wh", "Hz"],
+            "Scaling": [0.01, 1.0, 1.0]
         })
     }
 
@@ -56,10 +57,15 @@ def mockup_server() -> Tuple[str, int]:
             )]
         ),
         type_uint16=dict(
-            registers=[dict(
-                registers=[100, 100],  # Start, end
-                value=12345  # static value
-            )]
+            registers=[
+                # Static value
+                dict(registers=[100, 100], value=12345),
+                # Double value Big endian: 54830306.71802119   (418A 2527 15BE 81E5)
+                dict(registers=[101, 101], value=0x418A),
+                dict(registers=[102, 102], value=0x2527),
+                dict(registers=[103, 103], value=0x15BE),
+                dict(registers=[104, 104], value=0x81E5),
+            ]
         ),
         type_string=dict(  # Define strings, variable number of registers (2 bytes)
             registers=[]
@@ -95,8 +101,15 @@ def test_modbus_tcp_basic(minimal_modbus_config):
     src_api = modbus.ModbusTCP(source_parameters=minimal_modbus_config, executor_name="<test-modbus>")
     src_api.start()
 
+    time_start = datetime.datetime.utcnow()
     data = src_api.fetch_data()
+    time_end = datetime.datetime.utcnow()
+
     src_api.stop()
+
+    assert "observation_time" in data
+    assert time_start <= datetime.datetime.fromisoformat(data["observation_time"]) <= time_end
 
     assert data["frequency"] == 1234567890.0
     assert data["current_phase_1"] == 123.45
+    assert data["some_energy"] == 54830306.71802119

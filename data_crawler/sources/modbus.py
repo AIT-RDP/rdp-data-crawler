@@ -1,6 +1,7 @@
 """
 Accesses Christian's famous one and only Modbus Crawler to pick up Modbus values.
 """
+import datetime
 from typing import Dict, Any
 
 import modbus_crawler
@@ -53,8 +54,9 @@ class ModbusTCP(abstract_source.AbstractSourceAPI):
         """
         Queries the Modbus TCP device and returns the corresponding message
         """
-
-        return self._device.read_registers_as_dict()
+        out_info = {"observation_time": datetime.datetime.utcnow().isoformat()}
+        out_info.update(self._device.read_registers_as_dict())
+        return out_info
 
     def stop(self):
         """Disconnects from the Modbus server"""
