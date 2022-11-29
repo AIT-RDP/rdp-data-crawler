@@ -16,6 +16,7 @@ class AbstractSourceAPI(abc.ABC):
     arguments are supported:
 
       * source_parameters: Dict, The source-specific parameters listed in the configuration
+      * executor_name: The name of the executor for debugging purpose
     """
 
     def __init__(self, **kwargs):
@@ -31,3 +32,18 @@ class AbstractSourceAPI(abc.ABC):
 
         :return: The results queried from the source API.
         """
+
+    def start(self):
+        """
+        Starts the operation of the data source
+
+        The life-cycle hook is called within the executing thread before fetch_data() is accessed. The function may be
+        used to connect to external resources and to initialize thread-sensitive APIs.
+        """
+        pass
+
+    def stop(self):
+        """
+        Stops the source operation and frees allocated resources
+        """
+        pass

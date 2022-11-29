@@ -1,0 +1,10 @@
+# Tests the configuration parsing but may not necessarily provide a valid data crawler configuration
+
+standard mapping:
+  hello: world
+
+table 1: !table/csv
+  path: simple-1.csv
+
+table 2: !table/csv
+  path: ../../data/test/simple-1.csv

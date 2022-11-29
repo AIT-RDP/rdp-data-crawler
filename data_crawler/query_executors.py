@@ -1,14 +1,15 @@
 """
 Implements the logic to periodically execute API calls in a dedicated context
 """
-
+import datetime
 import importlib
 import inspect
 import json
 import logging
 import math
+import random
 import threading
-import time
+import traceback
 from typing import Optional, Dict, Any
 
 import pandas as pd
@@ -32,14 +33,33 @@ class _ExecutionTimer:
 
         freq_name = timer_config["frequency"]
         self._timer_interval = pd.Timedelta(freq_name).total_seconds()
-        self._logger.debug(f"Set timer interval to {self._timer_interval}s ({freq_name}).")
 
-        self._next_tick = 0.0  # Pre-reset default value to satisfy the linter
+        # Offset from the start of the current year, UTC. The start of the current year was chosen to mitigate some
+        # issues with leap seconds. Right now, leap-seconds on June, 30 are not encountered.
+        offset_name = timer_config.get("offset", "0s")
+        self._offset = pd.Timedelta(offset_name).total_seconds()
+
+        # The uniformly distributed random jitter to apply. (Symmetrically around the offset)
+        self._jitter = pd.Timedelta(timer_config.get("jitter", "0s")).total_seconds()
+        self._rnd = random.Random()
+
+        self._logger.debug(f"Set timer interval to {self._timer_interval}s ({freq_name}) aligning to an offset of "
+                           f"{self._offset}s ({offset_name}) +/-{self._jitter}s.")
+
+        self._next_tick_actual = 0.0  # Pre-reset default value to satisfy the linter
+        self._next_tick_nominal = 0.0  # Pre-reset default value to satisfy the linter
         self.reset()
 
     def reset(self):
         """Clears the state and instructs the timer to fire immediately"""
-        self._next_tick = time.time() - self._timer_interval  # Immediately issue a tick
+        date_now = datetime.datetime.utcnow()
+        base_date = datetime.datetime(date_now.year, 1, 1, 0, 0, 0, tzinfo=date_now.tzinfo)
+        base_date += pd.Timedelta(seconds=self._offset - self._timer_interval)
+
+        num_skip = math.floor((date_now - base_date).total_seconds() / self._timer_interval)
+        base_date += pd.Timedelta(seconds=num_skip * self._timer_interval)  # Floor to immediately trigger a tick.
+        self._next_tick_nominal = base_date.timestamp()
+        self._next_tick_actual = date_now.timestamp() + self._rnd.uniform(0, self._jitter)  # Also jitter the first tick
 
     def get_remaining_seconds(self) -> float:
         """
@@ -47,18 +67,20 @@ class _ExecutionTimer:
 
         The number may be negative in case it should already be fired
         """
-        now = time.time()
-        return self._next_tick - now
+        now = datetime.datetime.utcnow().timestamp()  # Unify with reset function.
+        return self._next_tick_actual - now
 
     def operation_done(self):
         """Indicates that the operation was just completed and that the time can advance to the next step."""
 
-        self._next_tick += self._timer_interval
+        self._next_tick_nominal += self._timer_interval
+        self._next_tick_actual = self._next_tick_nominal + self._rnd.uniform(-self._jitter, self._jitter)
 
         remaining = self.get_remaining_seconds()
-        if remaining > self._timer_interval:  # Skip some queries
+        if remaining > self._timer_interval + 2 * self._jitter:  # Skip some queries
             num_skip = math.floor(remaining / self._timer_interval)
-            self._next_tick += self._timer_interval * num_skip
+            self._next_tick_actual += self._timer_interval * num_skip
+            self._next_tick_nominal += self._timer_interval * num_skip
             self._logger.warning(f"Skipped {num_skip} queries since the previous queries were too much delayed.")
 
 
@@ -117,7 +139,7 @@ class ThreadQueryExecutor:
         self._termination_event = threading.Event()
 
         if source_api is None:
-            source_api = self._resolve_source_api(self._config)
+            source_api = self._resolve_source_api(self._config, name)
         self._source_api = source_api
 
         self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)
@@ -125,11 +147,12 @@ class ThreadQueryExecutor:
         self._data_sink = _RedisDataSink(self._config["redis"], redis_pool)
 
     @staticmethod
-    def _resolve_source_api(executor_config: dict) -> abstract_source.AbstractSourceAPI:
+    def _resolve_source_api(executor_config: dict, executor_name: str) -> abstract_source.AbstractSourceAPI:
         """
         Tries to load ind instantiate the source API
 
         :param executor_config: The configuration of the entire executor
+        :param executor_name: The executor's name for debugging purposes
         :return: The newly instantiated source API object
         """
 
@@ -151,7 +174,7 @@ class ThreadQueryExecutor:
             raise ModuleNotFoundError(f"The specified source API class '{type_name}' ({api_class}) is not an "
                                       f"AbstractSourceAPI.")
 
-        api_object = api_class(source_parameters=executor_config["source parameter"])
+        api_object = api_class(source_parameters=executor_config["source parameter"], executor_name=executor_name)
         return api_object
 
     @property
@@ -193,6 +216,8 @@ class ThreadQueryExecutor:
         """Executes the queries until termination is signaled"""
 
         self._timer.reset()
+        self._source_api.start()
+
         while True:
             timeout = self._timer.get_remaining_seconds()
             if timeout > 0:
@@ -209,5 +234,9 @@ class ThreadQueryExecutor:
             try:
                 data = self._source_api.fetch_data()
                 self._data_sink.push_data(data)
+            except Exception as err:
+                self._logger.error(f"Skip one sample due to a {type(err).__name__}: {err}\n{traceback.format_exc()}")
             finally:
                 self._timer.operation_done()
+
+        self._source_api.stop()
