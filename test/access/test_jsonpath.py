@@ -5,7 +5,7 @@ import datetime
 
 import pytest
 
-import data_crawler.extractors.jsonpath as jx
+import data_crawler.access.jsonpath as jx
 
 
 @pytest.fixture()
