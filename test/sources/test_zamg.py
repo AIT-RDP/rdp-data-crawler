@@ -26,7 +26,7 @@ def measurement_station_parameters() -> dict:
     return {
         "station id": "20209",
         "data points": ["DD", "FF", "GSX", "HSX", "P", "RF", "RR", "RRM", "TL", "TP"],
-        "initial history": "48h"
+        "initial history": "96h"
     }
 
 
@@ -106,10 +106,10 @@ def test_measurement_station_online(endpoint, station_id, measurement_station_pa
     assert response_length > 2
 
     first_ts = datetime.datetime.fromisoformat(response_data["observation_time"][0])
-    assert first_ts < now - datetime.timedelta(hours=47)
+    assert first_ts < now - datetime.timedelta(hours=95)
 
     last_ts = datetime.datetime.fromisoformat(response_data["observation_time"][-1])
-    assert last_ts > now - datetime.timedelta(hours=25)
+    assert last_ts > now - datetime.timedelta(hours=94)  # Allow ZAMG to fail for some time
 
     mandatory_measurements = [
         "air_temperature_2m", "air_pressure_at_sea_level", "dew_point_temperature_2m",
