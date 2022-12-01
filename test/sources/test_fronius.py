@@ -72,6 +72,7 @@ def test_inverter_rt_data_parsing_night(inverter_rt_device_response_2, rt_parame
     assert message["observation_time"] == "2022-12-01T19:22:17+01:00"
 
 
+@pytest.mark.xfail(strict=False)
 def test_inverter_rt_data_fetch(rt_parameters):
     """Test fetching some data a local device. This test case may fail for most systems."""
 
