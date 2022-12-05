@@ -1,6 +1,7 @@
 """
 Implements the Fronius APIs to query device information
 """
+import datetime
 import itertools
 from typing import Dict, Any, Optional, List
 
@@ -32,6 +33,7 @@ class FroniusInverterRealtimeData(abstract_source.AbstractSourceAPI):
 
         self._address = source_parameters["address"]
         self._device_id = int(source_parameters.get("device", 1))
+        self._correct_device_time = bool(source_parameters.get("correct device time", False))
 
         self._extractors = self._compile_extractors()
 
@@ -77,6 +79,8 @@ class FroniusInverterRealtimeData(abstract_source.AbstractSourceAPI):
         :return: The compiled message from the inverters
         """
 
+        ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
+
         if raw_data is None:
             raw_data = self._fetch_next_raw_result()
 
@@ -84,6 +88,11 @@ class FroniusInverterRealtimeData(abstract_source.AbstractSourceAPI):
         decoded_message = self._decode_raw_message(raw_data)
 
         decoded_message["P_DC_tot"] = decoded_message.get("I_DC_tot", 0.0) * decoded_message.get("U_DC", 0.0)
+        decoded_message["observation_time_device"] = decoded_message["observation_time"]
+
+        if self._correct_device_time:
+            decoded_message["observation_time"] = ts_now.isoformat()
+
         return decoded_message
 
     def _decode_raw_message(self, raw_data: dict) -> Dict[str, Any]:

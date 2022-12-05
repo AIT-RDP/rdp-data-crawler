@@ -49,6 +49,24 @@ def test_inverter_rt_data_parsing_day(inverter_rt_device_response_1, rt_paramete
     assert message["error_code"] == 0
     assert message["status_code"] == 7
     assert message["observation_time"] == "2022-11-30T11:06:23+01:00"
+    assert message["observation_time_device"] == "2022-11-30T11:06:23+01:00"
+
+
+def test_inverter_rt_data_parsing_time(inverter_rt_device_response_1, rt_parameters):
+    """Tests the device time correction functionality"""
+
+    rt_parameters["correct device time"] = True
+
+    api = fronius.FroniusInverterRealtimeData(source_parameters=rt_parameters, executor_name="<test>")
+    api.start()
+    ts_before = datetime.datetime.now(tz=datetime.timezone.utc)
+    message = api.fetch_data(raw_data=inverter_rt_device_response_1)
+    ts_after = datetime.datetime.now(tz=datetime.timezone.utc)
+    api.stop()
+
+    assert message is not None
+    assert message["observation_time_device"] == "2022-11-30T11:06:23+01:00"
+    assert ts_before <= datetime.datetime.fromisoformat(message["observation_time"]) <= ts_after
 
 
 def test_inverter_rt_data_parsing_night(inverter_rt_device_response_2, rt_parameters):
