@@ -172,7 +172,7 @@ class ThreadQueryExecutor:
         self._data_sink = _RedisDataSink(self._config["redis"], redis_pool)
 
     @staticmethod
-    def _resolve_source_api(executor_config: dict, executor_name: str) -> abstract_source.AbstractSourceAPI:
+    def _resolve_source_api(executor_config: dict, executor_name: str) -> abstract_source.AbstractMultiMessageSourceAPI:
         """
         Tries to load ind instantiate the source API
 
@@ -195,9 +195,9 @@ class ThreadQueryExecutor:
         if not inspect.isclass(api_class):
             raise ModuleNotFoundError(f"The specified source API '{type_name}' ({api_class}) is not an class.")
 
-        if not issubclass(api_class, abstract_source.AbstractSourceAPI):
+        if not issubclass(api_class, abstract_source.AbstractMultiMessageSourceAPI):
             raise ModuleNotFoundError(f"The specified source API class '{type_name}' ({api_class}) is not an "
-                                      f"AbstractSourceAPI.")
+                                      f"AbstractMultiMessageSourceAPI.")
 
         api_object = api_class(source_parameters=executor_config["source parameter"], executor_name=executor_name)
         return api_object
@@ -272,7 +272,7 @@ class ThreadQueryExecutor:
         """Performs one fetch and insert operation"""
 
         try:
-            data = self._source_api.fetch_data()
-            self._data_sink.push_data(data)
+            for data in self._source_api.fetch_data_bundle():
+                self._data_sink.push_data(data)
         except Exception as err:
             self._logger.error(f"Skip one sample due to a {type(err).__name__}: {err}\n{traceback.format_exc()}")
