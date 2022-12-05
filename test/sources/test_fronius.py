@@ -109,7 +109,8 @@ def test_inverter_rt_data_fetch(rt_parameters):
     assert datetime.datetime.fromisoformat(message["observation_time"]) <= dt_now + datetime.timedelta(minutes=50)
 
 
-inverter_archive_response_2 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-1.json")
+inverter_archive_response_1 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-1.json")
+inverter_archive_response_2 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-2.json")
 
 
 @pytest.fixture
@@ -124,12 +125,12 @@ def archive_parameters() -> dict:
     }
 
 
-def test_inverter_archive_parsing(inverter_archive_response_2, archive_parameters):
+def test_inverter_archive_parsing(inverter_archive_response_1, archive_parameters):
     """Tests parsing the archive files"""
 
     api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
     api.start()
-    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_2))
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_1))
     api.stop()
 
     ref_ts = ["2022-11-30T14:00:00+01:00", "2022-11-30T14:05:00+01:00", "2022-11-30T14:10:00+01:00",
@@ -168,7 +169,76 @@ def test_inverter_archive_parsing(inverter_archive_response_2, archive_parameter
                                                5.0199999999999996, 1.8411111111111111]
 
 
-def test_inverter_archive_device_tags(inverter_archive_response_2, archive_parameters):
+def test_inverter_archive_parsing_full(inverter_archive_response_2, archive_parameters):
+    """Tests parsing the archive files"""
+
+    del archive_parameters["data points"]  # Query all data points
+
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_2))
+    api.stop()
+
+    ref_ts = ["2022-12-05T15:45:00+01:00", "2022-12-05T15:50:00+01:00", "2022-12-05T15:55:00+01:00",
+              "2022-12-05T16:00:00+01:00", "2022-12-05T16:05:00+01:00", "2022-12-05T16:10:00+01:00",
+              "2022-12-05T16:15:00+01:00", "2022-12-05T16:20:00+01:00", "2022-12-05T16:25:00+01:00",
+              "2022-12-05T16:30:00+01:00", "2022-12-05T16:35:00+01:00", "2022-12-05T16:40:00+01:00"]
+
+    assert len(messages) == 5
+
+    assert messages[0]["device_id"] == "1"
+    assert messages[0]["observation_time"] == ref_ts
+    assert messages[0]["observation_time_device"] == ref_ts
+
+    assert messages[0]["I_L1"] == [0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    assert messages[0]["I_L2"] == [0.09, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    assert messages[0]["I_L3"] == [0.07, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    assert messages[0]["I_DC_S2"] == [0, 0.001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    assert messages[0]["U_DC_S1"] == [604.7, 523, 490, 494.3, 488.40000000000003, 472.1, 436.6, 388.5, 341.3, 294, 234,
+                                      183.60000000000002]
+    assert messages[0]["U_DC_S2"] == [185.9, 181.9, 169.70000000000002, 170.9, 169.5, 163.9, 152.8, 135.5,
+                                      121.10000000000001, 112.30000000000001, 96.30000000000001, 75.4]
+
+    assert messages[0]["device_temperature_1"] == [24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    assert messages[0]["U_L1N"] == [175.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    assert messages[0]["U_L2N"] == [175.10000000000002, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    assert messages[0]["U_L3N"] == [175.60000000000002, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+
+def test_inverter_archive_time_correction(inverter_archive_response_1, archive_parameters):
+    """Tests parsing the archive files"""
+
+    archive_parameters["correct device time"] = True
+
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api.start()
+    ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_1))
+    api.stop()
+
+    ref_ts = ["2022-11-30T14:00:00+01:00", "2022-11-30T14:05:00+01:00", "2022-11-30T14:10:00+01:00",
+              "2022-11-30T14:15:00+01:00", "2022-11-30T14:20:00+01:00", "2022-11-30T14:25:00+01:00",
+              "2022-11-30T14:30:00+01:00", "2022-11-30T14:35:00+01:00", "2022-11-30T14:40:00+01:00",
+              "2022-11-30T14:45:00+01:00", "2022-11-30T14:50:00+01:00"]
+
+    assert len(messages) == 5
+
+    assert messages[0]["device_id"] == "1"
+    assert messages[0]["observation_time_device"] == ref_ts
+
+    offset = ts_now - datetime.datetime.fromisoformat("2022-11-30T14:54:25+01:00")
+    assert len(messages[0]["observation_time"]) == 11
+    for ts_corr, ts_orig in zip(messages[0]["observation_time"], messages[0]["observation_time_device"]):
+        ts_corr = datetime.datetime.fromisoformat(ts_corr)
+        ts_orig = datetime.datetime.fromisoformat(ts_orig)
+
+        assert ts_orig + offset - datetime.timedelta(seconds=0.5) <= ts_corr
+        assert ts_corr <= ts_orig + offset + datetime.timedelta(seconds=0.5)
+
+
+def test_inverter_archive_device_tags(inverter_archive_response_1, archive_parameters):
     """Tests the device-specific tag function"""
 
     archive_parameters["device tags"] = {
@@ -178,7 +248,7 @@ def test_inverter_archive_device_tags(inverter_archive_response_2, archive_param
 
     api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
     api.start()
-    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_2))
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_1))
     api.stop()
 
     assert len(messages) == 5
@@ -193,6 +263,7 @@ def test_inverter_archive_device_tags(inverter_archive_response_2, archive_param
     assert messages[4]["readable_name"] == "fifth"
 
 
+@pytest.mark.xfail(strict=False)
 def test_inverter_archive_fetch(archive_parameters):
     """Tests fetching an exemplary data logger"""
 

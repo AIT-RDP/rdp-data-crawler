@@ -133,7 +133,7 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         "Current_DC_String_1": "I_DC_S1",  # [1A]
         "Current_DC_String_2": "I_DC_S2",  # [1A]
         "Voltage_DC_String_1": "U_DC_S1",  # [1V]
-        "Voltage_DC_String_2": "U_DC_S1",  # [1V]
+        "Voltage_DC_String_2": "U_DC_S2",  # [1V]
         "Temperature_Powerstage": "device_temperature_1",  # [deg C]
         "Voltage_AC_Phase_1": "U_L1N",  # [1V]
         "Voltage_AC_Phase_2": "U_L2N",  # [1V]
