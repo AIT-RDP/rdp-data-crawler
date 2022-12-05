@@ -107,3 +107,120 @@ def test_inverter_rt_data_fetch(rt_parameters):
 
     assert dt_now - datetime.timedelta(minutes=50) <= datetime.datetime.fromisoformat(message["observation_time"])
     assert datetime.datetime.fromisoformat(message["observation_time"]) <= dt_now + datetime.timedelta(minutes=50)
+
+
+inverter_archive_response_2 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-1.json")
+
+
+@pytest.fixture
+def archive_parameters() -> dict:
+    """Returns a simple Fronius device archive configuration"""
+
+    return {
+        "address": "10.10.10.126",  # This may or may not be a real device
+        "initial history": "1h",
+        "data points": ["EnergyReal_WAC_Sum_Produced", "Current_DC_String_1", "Voltage_DC_String_1",
+                        "PowerReal_PAC_Sum"]
+    }
+
+
+def test_inverter_archive_parsing(inverter_archive_response_2, archive_parameters):
+    """Tests parsing the archive files"""
+
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_2))
+    api.stop()
+
+    ref_ts = ["2022-11-30T14:00:00+01:00", "2022-11-30T14:05:00+01:00", "2022-11-30T14:10:00+01:00",
+              "2022-11-30T14:15:00+01:00", "2022-11-30T14:20:00+01:00", "2022-11-30T14:25:00+01:00",
+              "2022-11-30T14:30:00+01:00", "2022-11-30T14:35:00+01:00", "2022-11-30T14:40:00+01:00",
+              "2022-11-30T14:45:00+01:00", "2022-11-30T14:50:00+01:00"]
+
+    assert len(messages) == 5
+
+    assert messages[0]["device_id"] == "1"
+    assert messages[0]["observation_time"] == ref_ts
+    assert messages[0]["observation_time_device"] == ref_ts
+    assert messages[0]["E_P_exp_interval"] == [3.8938888888888887, 3.9494444444444445, 3.6025, 3.4608333333333334,
+                                               3.694722222222222, 1.6097222222222223, 2.8500000000000001,
+                                               3.6455555555555557, 4.1566666666666663, 3.881388888888889,
+                                               0.24638888888888888]
+    assert messages[0]["P_AC_avg"] == [46.88294314381271, 47.551839464882946, 43.374581939799334, 41.668896321070235,
+                                       44.484949832775918, 19.381270903010034, 34.314381270903013, 43.892976588628763,
+                                       50.046822742474909, 46.732441471571903, 2.9665551839464883]
+    assert messages[0]["I_DC_S1"] == [0.080000000000000002, 0.089999999999999997, 0.070000000000000007,
+                                      0.070000000000000007, 0.070000000000000007, 0.070000000000000007,
+                                      0.070000000000000007, 0.080000000000000002, 0.089999999999999997,
+                                      0.080000000000000002, 0.050000000000000003]
+    assert messages[0]["U_DC_S1"] == [671, 671.20000000000005, 672.10000000000002, 666.40000000000009,
+                                      674.80000000000007, 641.5, 690.40000000000009, 681.10000000000002, 687,
+                                      672.60000000000002, 656]
+    assert len(messages[0]["P_DC_S1"]) == 11
+    assert messages[0]["P_DC_S1"][:2] == [0.080000000000000002 * 671, 0.089999999999999997 * 671.20000000000005]
+
+    assert messages[4]["device_id"] == "5"
+    assert messages[4]["observation_time"] == ref_ts
+    assert messages[4]["observation_time_device"] == ref_ts
+    assert messages[4]["E_P_exp_interval"] == [4.4991666666666665, 5.5372222222222218, 3.589722222222222,
+                                               2.3619444444444446, 2.3786111111111112, 2.3883333333333332,
+                                               2.2461111111111109, 3.2947222222222221, 6.2255555555555553,
+                                               5.0199999999999996, 1.8411111111111111]
+
+
+def test_inverter_archive_device_tags(inverter_archive_response_2, archive_parameters):
+    """Tests the device-specific tag function"""
+
+    archive_parameters["device tags"] = {
+        "1": {"readable_name": "first"},
+        "5": {"readable_name": "fifth"},
+    }
+
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_2))
+    api.stop()
+
+    assert len(messages) == 5
+    assert messages[0]["device_id"] == "1"
+    assert messages[0]["readable_name"] == "first"
+
+    assert "readable_name" not in messages[1]
+    assert "readable_name" not in messages[2]
+    assert "readable_name" not in messages[3]
+
+    assert messages[4]["device_id"] == "5"
+    assert messages[4]["readable_name"] == "fifth"
+
+
+def test_inverter_archive_fetch(archive_parameters):
+    """Tests fetching an exemplary data logger"""
+
+    del archive_parameters["data points"]  # Query all data points
+
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api.start()
+    ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
+    messages = list(api.fetch_data_bundle())
+    api.stop()
+
+    assert len(messages) > 0
+    assert len(messages[0]["observation_time"]) > 0
+    assert all(ts_now - datetime.timedelta(hours=1.5) <= datetime.datetime.fromisoformat(ts) <=
+               ts_now + datetime.timedelta(hours=0.5) for ts in messages[0]["observation_time"])
+    assert len(messages[0]["observation_time_device"]) > 0
+    assert all(ts_now - datetime.timedelta(hours=1.5) <= datetime.datetime.fromisoformat(ts) <=
+               ts_now + datetime.timedelta(hours=0.5) for ts in messages[0]["observation_time_device"])
+
+    assert "E_P_exp_interval" in messages[0]
+    assert "I_DC_S1" in messages[0]
+    assert "U_DC_S1" in messages[0]
+    assert "device_temperature_1" in messages[0]
+    assert "U_L1N" in messages[0]
+    assert "U_L2N" in messages[0]
+    assert "U_L3N" in messages[0]
+    assert "I_L1" in messages[0]
+    assert "I_L2" in messages[0]
+    assert "I_L3" in messages[0]
+    assert "P_AC_avg" in messages[0]
+    assert "P_DC_S1" in messages[0]
