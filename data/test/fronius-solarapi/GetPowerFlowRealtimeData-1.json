@@ -1,0 +1,66 @@
+{
+   "Body" : {
+      "Data" : {
+         "Inverters" : {
+            "1" : {
+               "DT" : 233,
+               "E_Day" : 242.40000915527344,
+               "E_Total" : 6466259.5,
+               "E_Year" : 5329062,
+               "P" : 152
+            },
+            "2" : {
+               "DT" : 233,
+               "E_Day" : 747.70001220703125,
+               "E_Total" : 10147120,
+               "E_Year" : 8908375,
+               "P" : 432
+            },
+            "3" : {
+               "DT" : 233,
+               "E_Day" : 330.30001831054688,
+               "E_Total" : 5223590,
+               "E_Year" : 4207943,
+               "P" : 187
+            },
+            "4" : {
+               "DT" : 233,
+               "E_Day" : 564.4000244140625,
+               "E_Total" : 9279820,
+               "E_Year" : 8117679.5,
+               "P" : 359
+            },
+            "5" : {
+               "DT" : 233,
+               "E_Day" : 353,
+               "E_Total" : 8141699.5,
+               "E_Year" : 7070373.5,
+               "P" : 247
+            }
+         },
+         "Site" : {
+            "E_Day" : 2237.8000640869141,
+            "E_Total" : 39258489,
+            "E_Year" : 33633433,
+            "Meter_Location" : "unknown",
+            "Mode" : "produce-only",
+            "P_Akku" : null,
+            "P_Grid" : null,
+            "P_Load" : null,
+            "P_PV" : 1377,
+            "rel_Autonomy" : null,
+            "rel_SelfConsumption" : null
+         },
+         "Version" : "12"
+      }
+   },
+   "Head" : {
+      "RequestArguments" : {},
+      "Status" : {
+         "Code" : 0,
+         "Reason" : "",
+         "UserMessage" : ""
+      },
+      "Timestamp" : "2022-12-06T11:21:03+01:00"
+   }
+}

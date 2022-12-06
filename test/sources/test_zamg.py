@@ -3,6 +3,7 @@ import json
 import os
 
 import pytest
+import requests.exceptions
 
 import data_crawler.sources.zamg as zamg
 
@@ -85,6 +86,7 @@ def test_measurement_station_drop_missing_observations(measurement_station_param
         assert key not in response_data
 
 
+@pytest.mark.xfail(string=False, raises=requests.exceptions.HTTPError, reason="ZAMG servers are notoriously unreliable")
 @pytest.mark.parametrize("endpoint,station_id", [
     ("climate", "20209"),
     ("tawes", "8989076")

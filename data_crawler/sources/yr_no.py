@@ -7,7 +7,7 @@ from typing import Dict, Any
 import requests
 
 import data_crawler.sources.abc.http_cache as http_cache
-import data_crawler.extractors.jsonpath as jx
+import data_crawler.access.jsonpath as jx
 
 
 class LocationForecast(http_cache.GenericHTTPSourceAPI):

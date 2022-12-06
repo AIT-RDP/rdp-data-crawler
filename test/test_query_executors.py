@@ -27,7 +27,7 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
         self.start_invocations = 0
         self.stop_invocations = 0
 
-        self.last_fetch_ts = None
+        self.fetch_ts = []
 
     def start(self):
         """Counts the start and performs some basic checks"""
@@ -37,7 +37,7 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
     def fetch_data(self) -> Dict[str, Any]:
         """Generates some content and returns it"""
 
-        self.last_fetch_ts = datetime.datetime.utcnow()
+        self.fetch_ts.append(datetime.datetime.utcnow())
         self.fetch_invocations += 1
 
         assert self.start_invocations == self.stop_invocations + 1
@@ -192,8 +192,71 @@ def test_thread_executor_fetch_invocation(mockup_service_config, redis_pool):
     executor.join()
 
     assert 2 <= api.fetch_invocations <= 4
-    assert ((api.last_fetch_ts.microsecond < 0.1e6) or (api.last_fetch_ts.microsecond > 0.9e6) or
-            (0.4e6 < api.last_fetch_ts.microsecond < 0.6e6))  # Check alignment
+    assert ((api.fetch_ts[-1].microsecond < 0.1e6) or (api.fetch_ts[-1].microsecond > 0.9e6) or
+            (0.4e6 < api.fetch_ts[-1].microsecond < 0.6e6))  # Check alignment
+
+
+def test_thread_executor_timing_no_force_initial(mockup_service_config, redis_pool):
+    """Tests the timing when no initial sample is forced"""
+
+    mockup_service_config["polling"]["frequency"] = "1s"
+    mockup_service_config["polling"]["force initial"] = False
+
+    api = MockupSourceAPI(source_parameters={})
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool, source_api=api)
+
+    executor.start()
+    time.sleep(2.0)
+    executor.stop()
+    executor.join()
+
+    assert 1 <= api.fetch_invocations <= 3
+    for i, ts in enumerate(api.fetch_ts):
+        assert 0.9e6 < ts.microsecond or ts.microsecond < 0.1e6, f"Alignment error in sample {i}"  # Check alignment
+
+
+def test_thread_executor_timing_force_initial(mockup_service_config, redis_pool):
+    """Tests the timing when the initial sample is forced"""
+
+    mockup_service_config["polling"]["frequency"] = "1s"
+    mockup_service_config["polling"]["force initial"] = True
+
+    api = MockupSourceAPI(source_parameters={})
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool, source_api=api)
+
+    executor.start()
+    ts_now = datetime.datetime.utcnow()
+    time.sleep(2.0)
+    executor.stop()
+    executor.join()
+
+    assert 2 <= api.fetch_invocations <= 3
+    assert -0.1 <= (api.fetch_ts[0] - ts_now).total_seconds() <= 0.1  # The first sample must be triggered immediately
+    for i, ts in enumerate(api.fetch_ts[1:]):
+        assert 0.9e6 < ts.microsecond or ts.microsecond < 0.1e6, f"Alignment error in sample {i}"  # Check alignment
+
+
+def test_thread_executor_slot_mechanism(mockup_service_config, redis_pool):
+    """Tests whether the API fetch function is correctly invoked"""
+
+    mockup_service_config["polling"]["frequency"] = "1s"
+    mockup_service_config["polling"]["slot count"] = 2
+    mockup_service_config["polling"]["slot id"] = "1"  # The function must also support string inputs
+    mockup_service_config["polling"]["force initial"] = False
+
+    api = MockupSourceAPI(source_parameters={})
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool, source_api=api)
+
+    assert api.fetch_invocations == 0
+
+    executor.start()
+    time.sleep(2.0)
+    executor.stop()
+    executor.join()
+
+    assert 1 <= api.fetch_invocations <= 3
+    for i, ts in enumerate(api.fetch_ts):
+        assert 0.4e6 < ts.microsecond < 0.6e6, f"Alignment error in sample {i}"  # Check alignment
 
 
 def test_thread_executor_fetch_error(mockup_service_config, redis_pool):
@@ -210,8 +273,8 @@ def test_thread_executor_fetch_error(mockup_service_config, redis_pool):
     executor.join()
 
     assert 2 <= api.fetch_invocations <= 4
-    assert ((api.last_fetch_ts.microsecond < 0.1e6) or (api.last_fetch_ts.microsecond > 0.9e6) or
-            (0.4e6 < api.last_fetch_ts.microsecond < 0.6e6))  # Check alignment
+    assert ((api.fetch_ts[-1].microsecond < 0.1e6) or (api.fetch_ts[-1].microsecond > 0.9e6) or
+            (0.4e6 < api.fetch_ts[-1].microsecond < 0.6e6))  # Check alignment
 
 
 def test_thread_executor_redis_export(mockup_service_config, redis_pool, redis_stream_name):
@@ -246,3 +309,24 @@ def test_thread_executor_redis_export(mockup_service_config, redis_pool, redis_s
     assert messages[1][-1]["duplicate"] == '"config-key"'
     assert messages[1][-1]["invocations"] == '2'
     assert messages[1][-1]["data"] == '"some-test-nonsense"'
+
+
+def test_thread_executor_redis_templated_export(mockup_service_config, redis_pool, redis_stream_name):
+    """Specifically assesses the templated export mechanism"""
+
+    mockup_service_config["redis"]["stream"] = redis_stream_name + ".${data}"
+    api = MockupSourceAPI(source_parameters={})
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool, source_api=api)
+
+    redis_client = redis.Redis(connection_pool=redis_pool)
+
+    executor.start()
+    time.sleep(0.51)
+    executor.stop()
+    executor.join()
+
+    messages = redis_client.xrange(f"{redis_stream_name}.some-test-nonsense")
+    redis_client.delete(f"{redis_stream_name}.some-test-nonsense")
+    assert messages is not None
+    assert 2 <= len(messages) <= 3
+    assert len(messages) == api.fetch_invocations
