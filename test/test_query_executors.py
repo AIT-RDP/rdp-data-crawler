@@ -309,3 +309,24 @@ def test_thread_executor_redis_export(mockup_service_config, redis_pool, redis_s
     assert messages[1][-1]["duplicate"] == '"config-key"'
     assert messages[1][-1]["invocations"] == '2'
     assert messages[1][-1]["data"] == '"some-test-nonsense"'
+
+
+def test_thread_executor_redis_templated_export(mockup_service_config, redis_pool, redis_stream_name):
+    """Specifically assesses the templated export mechanism"""
+
+    mockup_service_config["redis"]["stream"] = redis_stream_name + ".${data}"
+    api = MockupSourceAPI(source_parameters={})
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool, source_api=api)
+
+    redis_client = redis.Redis(connection_pool=redis_pool)
+
+    executor.start()
+    time.sleep(0.51)
+    executor.stop()
+    executor.join()
+
+    messages = redis_client.xrange(f"{redis_stream_name}.some-test-nonsense")
+    redis_client.delete(f"{redis_stream_name}.some-test-nonsense")
+    assert messages is not None
+    assert 2 <= len(messages) <= 3
+    assert len(messages) == api.fetch_invocations

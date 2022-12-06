@@ -8,6 +8,7 @@ import json
 import logging
 import math
 import random
+import string
 import threading
 import traceback
 from typing import Optional, Dict, Any
@@ -120,7 +121,7 @@ class _RedisDataSink:
         """
 
         self._client = redis.Redis(connection_pool=redis_pool)
-        self._stream_name = redis_config["stream"]
+        self._stream_template = string.Template(redis_config["stream"])
         self._tags = redis_config.get("tags", {})
 
     def push_data(self, message: Dict[str, Any]):
@@ -134,7 +135,7 @@ class _RedisDataSink:
         message.update(self._tags)
 
         encoded_message = {key: json.dumps(val) for key, val in message.items()}
-        self._client.xadd(self._stream_name, encoded_message)
+        self._client.xadd(self._stream_template.substitute(message), encoded_message)
 
 
 class ThreadQueryExecutor:
