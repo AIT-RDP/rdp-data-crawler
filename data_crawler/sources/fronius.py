@@ -235,12 +235,25 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
                 self._logger.warning(f"The requested data point '{dp_name}' couldn't be fetched and will be ignored.")
                 continue
 
-            dp_time = sorted(chan_data[dp_name]["Values"].keys(), key=int)
-            if dp_time != ref_point_offset:
-                raise ValueError(f"Offset index of {dp_name}, {dp_time} differs from the reference {ref_point_offset}")
+            time_series = self._extract_time_series(chan_data[dp_name], ref_point_offset, dp_name)
+            ret[self._parameter_mapping[dp_name]] = time_series
 
-            ret[self._parameter_mapping[dp_name]] = [chan_data[dp_name]["Values"][ts] for ts in ref_point_offset]
+        return ret
 
+    def _extract_time_series(self, dp_data:dict, offset_axis:List[str], dp_name: str) -> list:
+        """Extracts the time series according to the offset axis and returns the result"""
+
+        unavailable_points = set(offset_axis).difference(dp_data["Values"].keys())
+        if len(unavailable_points) > 0:
+            self._logger.warning(f"Some values of series {dp_name} on offsets {list(unavailable_points)} are not "
+                                 "delivered and will be filled with None values.")
+
+        excess_points = set(dp_data["Values"].keys()).difference(offset_axis)
+        if len(excess_points) > 0:
+            self._logger.warning(f"Time series of {dp_name} has intermediate data points ({list(excess_points)}) that "
+                                 f"will be dropped")
+
+        ret = [dp_data["Values"].get(ts, None) for ts in offset_axis]
         return ret
 
     @staticmethod

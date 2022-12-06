@@ -111,6 +111,7 @@ def test_inverter_rt_data_fetch(rt_parameters):
 
 inverter_archive_response_1 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-1.json")
 inverter_archive_response_2 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-2.json")
+inverter_archive_response_3 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-3.json")
 
 
 @pytest.fixture
@@ -205,6 +206,29 @@ def test_inverter_archive_parsing_full(inverter_archive_response_2, archive_para
     assert messages[0]["U_L1N"] == [175.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     assert messages[0]["U_L2N"] == [175.10000000000002, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     assert messages[0]["U_L3N"] == [175.60000000000002, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+
+def test_inverter_archive_parsing_big_message(inverter_archive_response_3, archive_parameters):
+    """Tests parsing a bigger data file"""
+
+    del archive_parameters["data points"]  # Query all data points
+
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_3))
+    api.stop()
+
+    assert len(messages) == 5
+    assert len(messages[0]["observation_time"]) == 577
+    assert len(messages[0]["observation_time_device"]) == 577
+    assert len(messages[0]["I_L1"]) == 577
+    assert len(messages[0]["I_L2"]) == 577
+    assert len(messages[0]["I_L3"]) == 577
+    assert len(messages[0]["U_L1N"]) == 577
+    assert len(messages[0]["U_L2N"]) == 577
+    assert len(messages[0]["U_L3N"]) == 577
+
+    assert len(list(filter(lambda x: x is None, messages[0]["U_L1N"]))) == 1  # One interpolated None value
 
 
 def test_inverter_archive_time_correction(inverter_archive_response_1, archive_parameters):
