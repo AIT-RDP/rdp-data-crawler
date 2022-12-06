@@ -7,6 +7,7 @@ longitude;°;Float;yes;Longitude, WGS 84
 latitude;°;Float;yes;Latitude, WGS 84
 altitude;m;Float;yes;Altitude above sea level
 device_id;;String;yes;Unique (local) identifier for a particular device
+device_type;;String;yes;Device type identifier (mostly for debugging)
 air_temperature_2m;°C;Float;no;Air temperature at 2m above ground
 air_temperature_5cm;°C;Float;no;Air temperature at 5cm above ground
 apparent_temperature;°C;Float;no;Apparent/Feels-Like temperature

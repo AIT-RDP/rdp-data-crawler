@@ -208,7 +208,7 @@
 						"_comment" : "channelId=66049"
 					}
 				},
-				"DeviceType" : 233,
+					"DeviceType" : 233,
 				"End" : "2022-11-30T14:59:59+01:00",
 				"NodeType" : 98,
 				"Start" : "2022-11-30T14:00:00+01:00"

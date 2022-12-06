@@ -109,6 +109,146 @@ def test_inverter_rt_data_fetch(rt_parameters):
     assert datetime.datetime.fromisoformat(message["observation_time"]) <= dt_now + datetime.timedelta(minutes=50)
 
 
+inverter_pf_device_response_1 = helpers.get_json_fixture("data/test/fronius-solarapi/GetPowerFlowRealtimeData-1.json")
+
+
+@pytest.fixture()
+def pf_parameters() -> dict:
+    """Returns a simple real-time power-flow configuration"""
+
+    return {
+        "address": "10.10.10.126",  # This may or may not be a real device
+    }
+
+
+def test_inverter_pf_data_parsing_day(inverter_pf_device_response_1, pf_parameters):
+    """Tests the parsing functionality of the realtime power flow data source"""
+
+    api = fronius.FroniusInverterPowerFlowRealtimeData(source_parameters=pf_parameters, executor_name="<test>")
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_pf_device_response_1))
+    api.stop()
+
+    assert len(messages) == 5
+
+    assert messages[0]["observation_time"] == "2022-12-06T11:21:03+01:00"
+    assert messages[0]["observation_time_device"] == "2022-12-06T11:21:03+01:00"
+    assert messages[0]["device_id"] == "1"
+    assert messages[0]["device_type"] == "Fronius Symo 12.5-3-M"
+    assert messages[0]["active_power_generation"] == 0.152
+    assert messages[0]["P_AC_tot"] == 152
+    assert messages[0]["E_P_exp"] == 6466259.5
+    assert messages[0]["E_P_exp_day"] == 242.40000915527344
+    assert messages[0]["E_P_exp_year"] == 5329062
+
+    assert messages[1]["observation_time"] == "2022-12-06T11:21:03+01:00"
+    assert messages[1]["observation_time_device"] == "2022-12-06T11:21:03+01:00"
+    assert messages[1]["device_id"] == "2"
+    assert messages[1]["device_type"] == "Fronius Symo 12.5-3-M"
+    assert messages[1]["active_power_generation"] == 0.432
+    assert messages[1]["P_AC_tot"] == 432
+    assert messages[1]["E_P_exp"] == 10147120
+    assert messages[1]["E_P_exp_day"] == 747.70001220703125
+    assert messages[1]["E_P_exp_year"] == 8908375
+
+    assert messages[2]["observation_time"] == "2022-12-06T11:21:03+01:00"
+    assert messages[2]["observation_time_device"] == "2022-12-06T11:21:03+01:00"
+    assert messages[2]["device_id"] == "3"
+    assert messages[2]["device_type"] == "Fronius Symo 12.5-3-M"
+    assert messages[2]["active_power_generation"] == 0.187
+    assert messages[2]["P_AC_tot"] == 187
+    assert messages[2]["E_P_exp"] == 5223590
+    assert messages[2]["E_P_exp_day"] == 330.30001831054688
+    assert messages[2]["E_P_exp_year"] == 4207943
+    assert messages[0]["device_type"] == "Fronius Symo 12.5-3-M"
+
+    assert messages[3]["observation_time"] == "2022-12-06T11:21:03+01:00"
+    assert messages[3]["observation_time_device"] == "2022-12-06T11:21:03+01:00"
+    assert messages[3]["device_id"] == "4"
+    assert messages[3]["device_type"] == "Fronius Symo 12.5-3-M"
+    assert messages[3]["active_power_generation"] == 0.359
+    assert messages[3]["P_AC_tot"] == 359
+    assert messages[3]["E_P_exp"] == 9279820
+    assert messages[3]["E_P_exp_day"] == 564.4000244140625
+    assert messages[3]["E_P_exp_year"] == 8117679.5
+
+    assert messages[4]["observation_time"] == "2022-12-06T11:21:03+01:00"
+    assert messages[4]["observation_time_device"] == "2022-12-06T11:21:03+01:00"
+    assert messages[4]["device_id"] == "5"
+    assert messages[4]["device_type"] == "Fronius Symo 12.5-3-M"
+    assert messages[4]["active_power_generation"] == 0.247
+    assert messages[4]["P_AC_tot"] == 247
+    assert messages[4]["E_P_exp"] == 8141699.5
+    assert messages[4]["E_P_exp_day"] == 353
+    assert messages[4]["E_P_exp_year"] == 7070373.5
+
+
+def test_inverter_pf_data_time_correction(inverter_pf_device_response_1, pf_parameters):
+    """Tests the time correction mechanism"""
+
+    pf_parameters["correct device time"] = True
+
+    api = fronius.FroniusInverterPowerFlowRealtimeData(source_parameters=pf_parameters, executor_name="<test>")
+    api.start()
+    ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
+    messages = list(api.fetch_data_bundle(raw_data=inverter_pf_device_response_1))
+    api.stop()
+
+    assert len(messages) == 5
+    for msg in messages:
+        assert msg["observation_time_device"] == "2022-12-06T11:21:03+01:00"
+        observation_time = datetime.datetime.fromisoformat(msg["observation_time"])
+        assert ts_now <= observation_time <= ts_now + datetime.timedelta(seconds=0.5)
+
+
+def test_inverter_pf_data_device_tags(inverter_pf_device_response_1, pf_parameters):
+    """Tests the time correction mechanism"""
+
+    pf_parameters["device tags"] = {
+        "1": {"readable_name": "first"},
+        "5": {"readable_name": "fifth"},
+    }
+
+    api = fronius.FroniusInverterPowerFlowRealtimeData(source_parameters=pf_parameters, executor_name="<test>")
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_pf_device_response_1))
+    api.stop()
+
+    assert len(messages) == 5
+    assert messages[0]["device_id"] == "1"
+    assert messages[0]["readable_name"] == "first"
+
+    assert messages[1]["device_id"] == "2"
+    assert "readable_name" not in messages[1]
+
+    assert messages[2]["device_id"] == "3"
+    assert "readable_name" not in messages[2]
+
+    assert messages[3]["device_id"] == "4"
+    assert "readable_name" not in messages[3]
+
+    assert messages[4]["device_id"] == "5"
+    assert messages[4]["readable_name"] == "fifth"
+
+
+@pytest.mark.xfail(strict=False)
+def test_inverter_pf_data_fetch(pf_parameters):
+    """Test fetching some data a local device. This test case may fail for most systems."""
+
+    api = fronius.FroniusInverterPowerFlowRealtimeData(source_parameters=pf_parameters, executor_name="<test>")
+    api.start()
+    dt_now = datetime.datetime.now(tz=datetime.timezone.utc)
+    messages = list(api.fetch_data_bundle())
+    api.stop()
+
+    assert len(messages) >= 1
+    assert messages[0]["P_AC_tot"] >= 0
+    assert messages[0]["active_power_generation"] >= 0
+
+    assert dt_now - datetime.timedelta(minutes=50) <= datetime.datetime.fromisoformat(messages[0]["observation_time"])
+    assert datetime.datetime.fromisoformat(messages[0]["observation_time"]) <= dt_now + datetime.timedelta(minutes=50)
+
+
 inverter_archive_response_1 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-1.json")
 inverter_archive_response_2 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-2.json")
 inverter_archive_response_3 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-3.json")
@@ -142,6 +282,7 @@ def test_inverter_archive_parsing(inverter_archive_response_1, archive_parameter
     assert len(messages) == 5
 
     assert messages[0]["device_id"] == "1"
+    assert messages[0]["device_type"] == "Fronius Symo 12.5-3-M"
     assert messages[0]["observation_time"] == ref_ts
     assert messages[0]["observation_time_device"] == ref_ts
     assert messages[0]["E_P_exp_interval"] == [3.8938888888888887, 3.9494444444444445, 3.6025, 3.4608333333333334,
