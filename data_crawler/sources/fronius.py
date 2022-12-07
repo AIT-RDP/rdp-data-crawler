@@ -240,6 +240,8 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         initial_history = pd.to_timedelta(source_parameters.get("initial history", "48h"))
         self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - initial_history
 
+        self._fetch_ahead = pd.to_timedelta(source_parameters.get("fetch ahead", "10min"))
+
     def fetch_data_bundle(self, raw_data: Optional[dict] = None) -> Generator[Dict[str, Any], None, None]:
         """
         Fetches the archive response starting from the last successful time stamp
@@ -259,7 +261,7 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         else:
             time_offset = datetime.timedelta(seconds=0.0)
 
-        ts_latest = ts_now
+        ts_latest = ts_now + self._fetch_ahead if len(raw_data["Body"]["Data"]) > 0 else self._last_query_ts
         for inv_name, inv_data in raw_data["Body"]["Data"].items():
             message_data = self._decode_raw_inverter_data(inv_name, inv_data, time_offset)
             message_data = self._extend_message_data(message_data)
@@ -342,6 +344,7 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         """Returns the raw result from the current period"""
 
         # Jump to the next complete minute
+        ts_now += self._fetch_ahead
         ts_now = datetime.datetime(ts_now.year, ts_now.month, ts_now.day, ts_now.hour, ts_now.minute, 0,
                                    tzinfo=ts_now.tzinfo) + datetime.timedelta(minutes=1)
         # Floor the seconds
