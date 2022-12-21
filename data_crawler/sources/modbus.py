@@ -4,7 +4,7 @@ Accesses Christian's famous one and only Modbus Crawler to pick up Modbus values
 import datetime
 from typing import Dict, Any
 
-import modbus_crawler
+import modbus_crawler.modbus_device_tcp
 import pandas as pd
 import pymodbus.constants
 
@@ -30,7 +30,7 @@ class ModbusTCP(abstract_source.AbstractSourceAPI):
             raise ValueError(f"The modbus register spec '{register_spec}' at {executor_name} is not a valid table "
                              "(DataFrame). Please consider the appropriate YAML tags to input one.")
 
-        self._device = modbus_crawler.ModbusTcpDevice(
+        self._device = modbus_crawler.modbus_device_tcp.ModbusTcpDevice(
             ip_address=source_parameters["address"],
             modbus_port=source_parameters.get("port", 502),
             byteorder=self._get_endian_config(source_parameters.get("byte order", "Big")),
@@ -54,7 +54,7 @@ class ModbusTCP(abstract_source.AbstractSourceAPI):
         """
         Queries the Modbus TCP device and returns the corresponding message
         """
-        out_info = {"observation_time": datetime.datetime.utcnow().isoformat()}
+        out_info: Dict[str, Any] = {"observation_time": datetime.datetime.utcnow().isoformat()}
         out_info.update(self._device.read_registers_as_dict())
         return out_info
 
