@@ -25,13 +25,13 @@ def minimal_modbus_config(mockup_server):
         "address": mockup_server[0],
         "port": mockup_server[1],
         "register spec": pd.DataFrame.from_dict({
-            "Register_start": [100, "", 110],
-            "Register_end": [104, "", 111],
-            "Register_type": ["i", "i", "i"],
-            "Data_type": ["UINT16", "DOUBLE", "UINT32"],
-            "Name": ["current_phase_1", "some_energy", "frequency"],
-            "Unit": ["A", "Wh", "Hz"],
-            "Scaling": [0.01, 1.0, 1.0]
+            "Register_start": [100, "", "", 110],
+            "Register_end": ["", "", "", 111],
+            "Register_type": ["i", "i", "i", "i"],
+            "Data_type": ["UINT16", "DOUBLE", "FloaT", "UINT32"],
+            "Name": ["current_phase_1", "some_energy", "crazy number", "frequency"],
+            "Unit": ["A", "Wh", "1", "Hz"],
+            "Scaling": [0.01, 1.0, 1.0, 1.0]
         })
     }
 
@@ -65,6 +65,9 @@ def mockup_server() -> Tuple[str, int]:
                 dict(registers=[102, 102], value=0x2527),
                 dict(registers=[103, 103], value=0x15BE),
                 dict(registers=[104, 104], value=0x81E5),
+                # Float value, Big endian, value 0.2, (3E4C CCCD)
+                dict(registers=[105, 105], value=0x3E4C),
+                dict(registers=[106, 106], value=0xCCCD),
             ]
         ),
         type_string=dict(  # Define strings, variable number of registers (2 bytes)
@@ -113,3 +116,4 @@ def test_modbus_tcp_basic(minimal_modbus_config):
     assert data["frequency"] == 1234567890.0
     assert data["current_phase_1"] == 123.45
     assert data["some_energy"] == 54830306.71802119
+    assert data["crazy number"] == pytest.approx(0.2)
