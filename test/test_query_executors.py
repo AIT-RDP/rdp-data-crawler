@@ -82,23 +82,6 @@ def mockup_service_config(appended_test_path):
 
 
 @pytest.fixture()
-def redis_pool() -> redis.ConnectionPool:
-    """Opens a Redis pool and tests the connection"""
-
-    host = os.environ.get("DATA_CRAWLER_REDIS_HOST", "localhost")
-    port = os.environ.get("DATA_CRAWLER_REDIS_PORT", "6379")
-    db = os.environ.get("DATA_CRAWLER_REDIS_DB", "0")
-
-    logger.debug(f"Initialize redis pool connecting to host={host}, port={port}, db={db}")
-
-    pool = redis.ConnectionPool(host=host, port=port, db=db, decode_responses=True)
-    client = redis.Redis(connection_pool=pool)
-
-    client.ping()
-    return pool
-
-
-@pytest.fixture()
 def redis_stream_name(redis_pool) -> str:
     """Returns the name of a managed REDIS stream"""
 
