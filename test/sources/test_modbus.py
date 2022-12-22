@@ -25,7 +25,7 @@ def minimal_modbus_config(mockup_server):
         "address": mockup_server[0],
         "port": mockup_server[1],
         "register spec": pd.DataFrame.from_dict({
-            "Register_start": [100, "", "", 110],
+            "Register_start": [100, "X", "-", 110],
             "Register_end": ["", "", "", 111],
             "Register_type": ["i", "i", "i", "i"],
             "Data_type": ["UINT16", "DOUBLE", "FloaT", "UINT32"],
@@ -117,3 +117,58 @@ def test_modbus_tcp_basic(minimal_modbus_config):
     assert data["current_phase_1"] == 123.45
     assert data["some_energy"] == 54830306.71802119
     assert data["crazy number"] == pytest.approx(0.2)
+
+
+@pytest.fixture()
+def modbus_config_types(mockup_server):
+    """Returns a (quite) minimal modus configuration stanza with unconventional column types"""
+
+    return {
+        "address": mockup_server[0],
+        "port": mockup_server[1],
+        "register spec": pd.DataFrame.from_dict({
+            "Register_start": [100, None, None, 110],  # Will be translated to a float column
+            "Register_type": ["i", "i", "i", "i"],
+            "Data_type": ["UINT16", "DOUBLE", "FloaT", "UINT32"],
+            "Name": ["current_phase_1", "some_energy", "crazy number", "frequency"],
+            "Unit": ["A", "Wh", "1", "Hz"],
+            "Scaling": [0.01, 1.0, 1.0, 1.0]
+        })
+    }
+
+
+def test_modbus_tcp_unconventional_types(modbus_config_types):
+    """Tests the very basic operation of the modbus crawler"""
+
+    src_api = modbus.ModbusTCP(source_parameters=modbus_config_types, executor_name="<test-modbus>")
+    src_api.start()
+
+    time_start = datetime.datetime.utcnow()
+    data = src_api.fetch_data()
+    time_end = datetime.datetime.utcnow()
+
+    src_api.stop()
+
+    assert "observation_time" in data
+    assert time_start <= datetime.datetime.fromisoformat(data["observation_time"]) <= time_end
+
+    assert data["frequency"] == 1234567890.0
+    assert data["current_phase_1"] == 123.45
+    assert data["some_energy"] == 54830306.71802119
+    assert data["crazy number"] == pytest.approx(0.2)
+
+
+def test_modbus_tcp_invalid_register_spec(modbus_config_types):
+    """tests the modbus TCP implementation with an invalid register spec"""
+
+    modbus_config_types["register spec"] = pd.DataFrame.from_dict({
+            "Register_start": ["0.1", "x", "x", "110"],  # Invalid register id
+            "Register_type": ["i", "i", "i", "i"],
+            "Data_type": ["UINT16", "DOUBLE", "FloaT", "UINT32"],
+            "Name": ["current_phase_1", "some_energy", "crazy number", "frequency"],
+            "Unit": ["A", "Wh", "1", "Hz"],
+            "Scaling": [0.01, 1.0, 1.0, 1.0]
+        })
+
+    with pytest.raises(expected_exception=ValueError):
+        modbus.ModbusTCP(source_parameters=modbus_config_types, executor_name="<test-modbus>")
