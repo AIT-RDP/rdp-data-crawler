@@ -94,9 +94,12 @@ class FroniusInverterRealtimeData(abstract_source.AbstractSourceAPI):
 
         decoded_message["P_DC_tot"] = decoded_message.get("I_DC_tot", 0.0) * decoded_message.get("U_DC", 0.0)
         decoded_message["observation_time_device"] = decoded_message["observation_time"]
+        decoded_message["observation_time_correction"] = 0.0
 
         if self._correct_device_time:
             decoded_message["observation_time"] = ts_now.isoformat()
+            decoded_message["observation_time_correction"] = (datetime.datetime.fromisoformat(
+                decoded_message["observation_time_device"]) - ts_now).total_seconds()
 
         return decoded_message
 
@@ -151,10 +154,12 @@ class FroniusInverterPowerFlowRealtimeData(abstract_source.AbstractMultiMessageS
             raw_data = self._fetch_raw_data()
         _raise_for_fronius_status(raw_data)
 
-        observation_time = raw_data["Head"]["Timestamp"]
+        observation_time_device = datetime.datetime.fromisoformat(raw_data["Head"]["Timestamp"])
+        observation_time = ts_now if self._correct_device_time else observation_time_device
         base_message = {
-            "observation_time_device": observation_time,
-            "observation_time": ts_now.isoformat() if self._correct_device_time else observation_time,
+            "observation_time_device": observation_time_device.isoformat(),
+            "observation_time": observation_time.isoformat(),
+            "observation_time_correction": (observation_time_device - observation_time).total_seconds(),
         }
 
         for inv_name, inv_data in raw_data["Body"]["Data"]["Inverters"].items():
@@ -314,11 +319,17 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         if self._correct_device_time:
             observation_time = self._correct_observation_time(observation_time, time_offset)
 
+        correction_offset = [
+            (ts_device - ts_obs).total_seconds()
+            for ts_device, ts_obs in zip(observation_time_device, observation_time)
+        ]
+
         ret = {
             "device_id": device_id,
             "device_type": _fronius_device_types.get(inv_data["DeviceType"], "Unknown Device"),
             "observation_time_device": [ts.isoformat() for ts in observation_time_device],
             "observation_time": [ts.isoformat() for ts in observation_time],
+            "observation_time_correction": correction_offset,
             "observation_time_span": [float(chan_data["TimeSpanInSec"]["Values"][ts]) for ts in ref_point_offset]
         }
         ret.update(self._device_tags.get(device_id, {}))

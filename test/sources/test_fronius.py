@@ -51,6 +51,7 @@ def test_inverter_rt_data_parsing_day(inverter_rt_device_response_1, rt_paramete
     assert message["status_code"] == 7
     assert message["observation_time"] == "2022-11-30T11:06:23+01:00"
     assert message["observation_time_device"] == "2022-11-30T11:06:23+01:00"
+    assert message["observation_time_correction"] == 0.0
 
 
 def test_inverter_rt_data_parsing_time(inverter_rt_device_response_1, rt_parameters):
@@ -68,6 +69,7 @@ def test_inverter_rt_data_parsing_time(inverter_rt_device_response_1, rt_paramet
     assert message is not None
     assert message["observation_time_device"] == "2022-11-30T11:06:23+01:00"
     assert ts_before <= datetime.datetime.fromisoformat(message["observation_time"]) <= ts_after
+    assert message["observation_time_correction"] < 0.0
 
 
 def test_inverter_rt_data_parsing_night(inverter_rt_device_response_2, rt_parameters):
@@ -89,6 +91,7 @@ def test_inverter_rt_data_parsing_night(inverter_rt_device_response_2, rt_parame
     assert message["error_code"] == 307
     assert message["status_code"] == 3
     assert message["observation_time"] == "2022-12-01T19:22:17+01:00"
+    assert message["observation_time_correction"] == 0.0
 
 
 @pytest.mark.xfail(strict=False)
@@ -133,6 +136,7 @@ def test_inverter_pf_data_parsing_day(inverter_pf_device_response_1, pf_paramete
     assert len(messages) == 5
 
     assert messages[0]["observation_time"] == "2022-12-06T11:21:03+01:00"
+    assert messages[0]["observation_time_correction"] == 0.0
     assert messages[0]["observation_time_device"] == "2022-12-06T11:21:03+01:00"
     assert messages[0]["device_id"] == "1"
     assert messages[0]["device_type"] == "Fronius Symo 12.5-3-M"
@@ -143,6 +147,7 @@ def test_inverter_pf_data_parsing_day(inverter_pf_device_response_1, pf_paramete
     assert messages[0]["E_P_exp_year"] == 5329062
 
     assert messages[1]["observation_time"] == "2022-12-06T11:21:03+01:00"
+    assert messages[1]["observation_time_correction"] == 0.0
     assert messages[1]["observation_time_device"] == "2022-12-06T11:21:03+01:00"
     assert messages[1]["device_id"] == "2"
     assert messages[1]["device_type"] == "Fronius Symo 12.5-3-M"
@@ -153,6 +158,7 @@ def test_inverter_pf_data_parsing_day(inverter_pf_device_response_1, pf_paramete
     assert messages[1]["E_P_exp_year"] == 8908375
 
     assert messages[2]["observation_time"] == "2022-12-06T11:21:03+01:00"
+    assert messages[2]["observation_time_correction"] == 0.0
     assert messages[2]["observation_time_device"] == "2022-12-06T11:21:03+01:00"
     assert messages[2]["device_id"] == "3"
     assert messages[2]["device_type"] == "Fronius Symo 12.5-3-M"
@@ -164,6 +170,7 @@ def test_inverter_pf_data_parsing_day(inverter_pf_device_response_1, pf_paramete
     assert messages[0]["device_type"] == "Fronius Symo 12.5-3-M"
 
     assert messages[3]["observation_time"] == "2022-12-06T11:21:03+01:00"
+    assert messages[3]["observation_time_correction"] == 0.0
     assert messages[3]["observation_time_device"] == "2022-12-06T11:21:03+01:00"
     assert messages[3]["device_id"] == "4"
     assert messages[3]["device_type"] == "Fronius Symo 12.5-3-M"
@@ -174,6 +181,7 @@ def test_inverter_pf_data_parsing_day(inverter_pf_device_response_1, pf_paramete
     assert messages[3]["E_P_exp_year"] == 8117679.5
 
     assert messages[4]["observation_time"] == "2022-12-06T11:21:03+01:00"
+    assert messages[4]["observation_time_correction"] == 0.0
     assert messages[4]["observation_time_device"] == "2022-12-06T11:21:03+01:00"
     assert messages[4]["device_id"] == "5"
     assert messages[4]["device_type"] == "Fronius Symo 12.5-3-M"
@@ -200,6 +208,7 @@ def test_inverter_pf_data_time_correction(inverter_pf_device_response_1, pf_para
         assert msg["observation_time_device"] == "2022-12-06T11:21:03+01:00"
         observation_time = datetime.datetime.fromisoformat(msg["observation_time"])
         assert ts_now <= observation_time <= ts_now + datetime.timedelta(seconds=0.5)
+        assert msg["observation_time_correction"] < 0
 
 
 def test_inverter_pf_data_device_tags(inverter_pf_device_response_1, pf_parameters):
@@ -340,6 +349,7 @@ def test_inverter_archive_parsing_full(inverter_archive_response_2, archive_para
     assert messages[0]["device_id"] == "1"
     assert messages[0]["observation_time"] == ref_ts
     assert messages[0]["observation_time_device"] == ref_ts
+    assert messages[0]["observation_time_correction"] == [0.0] * 12
 
     assert messages[0]["I_L1"] == [0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     assert messages[0]["I_L2"] == [0.09, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -408,12 +418,14 @@ def test_inverter_archive_time_correction_single(inverter_archive_response_1, ar
     # Test that all messages have a common offset
     offset = ts_now - datetime.datetime.fromisoformat("2022-11-30T14:54:25+01:00")
     assert len(messages[0]["observation_time"]) == 11
-    for ts_corr, ts_orig in zip(messages[0]["observation_time"], messages[0]["observation_time_device"]):
+    for ts_corr, ts_orig, ts_off in zip(messages[0]["observation_time"], messages[0]["observation_time_device"],
+                                        messages[0]["observation_time_correction"]):
         ts_corr = datetime.datetime.fromisoformat(ts_corr)
         ts_orig = datetime.datetime.fromisoformat(ts_orig)
 
         assert ts_orig + offset - datetime.timedelta(seconds=0.5) <= ts_corr
         assert ts_corr <= ts_orig + offset + datetime.timedelta(seconds=0.5)
+        assert ts_off == (ts_orig - ts_corr).total_seconds()
 
 
 def test_inverter_archive_time_correction_multiple_calls_one_pass(inverter_archive_response_1, archive_parameters,
