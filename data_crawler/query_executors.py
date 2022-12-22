@@ -17,6 +17,7 @@ import pandas as pd
 import redis
 
 import data_crawler.sources.abc.abstract_source as abstract_source
+import data_crawler.access.storage as storage
 
 
 class _ExecutionTimer:
@@ -164,8 +165,10 @@ class ThreadQueryExecutor:
         self._termination_event = threading.Event()
         self._startup_event = threading.Event()  # Mostly used for testing. Triggered when startup completes.
 
+        persistent_store = storage.PersistentAPIStorage(redis_pool, name)
+
         if source_api is None:
-            source_api = self._resolve_source_api(self._config, name)
+            source_api = self._resolve_source_api(self._config, name, persistent_store)
         self._source_api = source_api
 
         self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)
@@ -173,7 +176,8 @@ class ThreadQueryExecutor:
         self._data_sink = _RedisDataSink(self._config["redis"], redis_pool)
 
     @staticmethod
-    def _resolve_source_api(executor_config: dict, executor_name: str) -> abstract_source.AbstractMultiMessageSourceAPI:
+    def _resolve_source_api(executor_config: dict, executor_name: str,
+                            persistent_store: storage.PersistentAPIStorage) -> abstract_source.AbstractMultiMessageSourceAPI:
         """
         Tries to load ind instantiate the source API
 
@@ -200,7 +204,8 @@ class ThreadQueryExecutor:
             raise ModuleNotFoundError(f"The specified source API class '{type_name}' ({api_class}) is not an "
                                       f"AbstractMultiMessageSourceAPI.")
 
-        api_object = api_class(source_parameters=executor_config["source parameter"], executor_name=executor_name)
+        api_object = api_class(source_parameters=executor_config["source parameter"], executor_name=executor_name,
+                               persistent_store=persistent_store)
         return api_object
 
     @property
