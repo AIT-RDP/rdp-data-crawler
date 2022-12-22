@@ -1,0 +1,21 @@
+version: 1
+data sources:
+  submeters.modbus.Hauptzaehler:
+    type: "data_crawler.sources.modbus.ModbusTCP"
+    source parameter:
+      register spec: !table/csv
+        path: "./PAC2200_modbus_registers.csv"
+      address: "10.10.10.131"
+    polling:
+      frequency: 10s
+    redis:
+      stream: "measurements.submeters.Hauptzaehler"
+      tags: # Additional Redis tags that will be appended
+        station: "KLAGENFURT-HTL1"
+        data_provider: "PAC2200"
+        device_name: "Hauptzaehler"
+
+redis:
+  host: localhost
+  port: 6379
+  db: 0
