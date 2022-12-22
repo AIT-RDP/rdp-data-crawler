@@ -5,6 +5,7 @@ import datetime
 
 import pytest
 
+import data_crawler.access.storage as storage
 import data_crawler.sources.fronius as fronius
 import helpers
 
@@ -266,10 +267,17 @@ def archive_parameters() -> dict:
     }
 
 
-def test_inverter_archive_parsing(inverter_archive_response_1, archive_parameters):
+@pytest.fixture()
+def persistent_store(redis_pool) -> storage.PersistentAPIStorage:
+    """Returns an initialized persistent store"""
+    return storage.PersistentAPIStorage(redis_pool, "test_executor")
+
+
+def test_inverter_archive_parsing(inverter_archive_response_1, archive_parameters, persistent_store):
     """Tests parsing the archive files"""
 
-    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
     api.start()
     messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_1))
     api.stop()
@@ -311,12 +319,13 @@ def test_inverter_archive_parsing(inverter_archive_response_1, archive_parameter
                                                5.0199999999999996, 1.8411111111111111]
 
 
-def test_inverter_archive_parsing_full(inverter_archive_response_2, archive_parameters):
+def test_inverter_archive_parsing_full(inverter_archive_response_2, archive_parameters, persistent_store):
     """Tests parsing the archive files"""
 
     del archive_parameters["data points"]  # Query all data points
 
-    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
     api.start()
     messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_2))
     api.stop()
@@ -349,12 +358,13 @@ def test_inverter_archive_parsing_full(inverter_archive_response_2, archive_para
     assert messages[0]["U_L3N"] == [175.60000000000002, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 
-def test_inverter_archive_parsing_big_message(inverter_archive_response_3, archive_parameters):
+def test_inverter_archive_parsing_big_message(inverter_archive_response_3, archive_parameters, persistent_store):
     """Tests parsing a bigger data file"""
 
     del archive_parameters["data points"]  # Query all data points
 
-    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
     api.start()
     messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_3))
     api.stop()
@@ -372,12 +382,14 @@ def test_inverter_archive_parsing_big_message(inverter_archive_response_3, archi
     assert len(list(filter(lambda x: x is None, messages[0]["U_L1N"]))) == 1  # One interpolated None value
 
 
-def test_inverter_archive_time_correction(inverter_archive_response_1, archive_parameters):
+def test_inverter_archive_time_correction_single(inverter_archive_response_1, archive_parameters, persistent_store):
     """Tests parsing the archive files"""
 
     archive_parameters["correct device time"] = True
 
-    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
+    api.clear_time_cache()
     api.start()
     ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
     messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_1))
@@ -393,6 +405,7 @@ def test_inverter_archive_time_correction(inverter_archive_response_1, archive_p
     assert messages[0]["device_id"] == "1"
     assert messages[0]["observation_time_device"] == ref_ts
 
+    # Test that all messages have a common offset
     offset = ts_now - datetime.datetime.fromisoformat("2022-11-30T14:54:25+01:00")
     assert len(messages[0]["observation_time"]) == 11
     for ts_corr, ts_orig in zip(messages[0]["observation_time"], messages[0]["observation_time_device"]):
@@ -403,7 +416,83 @@ def test_inverter_archive_time_correction(inverter_archive_response_1, archive_p
         assert ts_corr <= ts_orig + offset + datetime.timedelta(seconds=0.5)
 
 
-def test_inverter_archive_device_tags(inverter_archive_response_1, archive_parameters):
+def test_inverter_archive_time_correction_multiple_calls_one_pass(inverter_archive_response_1, archive_parameters,
+                                                                  persistent_store):
+    """Tests whether the archive call consistently corrects time stamps"""
+
+    archive_parameters["correct device time"] = True
+
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
+    api.clear_time_cache()
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_1))
+
+    ref_ts = ["2022-11-30T14:00:00+01:00", "2022-11-30T14:05:00+01:00", "2022-11-30T14:10:00+01:00",
+              "2022-11-30T14:15:00+01:00", "2022-11-30T14:20:00+01:00", "2022-11-30T14:25:00+01:00",
+              "2022-11-30T14:30:00+01:00", "2022-11-30T14:35:00+01:00", "2022-11-30T14:40:00+01:00",
+              "2022-11-30T14:45:00+01:00", "2022-11-30T14:50:00+01:00"]
+
+    assert len(messages) == 5
+
+    assert messages[0]["device_id"] == "1"
+    assert messages[0]["observation_time_device"] == ref_ts
+
+    obs_time = messages[0]["observation_time"].copy()
+
+    # Perform another API call
+    inverter_archive_response_1["Head"]["Timestamp"] = "2022-11-30T14:54:30+01:00"
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_1))
+    api.stop()
+
+    assert len(messages) == 5
+
+    assert messages[0]["device_id"] == "1"
+    assert messages[0]["observation_time_device"] == ref_ts
+    assert messages[0]["observation_time"] == obs_time
+
+
+def test_inverter_archive_time_correction_multiple_calls_restart(inverter_archive_response_1, archive_parameters,
+                                                                 persistent_store):
+    """Tests whether the archive call consistently corrects time stamps"""
+
+    archive_parameters["correct device time"] = True
+
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
+    api.clear_time_cache()
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_1))
+    api.stop()
+
+    ref_ts = ["2022-11-30T14:00:00+01:00", "2022-11-30T14:05:00+01:00", "2022-11-30T14:10:00+01:00",
+              "2022-11-30T14:15:00+01:00", "2022-11-30T14:20:00+01:00", "2022-11-30T14:25:00+01:00",
+              "2022-11-30T14:30:00+01:00", "2022-11-30T14:35:00+01:00", "2022-11-30T14:40:00+01:00",
+              "2022-11-30T14:45:00+01:00", "2022-11-30T14:50:00+01:00"]
+
+    assert len(messages) == 5
+
+    assert messages[0]["device_id"] == "1"
+    assert messages[0]["observation_time_device"] == ref_ts
+
+    obs_time = messages[0]["observation_time"].copy()
+
+    # Perform another API call with another api object
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
+    api.start()
+    inverter_archive_response_1["Head"]["Timestamp"] = "2022-11-30T14:54:30+01:00"
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_1))
+    api.stop()
+
+    assert len(messages) == 5
+
+    assert messages[0]["device_id"] == "1"
+    assert messages[0]["observation_time_device"] == ref_ts
+    assert messages[0]["observation_time"] == obs_time
+
+
+def test_inverter_archive_device_tags(inverter_archive_response_1, archive_parameters, persistent_store):
     """Tests the device-specific tag function"""
 
     archive_parameters["device tags"] = {
@@ -411,7 +500,8 @@ def test_inverter_archive_device_tags(inverter_archive_response_1, archive_param
         "5": {"readable_name": "fifth"},
     }
 
-    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
     api.start()
     messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_1))
     api.stop()
@@ -429,12 +519,13 @@ def test_inverter_archive_device_tags(inverter_archive_response_1, archive_param
 
 
 @pytest.mark.xfail(strict=False)
-def test_inverter_archive_fetch(archive_parameters):
+def test_inverter_archive_fetch(archive_parameters, persistent_store):
     """Tests fetching an exemplary data logger"""
 
     del archive_parameters["data points"]  # Query all data points
 
-    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>")
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
     api.start()
     ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
     messages = list(api.fetch_data_bundle())
