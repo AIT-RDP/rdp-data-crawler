@@ -25,7 +25,7 @@ def minimal_modbus_config(mockup_server):
         "address": mockup_server[0],
         "port": mockup_server[1],
         "register spec": pd.DataFrame.from_dict({
-            "Register_start": [100, "", "", 110],
+            "Register_start": [100, "X", "-", 110],
             "Register_end": ["", "", "", 111],
             "Register_type": ["i", "i", "i", "i"],
             "Data_type": ["UINT16", "DOUBLE", "FloaT", "UINT32"],
