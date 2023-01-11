@@ -13,6 +13,7 @@ import requests
 
 import data_crawler.access.guards as guards
 import data_crawler.access.jsonpath as jx
+import data_crawler.access.storage as storage
 import data_crawler.sources.abc.abstract_source as abstract_source
 
 # The access guard of all real-time queries
@@ -93,9 +94,12 @@ class FroniusInverterRealtimeData(abstract_source.AbstractSourceAPI):
 
         decoded_message["P_DC_tot"] = decoded_message.get("I_DC_tot", 0.0) * decoded_message.get("U_DC", 0.0)
         decoded_message["observation_time_device"] = decoded_message["observation_time"]
+        decoded_message["observation_time_correction"] = 0.0
 
         if self._correct_device_time:
             decoded_message["observation_time"] = ts_now.isoformat()
+            decoded_message["observation_time_correction"] = (datetime.datetime.fromisoformat(
+                decoded_message["observation_time_device"]) - ts_now).total_seconds()
 
         return decoded_message
 
@@ -150,10 +154,12 @@ class FroniusInverterPowerFlowRealtimeData(abstract_source.AbstractMultiMessageS
             raw_data = self._fetch_raw_data()
         _raise_for_fronius_status(raw_data)
 
-        observation_time = raw_data["Head"]["Timestamp"]
+        observation_time_device = datetime.datetime.fromisoformat(raw_data["Head"]["Timestamp"])
+        observation_time = ts_now if self._correct_device_time else observation_time_device
         base_message = {
-            "observation_time_device": observation_time,
-            "observation_time": ts_now.isoformat() if self._correct_device_time else observation_time,
+            "observation_time_device": observation_time_device.isoformat(),
+            "observation_time": observation_time.isoformat(),
+            "observation_time_correction": (observation_time_device - observation_time).total_seconds(),
         }
 
         for inv_name, inv_data in raw_data["Body"]["Data"]["Inverters"].items():
@@ -165,7 +171,7 @@ class FroniusInverterPowerFlowRealtimeData(abstract_source.AbstractMultiMessageS
 
         decoded_message = {
             "device_id": inv_name,
-            "device_type": _fronius_device_types.get(inv_data["DT"], "Unknown Device"),
+            "device_type": _fronius_device_types.get(inv_data.get("DT", -1), "Unknown Device"),
             "E_P_exp": inv_data["E_Total"],  # [Wh]
             "E_P_exp_day": inv_data["E_Day"],  # [Wh]
             "E_P_exp_year": inv_data["E_Year"],  # [Wh]
@@ -215,10 +221,11 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         "PowerReal_PAC_Sum": "P_AC_avg",  # [1W]
     }
 
-    def __init__(self, source_parameters, executor_name, **kwargs):
+    def __init__(self, source_parameters, executor_name, persistent_store: storage.PersistentAPIStorage, **kwargs):
         """
         :param source_parameters: The source parameters according to the configuration
         :param executor_name: The name of the executor for debugging purpose
+        :param persistent_store: The store to put the historical time corrections in.
         :param kwargs: Any extra arguments that will be sent to the super class
         """
 
@@ -237,10 +244,36 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
 
         self._device_tags = source_parameters.get("device tags", {})  # dict of device specific tags to append
 
-        initial_history = pd.to_timedelta(source_parameters.get("initial history", "48h"))
-        self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - initial_history
+        # Initialize the history window parameters
+        self._initial_history = pd.to_timedelta(source_parameters.get("initial history", "48h"))
+        if "max history" in source_parameters:
+            self._max_history = pd.to_timedelta(source_parameters["max history"])
+        else:
+            self._max_history = self._initial_history * 1.5
+
+        if self._initial_history > self._max_history:
+            raise ValueError(f"The max history ({self._max_history.total_seconds()}s) is smaller than the initial "
+                             f"history ({self._initial_history.total_seconds()}s).")
 
         self._fetch_ahead = pd.to_timedelta(source_parameters.get("fetch ahead", "10min"))
+        self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - self._initial_history
+
+        self._store = persistent_store
+        self._time_correction = self._fetch_historical_time_correction(persistent_store)
+
+    @staticmethod
+    def _fetch_historical_time_correction(store: storage.PersistentAPIStorage) -> Dict[
+        datetime.datetime, datetime.datetime]:
+        """Fetches the time correction state mapping the device time to observation time stamps"""
+
+        if "observation_time_map" in store:
+            ret = {
+                datetime.datetime.fromisoformat(k): datetime.datetime.fromisoformat(v)
+                for k, v in store["observation_time_map"].items()
+            }
+            return ret
+        else:
+            return {}
 
     def fetch_data_bundle(self, raw_data: Optional[dict] = None) -> Generator[Dict[str, Any], None, None]:
         """
@@ -293,13 +326,19 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         observation_time_device = [start_time + datetime.timedelta(seconds=int(ts)) for ts in ref_point_offset]
         observation_time = observation_time_device
         if self._correct_device_time:
-            observation_time = [ts + time_offset for ts in observation_time_device]
+            observation_time = self._correct_observation_time(observation_time, time_offset)
+
+        correction_offset = [
+            (ts_device - ts_obs).total_seconds()
+            for ts_device, ts_obs in zip(observation_time_device, observation_time)
+        ]
 
         ret = {
             "device_id": device_id,
-            "device_type": _fronius_device_types.get(inv_data["DeviceType"], "Unknown Device"),
+            "device_type": _fronius_device_types.get(inv_data.get("DeviceType", -1), "Unknown Device"),
             "observation_time_device": [ts.isoformat() for ts in observation_time_device],
             "observation_time": [ts.isoformat() for ts in observation_time],
+            "observation_time_correction": correction_offset,
             "observation_time_span": [float(chan_data["TimeSpanInSec"]["Values"][ts]) for ts in ref_point_offset]
         }
         ret.update(self._device_tags.get(device_id, {}))
@@ -311,6 +350,23 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
 
             time_series = self._extract_time_series(chan_data[dp_name], ref_point_offset, dp_name)
             ret[self._parameter_mapping[dp_name]] = time_series
+
+        return ret
+
+    def _correct_observation_time(self, observation_time: List[datetime.datetime],
+                                  offset: datetime.timedelta) -> List[datetime.datetime]:
+        """Corrects the observations and updates the values in the store"""
+
+        ret = [self._time_correction.get(ts, ts + offset) for ts in observation_time]
+        latest_ts = max(observation_time)
+
+        self._time_correction.update(dict(zip(observation_time, ret)))
+        self._time_correction = {  # Filter time stamps to avoid memory leaks
+            k: v
+            for k, v in self._time_correction.items()
+            if k >= latest_ts - self._max_history - self._fetch_ahead
+        }
+        self._store["observation_time_map"] = {k.isoformat(): v.isoformat() for k, v in self._time_correction.items()}
 
         return ret
 
@@ -347,8 +403,15 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         ts_now += self._fetch_ahead
         ts_now = datetime.datetime(ts_now.year, ts_now.month, ts_now.day, ts_now.hour, ts_now.minute, 0,
                                    tzinfo=ts_now.tzinfo) + datetime.timedelta(minutes=1)
-        # Floor the seconds
+
+        # Calculate the start point
         ts_start = self._last_query_ts
+        if ts_now - ts_start > self._max_history + self._fetch_ahead:
+            self._logger.warning(f"Query interval {(ts_now - ts_start - self._fetch_ahead).total_seconds()}s exceeds "
+                                 f"the maximum history {self._max_history.total_seconds()}. Curtail query.")
+            ts_start = ts_now - self._max_history - self._fetch_ahead
+
+        # Floor the seconds
         ts_start = datetime.datetime(ts_start.year, ts_start.month, ts_start.day, ts_start.hour, ts_start.minute, 0,
                                      tzinfo=ts_start.tzinfo)
 
@@ -366,6 +429,12 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         resp.raise_for_status()
         return resp.json()
 
+    def clear_time_cache(self):
+        """Clears the timing data"""
+
+        del self._store["observation_time_map"]
+        self._time_correction = {}
+
 
 def _raise_for_fronius_status(raw_data):
     """Parses the fronius status description and returns the result"""
@@ -378,6 +447,7 @@ def _raise_for_fronius_status(raw_data):
 
 
 _fronius_device_types = {  # Maps the type id to the appropriate device name
+    -1: "Unavailable Device ID",
     67: "Fronius Primo 15.0-1 208-240",
     68: "Fronius Primo 12.5-1 208-240",
     69: "Fronius Primo 11.4-1 208-240",

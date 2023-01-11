@@ -13,6 +13,7 @@ import redis
 
 import data_crawler.query_executors as query_executors
 import data_crawler.sources.abc.abstract_source as abstract_sources
+import data_crawler.access.storage as storage
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
 
     def __init__(self, source_parameters, **kwargs):
         """Stores the configuration and initializes the object"""
+        self.kwargs = kwargs
+
         self.config = source_parameters
         self.fetch_invocations = 0
         self.start_invocations = 0
@@ -82,23 +85,6 @@ def mockup_service_config(appended_test_path):
 
 
 @pytest.fixture()
-def redis_pool() -> redis.ConnectionPool:
-    """Opens a Redis pool and tests the connection"""
-
-    host = os.environ.get("DATA_CRAWLER_REDIS_HOST", "localhost")
-    port = os.environ.get("DATA_CRAWLER_REDIS_PORT", "6379")
-    db = os.environ.get("DATA_CRAWLER_REDIS_DB", "0")
-
-    logger.debug(f"Initialize redis pool connecting to host={host}, port={port}, db={db}")
-
-    pool = redis.ConnectionPool(host=host, port=port, db=db, decode_responses=True)
-    client = redis.Redis(connection_pool=pool)
-
-    client.ping()
-    return pool
-
-
-@pytest.fixture()
 def redis_stream_name(redis_pool) -> str:
     """Returns the name of a managed REDIS stream"""
 
@@ -139,6 +125,9 @@ def test_thread_executor_api_instantiation(mockup_service_config, redis_pool):
     api: MockupSourceAPI = executor.source_api
     assert "key" in api.config
     assert api.config["key"] == "<keep it secret>"
+
+    assert "persistent_store" in api.kwargs
+    assert isinstance(api.kwargs["persistent_store"], storage.PersistentAPIStorage)
 
 
 def test_thread_executor_api_lifecycle(mockup_service_config, redis_pool):

@@ -1,6 +1,7 @@
 ﻿Data Point Name;Unit;Datatype;Meta;Description
 observation_time;ISO TS;String;no;The ISO encoded time-zone aware real time instant of the observation or forecasted point
 observation_time_device;ISO TS;String;no;The ISO encoded time-zone aware real time instant of the observation or forecasted point according to the source device
+observation_time_correction;s;String;no;Any external time correction that is applied to the observation time
 observation_time_span;s;Float;no;The length of the current observation interval
 forecasting_time;ISO TS;String;no;The ISO encoded time-zone aware time of the encoded time the forecast was created
 longitude;°;Float;yes;Longitude, WGS 84
