@@ -244,10 +244,19 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
 
         self._device_tags = source_parameters.get("device tags", {})  # dict of device specific tags to append
 
+        # Initialize the history window parameters
         self._initial_history = pd.to_timedelta(source_parameters.get("initial history", "48h"))
-        self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - self._initial_history
+        if "max history" in source_parameters:
+            self._max_history = pd.to_timedelta(source_parameters["max history"])
+        else:
+            self._max_history = self._initial_history * 1.5
+
+        if self._initial_history > self._max_history:
+            raise ValueError(f"The max history ({self._max_history.total_seconds()}s) is smaller than the initial "
+                             f"history ({self._initial_history.total_seconds()}s).")
 
         self._fetch_ahead = pd.to_timedelta(source_parameters.get("fetch ahead", "10min"))
+        self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - self._initial_history
 
         self._store = persistent_store
         self._time_correction = self._fetch_historical_time_correction(persistent_store)
@@ -355,7 +364,7 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         self._time_correction = {  # Filter time stamps to avoid memory leaks
             k: v
             for k, v in self._time_correction.items()
-            if k >= latest_ts - self._initial_history - self._fetch_ahead
+            if k >= latest_ts - self._max_history - self._fetch_ahead
         }
         self._store["observation_time_map"] = {k.isoformat(): v.isoformat() for k, v in self._time_correction.items()}
 
@@ -394,8 +403,15 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         ts_now += self._fetch_ahead
         ts_now = datetime.datetime(ts_now.year, ts_now.month, ts_now.day, ts_now.hour, ts_now.minute, 0,
                                    tzinfo=ts_now.tzinfo) + datetime.timedelta(minutes=1)
-        # Floor the seconds
+
+        # Calculate the start point
         ts_start = self._last_query_ts
+        if ts_now - ts_start > self._max_history + self._fetch_ahead:
+            self._logger.warning(f"Query interval {(ts_now - ts_start - self._fetch_ahead).total_seconds()}s exceeds "
+                                 f"the maximum history {self._max_history.total_seconds()}. Curtail query.")
+            ts_start = ts_now - self._max_history - self._fetch_ahead
+
+        # Floor the seconds
         ts_start = datetime.datetime(ts_start.year, ts_start.month, ts_start.day, ts_start.hour, ts_start.minute, 0,
                                      tzinfo=ts_start.tzinfo)
 
