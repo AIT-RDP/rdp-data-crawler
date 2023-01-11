@@ -262,6 +262,7 @@ def test_inverter_pf_data_fetch(pf_parameters):
 inverter_archive_response_1 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-1.json")
 inverter_archive_response_2 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-2.json")
 inverter_archive_response_3 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-3.json")
+inverter_archive_response_4 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-4.json")
 
 
 @pytest.fixture
@@ -390,6 +391,50 @@ def test_inverter_archive_parsing_big_message(inverter_archive_response_3, archi
     assert len(messages[0]["U_L3N"]) == 577
 
     assert len(list(filter(lambda x: x is None, messages[0]["U_L1N"]))) == 1  # One interpolated None value
+
+
+def test_inverter_archive_parsing_reduced_device(inverter_archive_response_4, archive_parameters, persistent_store):
+    """Tests parsing the archive files with a reduced device response"""
+
+    del archive_parameters["data points"]  # Query all data points
+
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_4))
+    api.stop()
+
+    ref_ts = ["2022-12-27T08:35:00+01:00", "2022-12-27T08:40:00+01:00"]
+
+    assert len(messages) == 5
+
+    assert messages[0]["device_id"] == "1"
+    assert messages[0]["observation_time"] == ref_ts
+    assert messages[0]["observation_time_device"] == ref_ts
+    assert messages[0]["observation_time_correction"] == [0.0] * 2
+
+    assert messages[0]["I_L1"] == [0.06, 0.05]
+    assert messages[0]["I_L2"] == [0.06, 0.05]
+    assert messages[0]["I_L3"] == [0.06, 0.04]
+
+    assert messages[0]["I_DC_S1"] == [0.03, 0.03]
+    assert messages[0]["I_DC_S2"] == [0, 0]
+    assert messages[0]["U_DC_S1"] == [624, 640.5]
+    assert messages[0]["U_DC_S2"] == [179.20000000000002, 178.8]
+
+    assert messages[1]["device_id"] == "2"
+    assert messages[1]["observation_time"] == ref_ts
+    assert messages[1]["observation_time_device"] == ref_ts
+    assert messages[1]["observation_time_correction"] == [0.0] * 2
+
+    assert messages[1]["I_L1"] == [0.11, 0.11]
+    assert messages[1]["I_L2"] == [0.08, 0.09]
+    assert messages[1]["I_L3"] == [0.07, 0.08]
+
+    assert messages[1]["I_DC_S1"] == [0.04, 0.06]
+    assert messages[1]["I_DC_S2"] == [0.04, 0.05]
+    assert messages[1]["U_DC_S1"] == [610.2, 592.3000000000001]
+    assert messages[1]["U_DC_S2"] == [588.6, 569.5]
 
 
 def test_inverter_archive_time_correction_single(inverter_archive_response_1, archive_parameters, persistent_store):

@@ -171,7 +171,7 @@ class FroniusInverterPowerFlowRealtimeData(abstract_source.AbstractMultiMessageS
 
         decoded_message = {
             "device_id": inv_name,
-            "device_type": _fronius_device_types.get(inv_data["DT"], "Unknown Device"),
+            "device_type": _fronius_device_types.get(inv_data.get("DT", -1), "Unknown Device"),
             "E_P_exp": inv_data["E_Total"],  # [Wh]
             "E_P_exp_day": inv_data["E_Day"],  # [Wh]
             "E_P_exp_year": inv_data["E_Year"],  # [Wh]
@@ -326,7 +326,7 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
 
         ret = {
             "device_id": device_id,
-            "device_type": _fronius_device_types.get(inv_data["DeviceType"], "Unknown Device"),
+            "device_type": _fronius_device_types.get(inv_data.get("DeviceType", -1), "Unknown Device"),
             "observation_time_device": [ts.isoformat() for ts in observation_time_device],
             "observation_time": [ts.isoformat() for ts in observation_time],
             "observation_time_correction": correction_offset,
@@ -431,6 +431,7 @@ def _raise_for_fronius_status(raw_data):
 
 
 _fronius_device_types = {  # Maps the type id to the appropriate device name
+    -1: "Unavailable Device ID",
     67: "Fronius Primo 15.0-1 208-240",
     68: "Fronius Primo 12.5-1 208-240",
     69: "Fronius Primo 11.4-1 208-240",
