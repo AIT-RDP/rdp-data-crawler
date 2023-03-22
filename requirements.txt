@@ -5,7 +5,7 @@ requests==2.28
 cachecontrol==0.12
 lockfile==0.12.2
 numpy==1.23.1
-pandas==1.4.3
+pandas==1.5.3
 hiredis==2.0.0
 redis==4.3
 jsonpath-rw==1.4
