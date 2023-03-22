@@ -11,4 +11,4 @@ redis==4.3
 jsonpath-rw==1.4
 pymodbus==3.2.2
 git+https://${MODBUS_GIT_USER}:${MODBUS_GIT_PASSWORD}@gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler@master
-pyrdp-commons==0.0.0.post24.dev0+5cbd951
+pyrdp-commons==0.0.0.post26.dev0+c87af5c
