@@ -16,6 +16,6 @@ dependencies:
       - hiredis==2.0
       - versioneer==0.22  # Not needed for productive use
       - jsonpath-rw==1.4
-      - pymodbus==3.0.2
+      - pymodbus==3.2.2
       - git+https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler@master
       - pyrdp-commons==0.0.0.post24.dev0+5cbd951
