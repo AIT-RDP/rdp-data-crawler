@@ -1,5 +1,7 @@
 """
 Tests the high-level CLI and its configuration utilities
+
+These test cases are mostly there to ensure compatibility with the AIT RDP library
 """
 
 import os
@@ -7,7 +9,7 @@ from typing import Dict
 
 import pytest
 
-import data_crawler.cli as cli
+import pyrdp_commons.cli as cli
 
 
 @pytest.fixture()
@@ -53,7 +55,7 @@ def minimal_env_test_set() -> Dict[str, str]:
 def test_load_config_minimal(minimal_config_file, minimal_env_test_set):
     """Loads and checks the minimal test config"""
 
-    config = cli.load_config(minimal_config_file)
+    config = cli.setup_app(minimal_config_file, None)
     assert config is not None
     assert "version" in config
     assert config["version"] == 1
@@ -65,7 +67,7 @@ def test_load_config_minimal(minimal_config_file, minimal_env_test_set):
 def test_load_config_env_template(minimal_config_file, minimal_env_test_set):
     """Tests the environment variable_substitution"""
 
-    config = cli.load_config(minimal_config_file)
+    config = cli.setup_app(minimal_config_file, None)
 
     assert "testing" in config
     assert "key" in config["testing"]
@@ -82,12 +84,12 @@ def table_config_file() -> str:
     return file_path
 
 
-def test_load_config_table_csv(table_config_file):
+def test_load_config_table_csv(table_config_file, minimal_env_test_set):
     """Test loading an externally provided CSV table"""
 
     import pandas as pd  # May not be always available
 
-    config = cli.load_config(table_config_file)
+    config = cli.setup_app(table_config_file, None)
     assert config["standard mapping"]["hello"] == "world"
 
     reference = pd.DataFrame({
@@ -105,22 +107,3 @@ def test_load_config_table_csv(table_config_file):
 
     assert isinstance(config["table 2"], pd.DataFrame)
     pd.testing.assert_frame_equal(config["table 2"], reference)
-
-
-def test_load_env_mockup(mockup_env_file, minimal_env_test_set):
-    """Tests loading the environment file"""
-
-    cli.load_env_file(mockup_env_file)  # No override of existing variables
-    assert os.environ["API_KEY"] == "backdoor"
-    assert os.environ["API_USER"] == "nsa"
-
-    del os.environ["API_KEY"]
-    del os.environ["API_USER"]
-
-    cli.load_env_file(None)
-    assert "API_KEY" not in os.environ
-    assert "API_USER" not in os.environ
-
-    cli.load_env_file(mockup_env_file)
-    assert os.environ["API_KEY"] == "not-a-real-pwd"
-    assert os.environ["API_USER"] == "database-host"
