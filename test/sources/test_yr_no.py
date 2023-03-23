@@ -8,7 +8,7 @@ import os
 import pytest
 
 import data_crawler.sources.yr_no as yr_no
-
+import helpers
 
 @pytest.fixture()
 def simplified_base_response() -> dict:
@@ -34,10 +34,11 @@ def location_forecast_base_parameters() -> dict:
     }
 
 
-def test_location_forecast_parsing(simplified_base_response: dict, location_forecast_base_parameters: dict):
+@pytest.mark.parametrize("config_fkt", [helpers.direct_config, helpers.to_string_values])
+def test_location_forecast_parsing(simplified_base_response: dict, location_forecast_base_parameters: dict, config_fkt):
     """Tests the parsing and transformation mechanism with a static response"""
 
-    api = yr_no.LocationForecast(source_parameters=location_forecast_base_parameters)
+    api = yr_no.LocationForecast(source_parameters=config_fkt(location_forecast_base_parameters))
     response_data = api.fetch_data(raw_forecast=simplified_base_response)
 
     assert response_data is not None
@@ -82,10 +83,11 @@ def test_location_forecast_online(location_forecast_base_parameters):
            datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=1)
 
 
-def test_location_forecast_request_parameters(location_forecast_base_parameters):
+@pytest.mark.parametrize("config_fkt", [helpers.direct_config, helpers.to_string_values])
+def test_location_forecast_request_parameters(location_forecast_base_parameters, config_fkt):
     """Tests whether truncation is correctly performed"""
 
-    api = yr_no.LocationForecast(source_parameters=location_forecast_base_parameters)
+    api = yr_no.LocationForecast(source_parameters=config_fkt(location_forecast_base_parameters))
     assert "lat" in api.static_request_parameters
     assert api.static_request_parameters["lat"] == "48.2687"
     assert "lon" in api.static_request_parameters
