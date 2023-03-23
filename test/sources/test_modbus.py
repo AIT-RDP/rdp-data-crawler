@@ -15,7 +15,7 @@ import pymodbus.server
 import pytest
 
 import data_crawler.sources.modbus as modbus
-
+import helpers
 
 @pytest.fixture()
 def minimal_modbus_config(mockup_server):
@@ -147,10 +147,11 @@ def modbus_config_types(mockup_server):
     }
 
 
-def test_modbus_tcp_unconventional_types(modbus_config_types):
+@pytest.mark.parametrize("config_fkt", [helpers.direct_config, helpers.to_string_values])
+def test_modbus_tcp_unconventional_types(modbus_config_types, config_fkt):
     """Tests the very basic operation of the modbus crawler"""
 
-    src_api = modbus.ModbusTCP(source_parameters=modbus_config_types, executor_name="<test-modbus>")
+    src_api = modbus.ModbusTCP(source_parameters=config_fkt(modbus_config_types), executor_name="<test-modbus>")
     src_api.start()
 
     time_start = datetime.datetime.utcnow()

@@ -6,6 +6,7 @@ import datetime
 import pytest
 
 import data_crawler.sources.weatherbit as weatherbit
+import helpers
 
 
 @pytest.fixture()
@@ -32,10 +33,11 @@ def basic_weatherbit_config() -> dict:
     }
 
 
-def test_weatherbit_current_parsing(basic_weatherbit_config, simplified_mea_response):
+@pytest.mark.parametrize("config_fkt", [helpers.direct_config, helpers.to_string_values])
+def test_weatherbit_current_parsing(basic_weatherbit_config, simplified_mea_response, config_fkt):
     """Tests the parsing using a prefetched document"""
 
-    api = weatherbit.CurrentWeather(source_parameters=basic_weatherbit_config, executor_name="<test>")
+    api = weatherbit.CurrentWeather(source_parameters=config_fkt(basic_weatherbit_config), executor_name="<test>")
     message_data = api.fetch_data(raw_data=simplified_mea_response)
 
     assert message_data["observation_time"] == "2022-09-28T10:52:00+00:00"
@@ -59,10 +61,11 @@ def test_weatherbit_current_parsing(basic_weatherbit_config, simplified_mea_resp
 
 
 @pytest.mark.skipif("DATA_CRAWLER_WEATHERBIT_API_KEY" not in os.environ, reason="No API Key provided")
-def test_weatherbit_current_online(basic_weatherbit_config):
+@pytest.mark.parametrize("config_fkt", [helpers.direct_config, helpers.to_string_values])
+def test_weatherbit_current_online(basic_weatherbit_config, config_fkt):
     """Tests whether the source API correctly fetches online data"""
 
-    api = weatherbit.CurrentWeather(source_parameters=basic_weatherbit_config, executor_name="<test>")
+    api = weatherbit.CurrentWeather(source_parameters=config_fkt(basic_weatherbit_config), executor_name="<test>")
     message_data = api.fetch_data()
 
     assert message_data is not None
@@ -82,10 +85,11 @@ def simplified_hourly_fc_response() -> dict:
     return data
 
 
-def test_weatherbit_hourly_fc_parsing(basic_weatherbit_config, simplified_hourly_fc_response):
+@pytest.mark.parametrize("config_fkt", [helpers.direct_config, helpers.to_string_values])
+def test_weatherbit_hourly_fc_parsing(basic_weatherbit_config, simplified_hourly_fc_response, config_fkt):
     """Tests the parsing using a prefetched document"""
 
-    api = weatherbit.HourlyForecasts(source_parameters=basic_weatherbit_config, executor_name="<test>")
+    api = weatherbit.HourlyForecasts(source_parameters=config_fkt(basic_weatherbit_config), executor_name="<test>")
     message_data = api.fetch_data(raw_data=simplified_hourly_fc_response)
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 
@@ -118,10 +122,11 @@ def test_weatherbit_hourly_fc_parsing(basic_weatherbit_config, simplified_hourly
 
 
 @pytest.mark.skipif("DATA_CRAWLER_WEATHERBIT_API_KEY" not in os.environ, reason="No API Key provided")
-def test_weatherbit_hourly_fc_online(basic_weatherbit_config):
+@pytest.mark.parametrize("config_fkt", [helpers.direct_config, helpers.to_string_values])
+def test_weatherbit_hourly_fc_online(basic_weatherbit_config, config_fkt):
     """Tests whether the source API correctly fetches online data"""
 
-    api = weatherbit.HourlyForecasts(source_parameters=basic_weatherbit_config, executor_name="<test>")
+    api = weatherbit.HourlyForecasts(source_parameters=config_fkt(basic_weatherbit_config), executor_name="<test>")
     message_data = api.fetch_data()
 
     assert message_data is not None
