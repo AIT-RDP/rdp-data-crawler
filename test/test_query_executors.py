@@ -1,9 +1,11 @@
 """
 Test the query executor services
 """
+import copy
 import datetime
 import logging
 import os
+import threading
 import time
 import warnings
 from typing import Dict, Any
@@ -32,6 +34,9 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
 
         self.fetch_ts = []
 
+        self.enable_fetch = threading.Event()
+        self.enable_fetch.set()
+
     def start(self):
         """Counts the start and performs some basic checks"""
         assert self.start_invocations == self.stop_invocations
@@ -47,6 +52,8 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
 
         if self.config.get("no odd invocations", False) and self.fetch_invocations % 2 == 1:
             raise ValueError("That's odd.")
+
+        self.enable_fetch.wait()
 
         return {
             "invocations": self.fetch_invocations,
@@ -346,3 +353,84 @@ def test_thread_executor_redis_templated_export(mockup_service_config, redis_poo
     assert messages is not None
     assert 2 <= len(messages) <= 3
     assert len(messages) == api.fetch_invocations
+
+
+@pytest.fixture()
+def mockup_executors_config(mockup_service_config):
+    """A mockup config including two fake executors"""
+
+    return {
+        "first": copy.deepcopy(mockup_service_config),
+        "second": copy.deepcopy(mockup_service_config)
+    }
+
+
+@pytest.fixture()
+def mockup_executors_externals(mockup_executors_config) -> Dict[str, MockupSourceAPI]:
+    """Instantiates the mockup executors for the collection"""
+    return {
+        key: MockupSourceAPI(config) for key, config in mockup_executors_config.items()
+    }
+
+
+def test_query_supervisor_life_cycle(mockup_executors_config, mockup_executors_externals, redis_pool):
+    """Tests the standard life cycle of the supervisor"""
+
+    supervisor = query_executors.QuerySupervisor(mockup_executors_config, {}, redis_pool, mockup_executors_externals)
+    supervisor.start()
+
+    status = supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "ok"}
+
+    time.sleep(0.6)
+    status = supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "ok"}
+
+    assert mockup_executors_externals["first"].start_invocations == 1
+    assert mockup_executors_externals["first"].fetch_invocations >= 1
+    assert mockup_executors_externals["first"].stop_invocations == 0
+
+    assert mockup_executors_externals["second"].start_invocations == 1
+    assert mockup_executors_externals["second"].fetch_invocations >= 1
+    assert mockup_executors_externals["second"].stop_invocations == 0
+
+    supervisor.stop()
+    assert mockup_executors_externals["first"].start_invocations == 1
+    assert mockup_executors_externals["first"].fetch_invocations >= 1
+    assert mockup_executors_externals["first"].stop_invocations == 1
+
+    assert mockup_executors_externals["second"].start_invocations == 1
+    assert mockup_executors_externals["second"].fetch_invocations >= 1
+    assert mockup_executors_externals["second"].stop_invocations == 1
+
+
+def test_query_supervisor_restart(mockup_executors_config, mockup_executors_externals, redis_pool):
+    """Tests the friendly restart policy of the query supervisor"""
+    sup_config = {"dead timeout": "0.1s"}
+    supervisor = query_executors.QuerySupervisor(mockup_executors_config, sup_config, redis_pool,
+                                                 mockup_executors_externals)
+    supervisor.start()
+
+    status = supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "ok"}
+
+    mockup_executors_externals["second"].enable_fetch.clear()  # Block the execution
+    time.sleep(1.1)
+
+    status = supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "stop-by-timeout"}
+    status = supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "blocking"}
+
+    mockup_executors_externals["second"].enable_fetch.set()
+    time.sleep(0.1)  # Give the second source some time to terminate
+
+    status = supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "restarted"}
+
+    time.sleep(0.6)
+
+    status = supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "ok"}
+
+    supervisor.stop()
