@@ -151,6 +151,33 @@ def test_thread_executor_api_lifecycle(mockup_service_config, redis_pool):
     assert api.stop_invocations == 1
 
 
+def test_thread_executor_api_status(mockup_service_config, redis_pool):
+    """Tests the API instantiation function using the mockup API"""
+
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool)
+    assert isinstance(executor.source_api, MockupSourceAPI)
+
+    status = executor.get_activity_status()
+    assert status.last_wakeup is None
+    assert status.last_cycle_complete is None
+    assert status.max_permitted_cycle_time == datetime.timedelta(seconds=0.5)
+
+    ts_start = datetime.datetime.now(tz=datetime.timezone.utc)
+    executor.start()
+    time.sleep(0.6)
+    executor.stop()
+    executor.join()
+
+    status = executor.get_activity_status()
+    assert status.last_wakeup is not None
+    assert status.last_wakeup >= ts_start
+
+    assert status.last_cycle_complete is not None
+    assert status.last_cycle_complete >= ts_start
+
+    assert status.max_permitted_cycle_time == datetime.timedelta(seconds=0.5)
+
+
 def test_thread_executor_invalid_api_name(mockup_service_config, redis_pool):
     """Tests an invalid API name"""
 
