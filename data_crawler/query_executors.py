@@ -1,6 +1,8 @@
 """
 Implements the logic to periodically execute API calls in a dedicated context
 """
+import copy
+import dataclasses
 import datetime
 import importlib
 import inspect
@@ -109,6 +111,13 @@ class _ExecutionTimer:
             self._next_tick_nominal += self._timer_interval * num_skip
             self._logger.warning(f"Skipped {num_skip} queries since the previous queries were too much delayed.")
 
+    @property
+    def max_permitted_cycle_time(self) -> datetime.timedelta:
+        """Returns the maximum interval between two timer ticks. Note that this may not be the nominal time."""
+
+        max_time = self._timer_interval + 2 * self._jitter
+        return datetime.timedelta(seconds=max_time)
+
 
 class _RedisDataSink:
     """Helper class that relays data to a redis stream according to the configuration"""
@@ -137,6 +146,15 @@ class _RedisDataSink:
 
         encoded_message = {key: json.dumps(val) for key, val in message.items()}
         self._client.xadd(self._stream_template.substitute(message), encoded_message)
+
+
+@dataclasses.dataclass()
+class ActivityStatus:
+    """Groups the execution activity status information for debugging and fault detection"""
+
+    last_wakeup: Optional[datetime.datetime]
+    last_cycle_complete: Optional[datetime.datetime]
+    max_permitted_cycle_time: datetime.timedelta  # The maximum allowed time, not the measured one
 
 
 class ThreadQueryExecutor:
@@ -174,6 +192,9 @@ class ThreadQueryExecutor:
         self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)
         self._timer = _ExecutionTimer(self._config["polling"], self._logger)
         self._data_sink = _RedisDataSink(self._config["redis"], redis_pool)
+
+        self._activity_status: ActivityStatus = ActivityStatus(None, None, self._timer.max_permitted_cycle_time)
+        self._activity_status_lock = threading.Lock()
 
     @staticmethod
     def _resolve_source_api(executor_config: dict, executor_name: str,
@@ -265,14 +286,33 @@ class ThreadQueryExecutor:
                 self._logger.debug("Shut down the API crawler")
                 break
 
-            assert self._timer.get_remaining_seconds() <= 0.0, "The event didn't awaited its timeout."
-
+            self._log_start_of_cycle()
             try:
                 self._fetch_once()
             finally:
                 self._timer.operation_done()
+            self._log_end_of_cycle()
 
         self._source_api.stop()
+
+    def _log_start_of_cycle(self):
+        """Logs the start of the cycle and performs some basic sanity checks"""
+
+        ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
+        timeout = self._timer.get_remaining_seconds()
+        if timeout > 0.0:
+            self._logger.error(f"The timer didn't awaited its timeout. {timeout} seconds left.")
+            assert False, "The event didn't awaited its timeout."
+
+        with self._activity_status_lock:
+            self._activity_status.last_wakeup = ts_now
+
+    def _log_end_of_cycle(self):
+        """Logs the end of the cycle"""
+
+        ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
+        with self._activity_status_lock:
+            self._activity_status.last_cycle_complete = ts_now
 
     def _fetch_once(self):
         """Performs one fetch and insert operation"""
@@ -282,3 +322,12 @@ class ThreadQueryExecutor:
                 self._data_sink.push_data(data)
         except Exception as err:
             self._logger.error(f"Skip one sample due to a {type(err).__name__}: {err}\n{traceback.format_exc()}")
+
+    def get_activity_status(self) -> ActivityStatus:
+        """
+        Returns a copy of the current activity status in a thread-save way
+        :return: The current activity status
+        """
+
+        with self._activity_status_lock:
+            return copy.copy(self._activity_status)
