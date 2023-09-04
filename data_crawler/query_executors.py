@@ -16,6 +16,7 @@ import traceback
 from typing import Optional, Dict, Any, List
 
 import pandas as pd
+import prometheus_client as prom
 import redis
 
 import data_crawler.sources.abc.abstract_source as abstract_source
@@ -166,6 +167,13 @@ class ThreadQueryExecutor:
     The long-running query operations are decoupled by a dedicated thread.
     """
 
+    _prom_calls = prom.Counter("data_crawler_source_calls", labelnames=["source_name", "status"],
+                               documentation="Number of calls to the data source")
+    _prom_source_duration = prom.Summary("data_crawler_crawling_duration_seconds", labelnames=["source_name"],
+                                         documentation="The duration of crawling a given source")
+    _prom_call_latency = prom.Summary("data_crawler_scheduling_delay_seconds", labelnames=["source_name"],
+                                      documentation="The delay of starting a data crawling job")
+
     def __init__(self, executor_config: dict, redis_pool: redis.ConnectionPool,
                  source_api: Optional[abstract_source.AbstractSourceAPI] = None, name: str = "<default>"):
         """
@@ -197,6 +205,13 @@ class ThreadQueryExecutor:
 
         self._activity_status: ActivityStatus = ActivityStatus(None, None, self._timer.max_permitted_cycle_time)
         self._activity_status_lock = threading.Lock()
+
+        self._source_name = name
+        self._prom_calls.labels(source_name=name, status="started")
+        self._prom_calls.labels(source_name=name, status="success")
+        self._prom_calls.labels(source_name=name, status="failed")
+        self._prom_source_duration.labels(source_name=name)
+        self._prom_call_latency.labels(source_name=name)
 
     @staticmethod
     def _resolve_source_api(executor_config: dict, executor_name: str,
@@ -299,10 +314,10 @@ class ThreadQueryExecutor:
 
             self._log_start_of_cycle()
             try:
-                self._fetch_once()
+                success = self._fetch_once()
             finally:
                 self._timer.operation_done()
-            self._log_end_of_cycle()
+            self._log_end_of_cycle(success)
 
         self._source_api.stop()
 
@@ -315,24 +330,35 @@ class ThreadQueryExecutor:
             self._logger.error(f"The timer didn't awaited its timeout. {timeout} seconds left.")
             assert False, "The event didn't awaited its timeout."
 
+        self._prom_calls.labels(source_name=self._source_name, status="started").inc(1)
+        self._prom_call_latency.labels(source_name=self._source_name).observe(-timeout)
+
         with self._activity_status_lock:
             self._activity_status.last_wakeup = ts_now
 
-    def _log_end_of_cycle(self):
+    def _log_end_of_cycle(self, success: bool):
         """Logs the end of the cycle"""
 
         ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+        status = "success" if success else "failed"
+        self._prom_calls.labels(source_name=self._source_name, status=status).inc(1)
+
         with self._activity_status_lock:
             self._activity_status.last_cycle_complete = ts_now
 
-    def _fetch_once(self):
-        """Performs one fetch and insert operation"""
+    def _fetch_once(self) -> bool:
+        """Performs one fetch and insert operation and returns the success status of the operations"""
 
         try:
-            for data in self._source_api.fetch_data_bundle():
-                self._data_sink.push_data(data)
+            with self._prom_source_duration.labels(source_name=self._source_name).time():
+                for data in self._source_api.fetch_data_bundle():
+                    self._data_sink.push_data(data)
+            success = True
         except Exception as err:
             self._logger.error(f"Skip one sample due to a {type(err).__name__}: {err}\n{traceback.format_exc()}")
+            success = False
+        return success
 
     def get_activity_status(self) -> ActivityStatus:
         """
@@ -356,6 +382,13 @@ class QuerySupervisor:
     their operation. In addition, it supports a restarting mechanism to gracefully restart failed executors.
     """
 
+    _prom_source_status = prom.Gauge("data_crawler_source_status", labelnames=["source_name"],
+                                     documentation="Status flag of the source. Ok, if zero.")
+    _prom_source_restarted = prom.Counter("data_crawler_source_restarts", labelnames=["source_name"],
+                                          documentation="Number of forced restarts due to crashed sources")
+    _prom_supervisor_heartbeat = prom.Counter("data_crawler_supervisor_heartbeat",
+                                              documentation="Number of heartbeat invocations")
+
     def __init__(self, source_config: Dict[str, dict], supervisor_config: dict, redis_pool: redis.ConnectionPool,
                  ext_sources: Optional[Dict[str, abstract_source.AbstractSourceAPI]] = None):
         """
@@ -375,6 +408,10 @@ class QuerySupervisor:
         self._source_config = source_config
         self._executors = self._create_executors(source_config, redis_pool, ext_sources)
 
+        for name in self._executors.keys():
+            self._prom_source_restarted.labels(source_name=name)
+            self._prom_source_status.labels(source_name=name).set(4)
+
     @staticmethod
     def _create_executors(source_config: Dict[str, dict], redis_pool: redis.ConnectionPool,
                           ext_sources: Dict[str, abstract_source.AbstractSourceAPI]) -> Dict[str, ThreadQueryExecutor]:
@@ -384,7 +421,8 @@ class QuerySupervisor:
         sources = list(source_config.keys()) + [src for src in ext_sources.keys() if src not in source_config]
 
         ret = {
-            ex_name: ThreadQueryExecutor(source_config.get(ex_name, {}), redis_pool, ext_sources.get(ex_name, None))
+            ex_name: ThreadQueryExecutor(source_config.get(ex_name, {}), redis_pool, ext_sources.get(ex_name, None),
+                                         ex_name)
             for ex_name in sources
         }
         return ret
@@ -427,6 +465,8 @@ class QuerySupervisor:
                 self._executors[ex_name].join()  # Make sure no dangling threads are left behind
                 self._start_executor(ex_name)
                 ex_status[ex_name] = "restarted"
+                self._prom_source_status.labels(source_name=ex_name).set(3)
+                self._prom_source_restarted.labels(source_name=ex_name).inc(1)
 
             elif (
                     status.last_wakeup is not None and
@@ -438,6 +478,7 @@ class QuerySupervisor:
                                f"time {status.max_permitted_cycle_time}). Issue an asynchronous stop signal.")
                 self._executors[ex_name].stop()  # Don't wait for joins to not block the entire supervisor.
                 ex_status[ex_name] = "stop-by-timeout"
+                self._prom_source_status.labels(source_name=ex_name).set(1)
 
             elif (
                     status.last_wakeup is not None and
@@ -445,17 +486,20 @@ class QuerySupervisor:
             ):
                 logger.debug(f"Source {ex_name} reached a timeout and is marked for restart but has not stopped yet.")
                 ex_status[ex_name] = "blocking"
+                self._prom_source_status.labels(source_name=ex_name).set(2)
 
             else:
                 ex_status[ex_name] = "ok"
+                self._prom_source_status.labels(source_name=ex_name).set(0)
 
+        self._prom_supervisor_heartbeat.inc(1)
         return ex_status
 
     def _start_executor(self, ex_name):
         """Tries to (re-)start the given executor"""
 
         executor = ThreadQueryExecutor(self._source_config.get(ex_name, {}), self._redis_pool,
-                                       self._ext_sources.get(ex_name, None))
+                                       self._ext_sources.get(ex_name, None), ex_name)
         executor.start()
         self._executors[ex_name] = executor
 
