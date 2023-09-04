@@ -13,13 +13,15 @@ import random
 import string
 import threading
 import traceback
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 import pandas as pd
 import redis
 
 import data_crawler.sources.abc.abstract_source as abstract_source
 import data_crawler.access.storage as storage
+
+logger = logging.getLogger(__name__)
 
 
 class _ExecutionTimer:
@@ -258,11 +260,20 @@ class ThreadQueryExecutor:
         assert not self._termination_event.is_set(), "The executor has already been stopped"
         self._termination_event.set()
 
+    def is_stop_triggered(self) -> bool:
+        """
+        Returns whether the stop procedure was already triggered
+        """
+        return self._termination_event.is_set()
+
     def join(self):
         """
         Waits until the executor is stopped
         """
-        assert self._termination_event.is_set(), "The executor was not stopped before"
+        assert (
+                self._termination_event.is_set() or
+                (self._startup_event.is_set() and not self._thread.is_alive())  # Thread must have been started
+        ), "The executor was not stopped before"
         self._thread.join()
 
         self._termination_event.clear()
@@ -331,3 +342,124 @@ class ThreadQueryExecutor:
 
         with self._activity_status_lock:
             return copy.copy(self._activity_status)
+
+    def is_alive(self):
+        """Returns whether the executer thread is currently alive (running or waiting)"""
+        return self._thread.is_alive()
+
+
+class QuerySupervisor:
+    """
+    Manages the collection of query executors (and therefore data sources)
+
+    The supervisor provides a unified interface to control the life cycle of the individual executors and to monitor
+    their operation. In addition, it supports a restarting mechanism to gracefully restart failed executors.
+    """
+
+    def __init__(self, source_config: Dict[str, dict], supervisor_config: dict, redis_pool: redis.ConnectionPool,
+                 ext_sources: Optional[Dict[str, abstract_source.AbstractSourceAPI]] = None):
+        """
+        :param source_config: The dictionary of configured data source indexed by their unique name used for debugging
+        :param supervisor_config: The configuration snippet of the supervisor
+        :param redis_pool: The redis connection pool to draw the managed connections from
+        :param ext_sources: Externally supplied data sources to test the supervisor
+        """
+
+        if ext_sources is None:
+            ext_sources = {}
+
+        self._dead_timeout = pd.to_timedelta(supervisor_config.get("dead timeout", "1 min"))
+
+        self._redis_pool = redis_pool
+        self._ext_sources = ext_sources
+        self._source_config = source_config
+        self._executors = self._create_executors(source_config, redis_pool, ext_sources)
+
+    @staticmethod
+    def _create_executors(source_config: Dict[str, dict], redis_pool: redis.ConnectionPool,
+                          ext_sources: Dict[str, abstract_source.AbstractSourceAPI]) -> Dict[str, ThreadQueryExecutor]:
+        """Creates the collection of executors"""
+
+        # preserve order, hence do not use sets here
+        sources = list(source_config.keys()) + [src for src in ext_sources.keys() if src not in source_config]
+
+        ret = {
+            ex_name: ThreadQueryExecutor(source_config.get(ex_name, {}), redis_pool, ext_sources.get(ex_name, None))
+            for ex_name in sources
+        }
+        return ret
+
+    def start(self):
+        """Starts up all executors"""
+
+        for ex in self._executors.values():
+            ex.start()
+
+    def stop(self):
+        """Stops and joins all executor threads"""
+
+        for ex in self._executors.values():
+            ex.stop()
+
+        for ex in self._executors.values():
+            ex.join()
+
+    def heartbeat(self) -> Dict[str, str]:
+        """
+        Performs the check and repair policy of the supervisor
+
+        It is advised to regularly call the heartbeat function to be able to collect statistics and repair any failed
+        source.
+
+        :return: A dictionary of status messages per source
+        """
+
+        ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
+        ex_status = {}
+
+        for ex_name, executor in self._executors.copy().items():
+            is_alive = executor.is_alive()
+            status = executor.get_activity_status()
+
+            if not is_alive:
+                logger.warning(f"Found source {ex_name} with the last wakeup at {status.last_wakeup} and last "
+                               f"complete cycle {status.last_cycle_complete} to be dead. Restart the executor.")
+                self._executors[ex_name].join()  # Make sure no dangling threads are left behind
+                self._start_executor(ex_name)
+                ex_status[ex_name] = "restarted"
+
+            elif (
+                    status.last_wakeup is not None and
+                    ts_now - status.last_wakeup > status.max_permitted_cycle_time + self._dead_timeout and
+                    not self._executors[ex_name].is_stop_triggered()  # Avoid duplicate stop calls
+            ):
+                logger.warning(f"The source {ex_name} does not complete its cycle in time (last wakeup at "
+                               f"{status.last_wakeup} and last complete cycle {status.last_cycle_complete}, max cycle "
+                               f"time {status.max_permitted_cycle_time}). Issue an asynchronous stop signal.")
+                self._executors[ex_name].stop()  # Don't wait for joins to not block the entire supervisor.
+                ex_status[ex_name] = "stop-by-timeout"
+
+            elif (
+                    status.last_wakeup is not None and
+                    ts_now - status.last_wakeup > status.max_permitted_cycle_time + self._dead_timeout
+            ):
+                logger.debug(f"Source {ex_name} reached a timeout and is marked for restart but has not stopped yet.")
+                ex_status[ex_name] = "blocking"
+
+            else:
+                ex_status[ex_name] = "ok"
+
+        return ex_status
+
+    def _start_executor(self, ex_name):
+        """Tries to (re-)start the given executor"""
+
+        executor = ThreadQueryExecutor(self._source_config.get(ex_name, {}), self._redis_pool,
+                                       self._ext_sources.get(ex_name, None))
+        executor.start()
+        self._executors[ex_name] = executor
+
+    @property
+    def source_names(self) -> List[str]:
+        """The list of managed sources. (Mostly for testing)"""
+        return list(self._executors.keys())
