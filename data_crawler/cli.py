@@ -7,7 +7,6 @@ import logging
 import logging.config
 import signal
 import time
-from typing import Optional, List
 
 import pyrdp_commons.cli as cli
 import redis
@@ -38,18 +37,20 @@ def main(argv=None, prog=None):
     config = cli.setup_app(args.config_file, args.env)
 
     redis_pool = _load_redis_connection_pool(config)
-    executors = _startup_executors(config, redis_pool)
+    sup_config = config.get("supervision", {})
+    supervisor = query_executors.QuerySupervisor(config["data sources"], sup_config, redis_pool)
+    supervisor.start()
 
-    logger.info(f"Startup of {len(executors)} source(s) complete, press Ctrl+C to exit the data crawler.")
-    _wait_for_termination_request()
+    logger.info(f"Startup of {len(supervisor.source_names)} source(s) complete, press Ctrl+C to exit the data crawler.")
+    _heartbeat_until_termination_request(supervisor)
 
     logger.info(f"Begin to shutdown the data crawler.")
-    _stop_executors(executors)
+    supervisor.stop()
     logger.info("Bye!")
 
 
-def _wait_for_termination_request():
-    """suspends the main thread until a termination request was received"""
+def _heartbeat_until_termination_request(supervisor: query_executors.QuerySupervisor):
+    """Periodically triggers the heart beat until a termination request was received"""
 
     def _handler(signal_number, _frame):
         logger.debug(f"Received signal {signal_number}. Initiate shutdown.")
@@ -68,31 +69,9 @@ def _wait_for_termination_request():
     try:
         while True:
             time.sleep(10)
+            supervisor.heartbeat()
     except KeyboardInterrupt:
         pass
-
-
-def _startup_executors(config: dict, redis_pool: redis.ConnectionPool) -> List[query_executors.ThreadQueryExecutor]:
-    """Parses the system configuration and instantiates the query executors"""
-
-    ret = []
-    for exec_name, exec_config in config["data sources"].items():
-        ret.append(query_executors.ThreadQueryExecutor(exec_config, redis_pool, name=exec_name))
-
-    for exec in ret:
-        exec.start()
-
-    return ret
-
-
-def _stop_executors(executors: List[query_executors.ThreadQueryExecutor]):
-    """Stops all executors and waits until they are terminated"""
-
-    for ex in executors:
-        ex.stop()
-
-    for ex in executors:
-        ex.join()
 
 
 def _load_redis_connection_pool(config: dict) -> redis.ConnectionPool:
