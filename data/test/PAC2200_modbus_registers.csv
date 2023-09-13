@@ -1,0 +1,17 @@
+unit_id;Register_start;Register_end;Name;Data_type;Unit;Register_type;Scaling
+1;1;6;U_L1N;SINGLE;V;i;1
+;;;U_L2N;SINGLE;V;i;1
+;;;U_L3N;SINGLE;V;i;1
+1;13;36;I_L1;SINGLE;A;i;1
+;;;I_L2;SINGLE;A;i;1
+;;;I_L3;SINGLE;A;i;1
+;;;S_L1;SINGLE;VA;i;1
+;;;S_L2;SINGLE;VA;i;1
+;;;S_L3;SINGLE;VA;i;1
+;;;P_L1;SINGLE;W;i;1
+;;;P_L2;SINGLE;W;i;1
+;;;P_L3;SINGLE;W;i;1
+;;;Q_L1;SINGLE;var;i;1
+;;;Q_L2;SINGLE;var;i;1
+;;;Q_L3;SINGLE;var;i;1
+1;55;56;Frequency;SINGLE;Hz;i;1

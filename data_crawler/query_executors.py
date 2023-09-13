@@ -8,6 +8,7 @@ import json
 import logging
 import math
 import random
+import string
 import threading
 import traceback
 from typing import Optional, Dict, Any
@@ -16,6 +17,7 @@ import pandas as pd
 import redis
 
 import data_crawler.sources.abc.abstract_source as abstract_source
+import data_crawler.access.storage as storage
 
 
 class _ExecutionTimer:
@@ -39,9 +41,24 @@ class _ExecutionTimer:
         offset_name = timer_config.get("offset", "0s")
         self._offset = pd.Timedelta(offset_name).total_seconds()
 
+        # Configure time slots that may be used to shift the queries to avoid concurrent access to some device
+        slot_id = timer_config.get("slot id", 0)
+        slot_count = int(timer_config.get("slot count", 1))
+        if slot_id is None or str(slot_id).lower() == "false" or int(slot_id) < 0:
+            self._logger.info(f"The timer is disabled by slot '{slot_id}'. No query will be performed.")
+            self._timer_interval = 3600.0 * 24 * 356 * 100  # Once every 100 Years
+            slot_id = 0
+        slot_id = int(slot_id)
+        if slot_id >= slot_count:
+            raise ValueError(f"Invalid slot id {slot_id} on {slot_count} slot(s) in total.")
+        self._offset += (self._timer_interval / slot_count) * slot_id
+
         # The uniformly distributed random jitter to apply. (Symmetrically around the offset)
         self._jitter = pd.Timedelta(timer_config.get("jitter", "0s")).total_seconds()
         self._rnd = random.Random()
+
+        # Configure immediate fetch operation
+        self._force_initial = bool(timer_config.get("force initial", True))
 
         self._logger.debug(f"Set timer interval to {self._timer_interval}s ({freq_name}) aligning to an offset of "
                            f"{self._offset}s ({offset_name}) +/-{self._jitter}s.")
@@ -56,10 +73,19 @@ class _ExecutionTimer:
         base_date = datetime.datetime(date_now.year, 1, 1, 0, 0, 0, tzinfo=date_now.tzinfo)
         base_date += pd.Timedelta(seconds=self._offset - self._timer_interval)
 
-        num_skip = math.floor((date_now - base_date).total_seconds() / self._timer_interval)
-        base_date += pd.Timedelta(seconds=num_skip * self._timer_interval)  # Floor to immediately trigger a tick.
+        num_skip = (date_now - base_date).total_seconds() / self._timer_interval
+        # Floor to immediately trigger a tick or ceil to wait for the next tick to appear:
+        num_skip = math.floor(num_skip) if self._force_initial else math.ceil(num_skip)
+        base_date += pd.Timedelta(seconds=num_skip * self._timer_interval)
+
+        # Set the nominal and actual tick as needed. Don't forget to also jitter the first tick, as needed
         self._next_tick_nominal = base_date.timestamp()
-        self._next_tick_actual = date_now.timestamp() + self._rnd.uniform(0, self._jitter)  # Also jitter the first tick
+        if self._force_initial:
+            # Use the current time as base for jitter since the last sample may be likely overdue.
+            self._next_tick_actual = date_now.timestamp() + self._rnd.uniform(0, self._jitter)
+        else:
+            # Just jitter the nominal base date. It should point to the next instance of time
+            self._next_tick_actual = base_date.timestamp() + self._rnd.uniform(-self._jitter, self._jitter)
 
     def get_remaining_seconds(self) -> float:
         """
@@ -96,7 +122,7 @@ class _RedisDataSink:
         """
 
         self._client = redis.Redis(connection_pool=redis_pool)
-        self._stream_name = redis_config["stream"]
+        self._stream_template = string.Template(redis_config["stream"])
         self._tags = redis_config.get("tags", {})
 
     def push_data(self, message: Dict[str, Any]):
@@ -110,7 +136,7 @@ class _RedisDataSink:
         message.update(self._tags)
 
         encoded_message = {key: json.dumps(val) for key, val in message.items()}
-        self._client.xadd(self._stream_name, encoded_message)
+        self._client.xadd(self._stream_template.substitute(message), encoded_message)
 
 
 class ThreadQueryExecutor:
@@ -137,9 +163,12 @@ class ThreadQueryExecutor:
 
         self._thread = threading.Thread(target=self._run_timed_execution)
         self._termination_event = threading.Event()
+        self._startup_event = threading.Event()  # Mostly used for testing. Triggered when startup completes.
+
+        persistent_store = storage.PersistentAPIStorage(redis_pool, name)
 
         if source_api is None:
-            source_api = self._resolve_source_api(self._config, name)
+            source_api = self._resolve_source_api(self._config, name, persistent_store)
         self._source_api = source_api
 
         self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)
@@ -147,7 +176,8 @@ class ThreadQueryExecutor:
         self._data_sink = _RedisDataSink(self._config["redis"], redis_pool)
 
     @staticmethod
-    def _resolve_source_api(executor_config: dict, executor_name: str) -> abstract_source.AbstractSourceAPI:
+    def _resolve_source_api(executor_config: dict, executor_name: str,
+                            persistent_store: storage.PersistentAPIStorage) -> abstract_source.AbstractMultiMessageSourceAPI:
         """
         Tries to load ind instantiate the source API
 
@@ -170,11 +200,12 @@ class ThreadQueryExecutor:
         if not inspect.isclass(api_class):
             raise ModuleNotFoundError(f"The specified source API '{type_name}' ({api_class}) is not an class.")
 
-        if not issubclass(api_class, abstract_source.AbstractSourceAPI):
+        if not issubclass(api_class, abstract_source.AbstractMultiMessageSourceAPI):
             raise ModuleNotFoundError(f"The specified source API class '{type_name}' ({api_class}) is not an "
-                                      f"AbstractSourceAPI.")
+                                      f"AbstractMultiMessageSourceAPI.")
 
-        api_object = api_class(source_parameters=executor_config["source parameter"], executor_name=executor_name)
+        api_object = api_class(source_parameters=executor_config["source parameter"], executor_name=executor_name,
+                               persistent_store=persistent_store)
         return api_object
 
     @property
@@ -197,6 +228,7 @@ class ThreadQueryExecutor:
 
         assert not self._termination_event.is_set(), "The executor has already been stopped"
         self._thread.start()
+        self._startup_event.wait()
 
     def stop(self):
         """
@@ -212,11 +244,15 @@ class ThreadQueryExecutor:
         assert self._termination_event.is_set(), "The executor was not stopped before"
         self._thread.join()
 
+        self._termination_event.clear()
+        self._startup_event.clear()
+
     def _run_timed_execution(self):
         """Executes the queries until termination is signaled"""
 
-        self._timer.reset()
         self._source_api.start()
+        self._timer.reset()  # Reset after startup to avoid initial deadline misses
+        self._startup_event.set()  # Release the main thread (mostly to test the timing)
 
         while True:
             timeout = self._timer.get_remaining_seconds()
@@ -232,11 +268,17 @@ class ThreadQueryExecutor:
             assert self._timer.get_remaining_seconds() <= 0.0, "The event didn't awaited its timeout."
 
             try:
-                data = self._source_api.fetch_data()
-                self._data_sink.push_data(data)
-            except Exception as err:
-                self._logger.error(f"Skip one sample due to a {type(err).__name__}: {err}\n{traceback.format_exc()}")
+                self._fetch_once()
             finally:
                 self._timer.operation_done()
 
         self._source_api.stop()
+
+    def _fetch_once(self):
+        """Performs one fetch and insert operation"""
+
+        try:
+            for data in self._source_api.fetch_data_bundle():
+                self._data_sink.push_data(data)
+        except Exception as err:
+            self._logger.error(f"Skip one sample due to a {type(err).__name__}: {err}\n{traceback.format_exc()}")

@@ -7,7 +7,7 @@ import itertools
 import logging
 from typing import Dict, Any, Optional, List
 
-import data_crawler.extractors.jsonpath as jx
+import data_crawler.access.jsonpath as jx
 import data_crawler.sources.abc.http_cache as http_cache
 
 import pandas as pd

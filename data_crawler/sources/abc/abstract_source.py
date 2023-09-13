@@ -3,10 +3,11 @@ Specifies the abstract source API to query external services
 """
 
 import abc
+from collections.abc import Generator
 from typing import Dict, Any
 
 
-class AbstractSourceAPI(abc.ABC):
+class AbstractMultiMessageSourceAPI(abc.ABC):
     """
     Specifies the interface of one data source that can be dynamically instantiated and executed to query data
 
@@ -23,15 +24,16 @@ class AbstractSourceAPI(abc.ABC):
         """Just for type checking"""
 
     @abc.abstractmethod
-    def fetch_data(self) -> Dict[str, Any]:
+    def fetch_data_bundle(self) -> Generator[Dict[str, Any], None, None]:
         """
-        Fetches the data from the external API and returns it.
+        Fetches the remote data into a bundle of multiple messages.
 
-        The returned data must be formatted using common conventions. Each observation needs to be represented by a
-        unique key. In case multiple values are fetched as one, they need to be encapsulated in python lists.
+        The function may be overriden in case multiple values need to be returned
 
-        :return: The results queried from the source API.
+        :returns: The function will return a generator that yields one message at a time.
         """
+
+        yield {}
 
     def start(self):
         """
@@ -47,3 +49,37 @@ class AbstractSourceAPI(abc.ABC):
         Stops the source operation and frees allocated resources
         """
         pass
+
+
+class AbstractSourceAPI(AbstractMultiMessageSourceAPI, abc.ABC):
+    """
+    Refines the abstract AbstractMultiMessageSourceAPI by a convenience hook that returns exactly one message at a time
+    """
+
+    def __init__(self, **kwargs):
+        """Just for type checking"""
+        super(AbstractSourceAPI, self).__init__(**kwargs)
+
+    def fetch_data_bundle(self) -> Generator[Dict[str, Any], None, None]:
+        """
+        Fetches the remote data into a bundle of multiple messages.
+
+        The function may be overriden in case multiple values need to be returned
+
+        :returns: The function will return a generator that yields one message at a time.
+        """
+
+        data = self.fetch_data()
+        if data is not None:
+            yield data
+
+    @abc.abstractmethod
+    def fetch_data(self) -> Dict[str, Any]:
+        """
+        Fetches the data from the external API and returns it.
+
+        The returned data must be formatted using common conventions. Each observation needs to be represented by a
+        unique key. In case multiple values are fetched as one, they need to be encapsulated in python lists.
+
+        :return: The results queried from the source API.
+        """

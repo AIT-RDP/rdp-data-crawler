@@ -1,0 +1,640 @@
+{
+  "Body": {
+    "Data": {
+      "inverter/1": {
+        "Data": {
+          "Current_AC_Phase_1": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.06,
+              "300": 0.05
+            },
+            "_comment": "channelId=65794"
+          },
+          "Current_AC_Phase_2": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.06,
+              "300": 0.05
+            },
+            "_comment": "channelId=131330"
+          },
+          "Current_AC_Phase_3": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.06,
+              "300": 0.04
+            },
+            "_comment": "channelId=196866"
+          },
+          "Current_DC_String_1": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.03,
+              "300": 0.03
+            },
+            "_comment": "channelId=66050"
+          },
+          "Current_DC_String_2": {
+            "Unit": "A",
+            "Values": {
+              "0": 0,
+              "300": 0
+            },
+            "_comment": "channelId=131586"
+          },
+          "EnergyReal_WAC_Sum_Produced": {
+            "Unit": "Wh",
+            "Values": {
+              "0": 0.13277777777777777,
+              "300": 0.1763888888888889
+            },
+            "_comment": "channelId=67830024"
+          },
+          "PowerReal_PAC_Sum": {
+            "Unit": "W",
+            "Values": {
+              "0": 1.5986622073578596,
+              "300": 2.1237458193979935
+            },
+            "_comment": "channelId=67109125"
+          },
+          "Temperature_Powerstage": {
+            "Unit": "°C",
+            "Values": {
+              "0": 12,
+              "300": 12
+            },
+            "_comment": "channelId=65795"
+          },
+          "TimeSpanInSec": {
+            "Unit": "sec",
+            "Values": {
+              "0": 299,
+              "300": 299
+            },
+            "_comment": "channelId=65549"
+          },
+          "Voltage_AC_Phase_1": {
+            "Unit": "V",
+            "Values": {
+              "0": 134.3,
+              "300": 116.60000000000001
+            },
+            "_comment": "channelId=65793"
+          },
+          "Voltage_AC_Phase_2": {
+            "Unit": "V",
+            "Values": {
+              "0": 133.5,
+              "300": 116.10000000000001
+            },
+            "_comment": "channelId=131329"
+          },
+          "Voltage_AC_Phase_3": {
+            "Unit": "V",
+            "Values": {
+              "0": 134.20000000000002,
+              "300": 116.30000000000001
+            },
+            "_comment": "channelId=196865"
+          },
+          "Voltage_DC_String_1": {
+            "Unit": "V",
+            "Values": {
+              "0": 624,
+              "300": 640.5
+            },
+            "_comment": "channelId=66049"
+          },
+          "Voltage_DC_String_2": {
+            "Unit": "V",
+            "Values": {
+              "0": 179.20000000000002,
+              "300": 178.8
+            },
+            "_comment": "channelId=131585"
+          }
+        },
+        "DeviceType": 233,
+        "End": "2022-12-27T08:42:59+01:00",
+        "NodeType": 97,
+        "Start": "2022-12-27T08:35:00+01:00"
+      },
+      "inverter/2": {
+        "Data": {
+          "Current_AC_Phase_1": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.11,
+              "300": 0.11
+            },
+            "_comment": "channelId=65794"
+          },
+          "Current_AC_Phase_2": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.08,
+              "300": 0.09
+            },
+            "_comment": "channelId=131330"
+          },
+          "Current_AC_Phase_3": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.07,
+              "300": 0.08
+            },
+            "_comment": "channelId=196866"
+          },
+          "Current_DC_String_1": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.04,
+              "300": 0.06
+            },
+            "_comment": "channelId=66050"
+          },
+          "Current_DC_String_2": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.04,
+              "300": 0.05
+            },
+            "_comment": "channelId=131586"
+          },
+          "EnergyReal_WAC_Sum_Produced": {
+            "Unit": "Wh",
+            "Values": {
+              "0": 1.15,
+              "300": 1.5005555555555556
+            },
+            "_comment": "channelId=67830024"
+          },
+          "PowerReal_PAC_Sum": {
+            "Unit": "W",
+            "Values": {
+              "0": 13.8,
+              "300": 18.066889632107024
+            },
+            "_comment": "channelId=67109125"
+          },
+          "Temperature_Powerstage": {
+            "Unit": "°C",
+            "Values": {
+              "0": 9,
+              "300": 9
+            },
+            "_comment": "channelId=65795"
+          },
+          "TimeSpanInSec": {
+            "Unit": "sec",
+            "Values": {
+              "0": 300,
+              "300": 299
+            },
+            "_comment": "channelId=65549"
+          },
+          "Voltage_AC_Phase_1": {
+            "Unit": "V",
+            "Values": {
+              "0": 204,
+              "300": 207
+            },
+            "_comment": "channelId=65793"
+          },
+          "Voltage_AC_Phase_2": {
+            "Unit": "V",
+            "Values": {
+              "0": 203.10000000000002,
+              "300": 207.4
+            },
+            "_comment": "channelId=131329"
+          },
+          "Voltage_AC_Phase_3": {
+            "Unit": "V",
+            "Values": {
+              "0": 203.10000000000002,
+              "300": 207.5
+            },
+            "_comment": "channelId=196865"
+          },
+          "Voltage_DC_String_1": {
+            "Unit": "V",
+            "Values": {
+              "0": 610.2,
+              "300": 592.3000000000001
+            },
+            "_comment": "channelId=66049"
+          },
+          "Voltage_DC_String_2": {
+            "Unit": "V",
+            "Values": {
+              "0": 588.6,
+              "300": 569.5
+            },
+            "_comment": "channelId=131585"
+          }
+        },
+        "End": "2022-12-27T08:42:59+01:00",
+        "NodeType": 98,
+        "Start": "2022-12-27T08:35:00+01:00"
+      },
+      "inverter/3": {
+        "Data": {
+          "Current_AC_Phase_1": {
+            "Unit": "A",
+            "Values": {
+              "0": 0,
+              "300": 0.04
+            },
+            "_comment": "channelId=65794"
+          },
+          "Current_AC_Phase_2": {
+            "Unit": "A",
+            "Values": {
+              "0": 0,
+              "300": 0.02
+            },
+            "_comment": "channelId=131330"
+          },
+          "Current_AC_Phase_3": {
+            "Unit": "A",
+            "Values": {
+              "0": 0,
+              "300": 0.02
+            },
+            "_comment": "channelId=196866"
+          },
+          "Current_DC_String_1": {
+            "Unit": "A",
+            "Values": {
+              "0": 0,
+              "300": 0
+            },
+            "_comment": "channelId=66050"
+          },
+          "Current_DC_String_2": {
+            "Unit": "A",
+            "Values": {
+              "0": 0,
+              "300": 0.04
+            },
+            "_comment": "channelId=131586"
+          },
+          "EnergyReal_WAC_Sum_Produced": {
+            "Unit": "Wh",
+            "Values": {
+              "0": 0,
+              "300": 0.034444444444444444
+            },
+            "_comment": "channelId=67830024"
+          },
+          "PowerReal_PAC_Sum": {
+            "Unit": "W",
+            "Values": {
+              "0": 0,
+              "300": 0.41471571906354515
+            },
+            "_comment": "channelId=67109125"
+          },
+          "Temperature_Powerstage": {
+            "Unit": "°C",
+            "Values": {
+              "0": 0,
+              "300": 8
+            },
+            "_comment": "channelId=65795"
+          },
+          "TimeSpanInSec": {
+            "Unit": "sec",
+            "Values": {
+              "0": 300,
+              "300": 299
+            },
+            "_comment": "channelId=65549"
+          },
+          "Voltage_AC_Phase_1": {
+            "Unit": "V",
+            "Values": {
+              "0": 0,
+              "300": 96.7
+            },
+            "_comment": "channelId=65793"
+          },
+          "Voltage_AC_Phase_2": {
+            "Unit": "V",
+            "Values": {
+              "0": 0,
+              "300": 96.2
+            },
+            "_comment": "channelId=131329"
+          },
+          "Voltage_AC_Phase_3": {
+            "Unit": "V",
+            "Values": {
+              "0": 0,
+              "300": 96.30000000000001
+            },
+            "_comment": "channelId=196865"
+          },
+          "Voltage_DC_String_1": {
+            "Unit": "V",
+            "Values": {
+              "0": 169.9,
+              "300": 158.5
+            },
+            "_comment": "channelId=66049"
+          },
+          "Voltage_DC_String_2": {
+            "Unit": "V",
+            "Values": {
+              "0": 532,
+              "300": 563.9
+            },
+            "_comment": "channelId=131585"
+          }
+        },
+        "DeviceType": 233,
+        "End": "2022-12-27T08:42:59+01:00",
+        "NodeType": 99,
+        "Start": "2022-12-27T08:35:00+01:00"
+      },
+      "inverter/4": {
+        "Data": {
+          "Current_AC_Phase_1": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.11,
+              "300": 0.1
+            },
+            "_comment": "channelId=65794"
+          },
+          "Current_AC_Phase_2": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.06,
+              "300": 0.12
+            },
+            "_comment": "channelId=131330"
+          },
+          "Current_AC_Phase_3": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.09,
+              "300": 0.09
+            },
+            "_comment": "channelId=196866"
+          },
+          "Current_DC_String_1": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.04,
+              "300": 0.06
+            },
+            "_comment": "channelId=66050"
+          },
+          "Current_DC_String_2": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.03,
+              "300": 0.04
+            },
+            "_comment": "channelId=131586"
+          },
+          "EnergyReal_WAC_Sum_Produced": {
+            "Unit": "Wh",
+            "Values": {
+              "0": 0.6361111111111111,
+              "300": 1.4494444444444445
+            },
+            "_comment": "channelId=67830024"
+          },
+          "PowerReal_PAC_Sum": {
+            "Unit": "W",
+            "Values": {
+              "0": 7.633333333333334,
+              "300": 17.451505016722408
+            },
+            "_comment": "channelId=67109125"
+          },
+          "Temperature_Powerstage": {
+            "Unit": "°C",
+            "Values": {
+              "0": 9,
+              "300": 10
+            },
+            "_comment": "channelId=65795"
+          },
+          "TimeSpanInSec": {
+            "Unit": "sec",
+            "Values": {
+              "0": 300,
+              "300": 299
+            },
+            "_comment": "channelId=65549"
+          },
+          "Voltage_AC_Phase_1": {
+            "Unit": "V",
+            "Values": {
+              "0": 186.5,
+              "300": 210.4
+            },
+            "_comment": "channelId=65793"
+          },
+          "Voltage_AC_Phase_2": {
+            "Unit": "V",
+            "Values": {
+              "0": 185.4,
+              "300": 210.10000000000002
+            },
+            "_comment": "channelId=131329"
+          },
+          "Voltage_AC_Phase_3": {
+            "Unit": "V",
+            "Values": {
+              "0": 186.3,
+              "300": 210.10000000000002
+            },
+            "_comment": "channelId=196865"
+          },
+          "Voltage_DC_String_1": {
+            "Unit": "V",
+            "Values": {
+              "0": 626.9000000000001,
+              "300": 588.6
+            },
+            "_comment": "channelId=66049"
+          },
+          "Voltage_DC_String_2": {
+            "Unit": "V",
+            "Values": {
+              "0": 602.1,
+              "300": 563
+            },
+            "_comment": "channelId=131585"
+          }
+        },
+        "DeviceType": 233,
+        "End": "2022-12-27T08:42:59+01:00",
+        "NodeType": 100,
+        "Start": "2022-12-27T08:35:00+01:00"
+      },
+      "inverter/5": {
+        "Data": {
+          "Current_AC_Phase_1": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.04,
+              "300": 0.07
+            },
+            "_comment": "channelId=65794"
+          },
+          "Current_AC_Phase_2": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.04,
+              "300": 0.1
+            },
+            "_comment": "channelId=131330"
+          },
+          "Current_AC_Phase_3": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.05,
+              "300": 0.09
+            },
+            "_comment": "channelId=196866"
+          },
+          "Current_DC_String_1": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.02,
+              "300": 0.03
+            },
+            "_comment": "channelId=66050"
+          },
+          "Current_DC_String_2": {
+            "Unit": "A",
+            "Values": {
+              "0": 0.02,
+              "300": 0.04
+            },
+            "_comment": "channelId=131586"
+          },
+          "EnergyReal_WAC_Sum_Produced": {
+            "Unit": "Wh",
+            "Values": {
+              "0": 0.12333333333333334,
+              "300": 0.9680555555555556
+            },
+            "_comment": "channelId=67830024"
+          },
+          "PowerReal_PAC_Sum": {
+            "Unit": "W",
+            "Values": {
+              "0": 1.48,
+              "300": 11.65551839464883
+            },
+            "_comment": "channelId=67109125"
+          },
+          "Temperature_Powerstage": {
+            "Unit": "°C",
+            "Values": {
+              "0": 8,
+              "300": 9
+            },
+            "_comment": "channelId=65795"
+          },
+          "TimeSpanInSec": {
+            "Unit": "sec",
+            "Values": {
+              "0": 300,
+              "300": 299
+            },
+            "_comment": "channelId=65549"
+          },
+          "Voltage_AC_Phase_1": {
+            "Unit": "V",
+            "Values": {
+              "0": 134.8,
+              "300": 192.10000000000002
+            },
+            "_comment": "channelId=65793"
+          },
+          "Voltage_AC_Phase_2": {
+            "Unit": "V",
+            "Values": {
+              "0": 134.4,
+              "300": 191.70000000000002
+            },
+            "_comment": "channelId=131329"
+          },
+          "Voltage_AC_Phase_3": {
+            "Unit": "V",
+            "Values": {
+              "0": 134.6,
+              "300": 192
+            },
+            "_comment": "channelId=196865"
+          },
+          "Voltage_DC_String_1": {
+            "Unit": "V",
+            "Values": {
+              "0": 640.5,
+              "300": 624.4000000000001
+            },
+            "_comment": "channelId=66049"
+          },
+          "Voltage_DC_String_2": {
+            "Unit": "V",
+            "Values": {
+              "0": 620.8000000000001,
+              "300": 598
+            },
+            "_comment": "channelId=131585"
+          }
+        },
+        "DeviceType": 233,
+        "End": "2022-12-27T08:42:59+01:00",
+        "NodeType": 101,
+        "Start": "2022-12-27T08:35:00+01:00"
+      }
+    }
+  },
+  "Head": {
+    "RequestArguments": {
+      "Channel": [
+        "Voltage_AC_Phase_2",
+        "Voltage_AC_Phase_3",
+        "Current_DC_String_1",
+        "EnergyReal_WAC_Sum_Produced",
+        "Voltage_AC_Phase_1",
+        "Current_AC_Phase_2",
+        "EnergyReal_WAC_Sum_Consumed",
+        "Voltage_DC_String_2",
+        "Current_AC_Phase_1",
+        "Current_AC_Phase_3",
+        "PowerReal_PAC_Sum",
+        "Temperature_Powerstage",
+        "Voltage_DC_String_1",
+        "Current_DC_String_2",
+        "TimeSpanInSec"
+      ],
+      "EndDate": "2022-12-28T08:42:59+01:00",
+      "HumanReadable": "False",
+      "Scope": "System",
+      "SeriesType": "Detail",
+      "StartDate": "2022-12-27T08:35:00+01:00"
+    },
+    "Status": {
+      "Code": 0,
+      "ErrorDetail": {
+        "Nodes": []
+      },
+      "Reason": "",
+      "UserMessage": ""
+    },
+    "Timestamp": "2023-01-09T12:47:08+01:00"
+  }
+}

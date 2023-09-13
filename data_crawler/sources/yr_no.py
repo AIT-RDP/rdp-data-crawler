@@ -7,7 +7,7 @@ from typing import Dict, Any
 import requests
 
 import data_crawler.sources.abc.http_cache as http_cache
-import data_crawler.extractors.jsonpath as jx
+import data_crawler.access.jsonpath as jx
 
 
 class LocationForecast(http_cache.GenericHTTPSourceAPI):
@@ -23,8 +23,8 @@ class LocationForecast(http_cache.GenericHTTPSourceAPI):
         super(LocationForecast, self).__init__(source_parameters=source_parameters, **kwargs)
 
         self._static_request_parameters = {
-            "lat": f"{source_parameters['latitude']:.4f}",
-            "lon": f"{source_parameters['longitude']:.4f}"
+            "lat": f"{float(source_parameters['latitude']):.4f}",
+            "lon": f"{float(source_parameters['longitude']):.4f}"
         }
         if "altitude" in source_parameters:
             self._static_request_parameters["altitude"] = source_parameters["altitude"]

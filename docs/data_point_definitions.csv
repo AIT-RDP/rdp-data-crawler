@@ -1,9 +1,14 @@
 ﻿Data Point Name;Unit;Datatype;Meta;Description
 observation_time;ISO TS;String;no;The ISO encoded time-zone aware real time instant of the observation or forecasted point
+observation_time_device;ISO TS;String;no;The ISO encoded time-zone aware real time instant of the observation or forecasted point according to the source device
+observation_time_correction;s;String;no;Any external time correction that is applied to the observation time
+observation_time_span;s;Float;no;The length of the current observation interval
 forecasting_time;ISO TS;String;no;The ISO encoded time-zone aware time of the encoded time the forecast was created
 longitude;°;Float;yes;Longitude, WGS 84
 latitude;°;Float;yes;Latitude, WGS 84
 altitude;m;Float;yes;Altitude above sea level
+device_id;;String;yes;Unique (local) identifier for a particular device
+device_type;;String;yes;Device type identifier (mostly for debugging)
 air_temperature_2m;°C;Float;no;Air temperature at 2m above ground
 air_temperature_5cm;°C;Float;no;Air temperature at 5cm above ground
 apparent_temperature;°C;Float;no;Apparent/Feels-Like temperature
@@ -37,3 +42,31 @@ soil_temperature_10_cm;°C;Float;no;Soil temperature 10cm below ground
 soil_temperature_20_cm;°C;Float;no;Soil temperature 20cm below ground
 soil_temperature_50_cm;°C;Float;no;Soil temperature 50cm below ground
 air_quality_index_epa;1;Float;no;Air quality index [US - EPA standard 0 - +500]
+Frequency;Hz;Float;no;Current Frequency
+I_AC_tot;A;Float;no;Total Current on the AC side of all phases
+I_DC_tot;A;Float;no;Total Current on the DC side of parallel inputs/outputs
+I_DC_S1;A;Float;no;DC Current of string nr. 1
+I_DC_S2;A;Float;no;DC Current of string nr. 2
+I_L1;A;Float;no;AC current on L1
+I_L2;A;Float;no;AC current on L2
+I_L3;A;Float;no;AC current on L3
+U_AC;V;Float;no;Voltage on the AC side, on average over all phases
+U_DC;V;Float;no;Voltage on the DC side
+U_DC_S1;V;Float;no;DC Voltage of String nr. 1
+U_DC_S2;V;Float;no;DC Voltage of String nr. 2
+U_L1N;V;Float;no;AC Voltage L1 to N
+U_L2N;V;Float;no;AC Voltage L2 to N
+U_L3N;V;Float;no;AC Voltage L3 to N
+P_AC_tot;W;Float;no;Total AC power
+P_DC_tot;W;Float;no;Total DC power
+P_DC_S1;W;Float;no;DC Power, string 1 is delivering
+P_DC_S2;W;Float;no;DC Power, string 2 is delivering
+P_AC_avg;W;Float;no;Average AC power over the configured averaging period
+E_P_exp;Wh;Float;no;Exported energy, total
+E_P_exp_day;Wh;Float;no;Exported energy, per day
+E_P_exp_year;Wh;Float;no;Exported energy, per year
+E_P_exp_interval;Wh;Float;no;Exported energy, per measurement interval
+E_P_imp_interval;Wh;Float;no;Imported energy, per measurement interval
+error_code;1;Integer;no;Current error of the device. (Device specific)
+status_code;1;Integer;no;Current status of the device. (Device specific)
+device_temperature_1;°C;Float;no;Internal device temperature, channel 1
