@@ -2,13 +2,14 @@
 Implements the main command line interface of the E3 data crawler
 """
 
-import argparse
 import logging
 import logging.config
 import signal
 import time
+import warnings
 from typing import Optional
 
+import click
 import prometheus_client as prom
 import pyrdp_commons.cli as cli
 import redis
@@ -25,18 +26,27 @@ def main(argv=None, prog=None):
     :param argv: An optional argument vector that can be supplied for testing purposes
     :param prog: An optional program name. Otherwise the first element in the argument vector will be used
     """
+    warnings.warn("The function main is deprecated and will be deleted soon. Please directly call periodic_operation() "
+                  "or periodic_operation.main(arg, prog_name) if needed.", category=DeprecationWarning)
+
+    periodic_operation.main(argv, prog_name=prog)
+
+
+@click.command()
+@click.option("-c", "--config_file", default="data_crawler.yaml",
+              help="The main YAML configuration describing the data sources")
+@click.option("--env", default=None, help="An environment file that specifies the variables to load")
+def periodic_operation(config_file, env):
+    """
+    Polls the configured data items periodically
+
+    The command reads the user-defined configuration and periodically queries the data from all configured data sources.
+    In parallel, the data sources are supervised and restarted, if necessary.
+    """
 
     logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s: %(message)s", level=logging.DEBUG)
-
-    parser = argparse.ArgumentParser(prog=prog, description="Periodically fetches the data sources")
-    parser.add_argument("--config_file", metavar="CONF", default="data_crawler.yaml",
-                        help="The main YAML configuration describing the data sources")
-    parser.add_argument("--env", metavar="ENV_FILE", default=None,
-                        help="An environment file that specifies the variables to load")
-    args = parser.parse_args(args=argv)
-
-    logger.debug("Parse main YAML configuration file '%s'", args.config_file)
-    config = cli.setup_app(args.config_file, args.env)
+    logger.debug("Parse main YAML configuration file '%s'", config_file)
+    config = cli.setup_app(config_file, env)
     _startup_prometheus_client(config.get("prometheus client", {}))
 
     redis_pool = _load_redis_connection_pool(config)
