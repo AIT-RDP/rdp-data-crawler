@@ -5,6 +5,8 @@ stages:
 
 variables:
   CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  CONTAINER_MAIN_RELEASE_IMAGE: $CI_REGISTRY_IMAGE:latest
+  CONTAINER_DEVELOPMENT_RELEASE_IMAGE: $CI_REGISTRY_IMAGE:latest-dev
 
 # =============================================================================
 # Perform the unit test

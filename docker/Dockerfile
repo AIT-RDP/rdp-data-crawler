@@ -14,4 +14,7 @@ COPY docker/etc/data_crawler /etc/data_crawler
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir .
 
-CMD ["datacrawler", "--config", "/etc/data_crawler/config.yml", "--env", "/etc/data_crawler/default.env"]
+# Use the environment variables instead of arguments to specify the config and .env file. This should make both
+# customization and invoking subcommands easier.
+ENV DATA_CRAWLER_CONFIG="/etc/data_crawler/config.yml" DATA_CRAWLER_ENV="/etc/data_crawler/default.env"
+CMD ["datacrawler", "run"]
