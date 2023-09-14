@@ -1,7 +1,7 @@
 """
 Implements the main command line interface of the E3 data crawler
 """
-
+import dataclasses
 import logging
 import logging.config
 import signal
@@ -11,7 +11,7 @@ from typing import Optional
 
 import click
 import prometheus_client as prom
-import pyrdp_commons.cli as cli
+import pyrdp_commons.cli
 import redis
 
 import data_crawler.query_executors as query_executors
@@ -19,24 +19,52 @@ import data_crawler.query_executors as query_executors
 logger = logging.getLogger(__name__)
 
 
+@dataclasses.dataclass()
+class CommandContextInfo:
+    """Implements some basic attributes that are passed on to subcommands"""
+
+    config: dict  # The global configuration
+
+
 def main(argv=None, prog=None):
     """
     Parses the commandline arguments, reads the configuration and starts the main program flow
 
+    This function is deprecated. Consider directly invoking the commands.
+
     :param argv: An optional argument vector that can be supplied for testing purposes
     :param prog: An optional program name. Otherwise the first element in the argument vector will be used
     """
-    warnings.warn("The function main is deprecated and will be deleted soon. Please directly call periodic_operation() "
-                  "or periodic_operation.main(arg, prog_name) if needed.", category=DeprecationWarning)
+    warnings.warn("The function main is deprecated and will be deleted soon. Please directly call cli() "
+                  "or cli.main(arg, prog_name) if needed.", category=DeprecationWarning)
 
-    periodic_operation.main(argv, prog_name=prog)
+    cli.main(argv, prog_name=prog)
 
 
-@click.command()
-@click.option("-c", "--config_file", default="data_crawler.yaml",
+@click.group(invoke_without_command=True)
+@click.option("-c", "--config_file", default="data_crawler.yaml", envvar="DATA_CRAWLER_CONFIG",
               help="The main YAML configuration describing the data sources")
-@click.option("--env", default=None, help="An environment file that specifies the variables to load")
-def periodic_operation(config_file, env):
+@click.option("--env", default=None, envvar="DATA_CRAWLER_ENV",
+              help="An environment file that specifies the variables to load")
+@click.pass_context
+def cli(ctx: click.Context, config_file, env):
+    """Loads the basic data crawler functionality"""
+
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s: %(message)s", level=logging.DEBUG)
+    logger.debug("Parse main YAML configuration file '%s'", config_file)
+    config = pyrdp_commons.cli.setup_app(config_file, env)
+
+    ctx.obj = CommandContextInfo(config=config)
+
+    if ctx.invoked_subcommand is None:
+        warnings.warn("Directly calling the cli without and subcommand is deprecated and will be removed in future. "
+                      "Call 'cli [OPTIONS] run' instead ", category=DeprecationWarning)
+        ctx.invoke(run)  # Directly execute run per default to maintain compatibility
+
+
+@cli.command("run")
+@click.pass_context
+def run(ctx):
     """
     Polls the configured data items periodically
 
@@ -44,9 +72,8 @@ def periodic_operation(config_file, env):
     In parallel, the data sources are supervised and restarted, if necessary.
     """
 
-    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s: %(message)s", level=logging.DEBUG)
-    logger.debug("Parse main YAML configuration file '%s'", config_file)
-    config = cli.setup_app(config_file, env)
+    config = ctx.obj.config
+
     _startup_prometheus_client(config.get("prometheus client", {}))
 
     redis_pool = _load_redis_connection_pool(config)
