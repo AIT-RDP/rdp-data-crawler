@@ -15,12 +15,13 @@ import redis
 
 import data_crawler.query_executors as query_executors
 import data_crawler.sources.abc.abstract_source as abstract_sources
+import data_crawler.sources.abc.history as history
 import data_crawler.access.storage as storage
 
 logger = logging.getLogger(__name__)
 
 
-class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
+class MockupSourceAPI(abstract_sources.AbstractSourceAPI, history.AbstractTimedHistorySourceMixin):
     """Test API source that just counts function invocations"""
 
     def __init__(self, source_parameters, **kwargs):
@@ -29,6 +30,7 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
 
         self.config = source_parameters
         self.fetch_invocations = 0
+        self.history_invocations = 0
         self.start_invocations = 0
         self.stop_invocations = 0
 
@@ -59,6 +61,24 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI):
             "invocations": self.fetch_invocations,
             "data": "some-test-nonsense",
             "duplicate": "api-key"
+        }
+
+    def fetch_historic_data(self, start_time: datetime.datetime, end_time: datetime.datetime,
+                            filter_clauses: Dict[str, Any]) -> Dict[str, Any]:
+        """Generates some content and returns it"""
+
+        self.history_invocations += 1
+
+        assert self.start_invocations == self.stop_invocations + 1
+
+        if self.config.get("no odd invocations", False) and self.history_invocations % 2 == 1:
+            raise ValueError("That's odd.")
+
+        return {
+            "fetch_invocations": self.fetch_invocations,
+            "history_invocations": self.history_invocations,
+            "data": "another-test-nonsense",
+            "duplicate": "same-api-key"
         }
 
     def stop(self):
@@ -147,6 +167,7 @@ def test_thread_executor_api_lifecycle(mockup_service_config, redis_pool):
     assert api.fetch_invocations == 0
     assert api.start_invocations == 0
     assert api.stop_invocations == 0
+    assert api.history_invocations == 0
 
     executor.start()
     time.sleep(0.6)
@@ -156,6 +177,7 @@ def test_thread_executor_api_lifecycle(mockup_service_config, redis_pool):
     assert api.fetch_invocations >= 1
     assert api.start_invocations == 1
     assert api.stop_invocations == 1
+    assert api.history_invocations == 0
 
 
 def test_thread_executor_api_status(mockup_service_config, redis_pool):
@@ -434,3 +456,112 @@ def test_query_supervisor_restart(mockup_executors_config, mockup_executors_exte
     assert status == {"first": "ok", "second": "ok"}
 
     supervisor.stop()
+
+
+def test_one_shot_executor_api_instantiation(mockup_service_config, redis_pool):
+    """Tests the API instantiation function using the mockup API"""
+
+    executor = query_executors.OneShotQueryExecutor(mockup_service_config, redis_pool, name="<test>")
+    assert isinstance(executor.source_api, MockupSourceAPI)
+
+    api: MockupSourceAPI = executor.source_api
+    assert "key" in api.config
+    assert api.config["key"] == "<keep it secret>"
+
+    assert "persistent_store" in api.kwargs
+    assert isinstance(api.kwargs["persistent_store"], storage.PersistentAPIStorage)
+
+    assert api.fetch_invocations == 0
+    assert api.history_invocations == 0
+
+
+def test_one_shot_executor_api_lifecycle(mockup_service_config, redis_pool):
+    """Tests the API instantiation function using the mockup API"""
+
+    executor = query_executors.OneShotQueryExecutor(mockup_service_config, redis_pool, name="<test>")
+    assert isinstance(executor.source_api, MockupSourceAPI)
+
+    api: MockupSourceAPI = executor.source_api
+    assert api.fetch_invocations == 0
+    assert api.start_invocations == 0
+    assert api.stop_invocations == 0
+    assert api.history_invocations == 0
+
+    executor.execute_batch([dict(start_time="2023-09-17T00:00:00Z", end_time="2023-09-18T00:00:00Z")])
+
+    assert api.fetch_invocations == 0
+    assert api.start_invocations == 1
+    assert api.stop_invocations == 1
+    assert api.history_invocations == 1
+
+
+def test_one_shot_executor_fetch_error(mockup_service_config, redis_pool):
+    """Tests whether the API fetch function is correctly invoked"""
+
+    api = MockupSourceAPI(source_parameters={"no odd invocations": True})
+    executor = query_executors.OneShotQueryExecutor(mockup_service_config, redis_pool, source_api=api, name="<test>")
+
+    assert api.fetch_invocations == 0
+    assert api.history_invocations == 0
+
+    with pytest.raises(ValueError, match="That's odd."):
+        filters = [dict(start_time="2023-09-17T00:00:00Z", end_time="2023-09-18T00:00:00Z"),
+                   dict(start_time="2023-09-18T00:00:00Z", end_time="2023-09-19T00:00:00Z")]
+        executor.execute_batch(filters)
+
+    assert api.fetch_invocations == 0
+    assert api.history_invocations == 1
+    assert api.start_invocations == 1
+    assert api.stop_invocations == 1
+
+
+def test_one_shot_executor_redis_export(mockup_service_config, redis_pool, redis_stream_name):
+    """Tests the executor's capabilities in writing Redis streams"""
+
+    mockup_service_config["redis"]["stream"] = redis_stream_name
+    api = MockupSourceAPI(source_parameters={})
+    executor = query_executors.OneShotQueryExecutor(mockup_service_config, redis_pool, source_api=api, name="test")
+
+    redis_client = redis.Redis(connection_pool=redis_pool)
+
+    filters = [dict(start_time="2023-09-17T00:00:00Z", end_time="2023-09-18T00:00:00Z"),
+               dict(start_time="2023-09-18T00:00:00Z", end_time="2023-09-19T00:00:00Z")]
+    executor.execute_batch(filters)
+
+    messages = redis_client.xrange(redis_stream_name)
+    assert messages is not None
+    assert len(messages) == 2
+    assert len(messages) == api.history_invocations
+
+    assert messages[0][-1]["source type"] == '"mockup-test"'
+    assert messages[0][-1]["empty"] == '""'
+    assert messages[0][-1]["my-number"] == '0.2'
+    assert messages[0][-1]["duplicate"] == '"config-key"'
+    assert messages[0][-1]["history_invocations"] == '1'  # Number of invocations including the current one
+    assert messages[0][-1]["data"] == '"another-test-nonsense"'
+
+    assert messages[1][-1]["source type"] == '"mockup-test"'
+    assert messages[1][-1]["empty"] == '""'
+    assert messages[1][-1]["my-number"] == '0.2'
+    assert messages[1][-1]["duplicate"] == '"config-key"'
+    assert messages[1][-1]["history_invocations"] == '2'
+    assert messages[1][-1]["data"] == '"another-test-nonsense"'
+
+
+def test_execute_one_shot_batches(mockup_executors_config, redis_pool):
+    """Tests the complete one shot cycle function"""
+
+    filters = [dict(start_time="2023-09-17T00:00:00Z", end_time="2023-09-18T00:00:00Z"),
+               dict(start_time="2023-09-18T00:00:00Z", end_time="2023-09-19T00:00:00Z")]
+    targets = ["non-existing*", "secon*"]
+
+    sources = query_executors.execute_one_shot_batches(mockup_executors_config, redis_pool, filters, targets,
+                                                       debug_return=True)
+
+    assert len(sources) == 1
+    api: MockupSourceAPI = sources["second"]
+
+    assert api.start_invocations == 1
+    assert api.fetch_invocations == 0
+    assert api.history_invocations == 2
+    assert api.stop_invocations == 1

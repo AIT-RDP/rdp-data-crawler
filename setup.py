@@ -16,7 +16,8 @@ setup(
         "redis>=4.3",
         "python-dotenv>=0.20",
         "requests>=2.28",
-        "cachecontrol>=0.12"
+        "cachecontrol>=0.12",
+        "click>=8.0"
     ],
     test_requires=["pytest"],
 )

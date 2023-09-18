@@ -125,6 +125,49 @@ def test_measurement_station_online(endpoint, station_id, measurement_station_pa
     assert response_data is not None
 
 
+@pytest.mark.xfail(string=False, raises=requests.exceptions.HTTPError, reason="ZAMG servers are notoriously unreliable")
+@pytest.mark.parametrize("endpoint,station_id", [
+    ("climate", "20209"),
+    ("tawes", "8989076")
+])
+def test_measurement_station_history_online(endpoint, station_id, measurement_station_parameters):
+    """Tests the online query against the real API endpoint"""
+
+    del measurement_station_parameters["data points"]  # Fetch all
+    measurement_station_parameters["endpoint"] = endpoint
+    measurement_station_parameters["station id"] = station_id
+
+    api = zamg.MeasurementStationData(source_parameters=measurement_station_parameters, executor_name="<test>")
+
+    filter_clauses = dict(start_time="2023-09-17T00:00:00Z", end_time="2023-09-18T00:00:00Z")
+    response_data = api.fetch_historic_data_bundle(filter_clauses)
+    assert response_data is not None
+
+    response_data = list(response_data)
+    assert len(response_data) == 1
+
+    response_data = response_data[0]
+    response_length = len(response_data["observation_time"])
+    assert response_length > 23
+
+    first_ts = datetime.datetime.fromisoformat(response_data["observation_time"][0])
+    utc = datetime.timezone.utc
+    assert datetime.datetime(2023, 9, 16, 23, 50, 0, tzinfo=utc) <= first_ts
+    assert first_ts <= datetime.datetime(2023, 9, 17, 0, 10, 0, tzinfo=utc)
+
+    last_ts = datetime.datetime.fromisoformat(response_data["observation_time"][-1])
+    assert datetime.datetime(2023, 9, 17, 23, 50, 0, tzinfo=utc) <= last_ts
+    assert last_ts <= datetime.datetime(2023, 9, 18, 0, 10, 0, tzinfo=utc)
+
+    mandatory_measurements = [
+        "air_temperature_2m", "air_pressure_at_sea_level", "dew_point_temperature_2m",
+        "relative_humidity_2m", "wind_direction_10m", "wind_speed_10m", "precipitation_total_10min"
+    ]
+    for mea_name in mandatory_measurements:
+        assert mea_name in response_data
+        assert len(response_data[mea_name]) == response_length
+
+
 @pytest.fixture()
 def simplified_tawes_response() -> dict:
     """Returns a simplified ZAMG measurement station base response"""

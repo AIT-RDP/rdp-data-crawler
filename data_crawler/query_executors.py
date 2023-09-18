@@ -1,11 +1,14 @@
 """
 Implements the logic to periodically execute API calls in a dedicated context
 """
+import abc
 import copy
 import dataclasses
 import datetime
+import fnmatch
 import importlib
 import inspect
+import itertools
 import json
 import logging
 import math
@@ -13,13 +16,15 @@ import random
 import string
 import threading
 import traceback
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Iterable
 
 import pandas as pd
 import prometheus_client as prom
 import redis
 
 import data_crawler.sources.abc.abstract_source as abstract_source
+import data_crawler.sources.abc.history as history_source
+
 import data_crawler.access.storage as storage
 
 logger = logging.getLogger(__name__)
@@ -160,22 +165,16 @@ class ActivityStatus:
     max_permitted_cycle_time: datetime.timedelta  # The maximum allowed time, not the measured one
 
 
-class ThreadQueryExecutor:
+class _QueryExecutorBase(abc.ABC):
     """
-    Periodically executes the hosted query and pushes the results to the connected REDIS database
+    Simple container class that holds the basic facilities of executing a data source.
 
-    The long-running query operations are decoupled by a dedicated thread.
+    The class only does not implement the execution logic itself. This function is implementation specific and must be
+    relayed to the child class.
     """
-
-    _prom_calls = prom.Counter("data_crawler_source_calls", labelnames=["source_name", "status"],
-                               documentation="Number of calls to the data source")
-    _prom_source_duration = prom.Summary("data_crawler_crawling_duration_seconds", labelnames=["source_name"],
-                                         documentation="The duration of crawling a given source")
-    _prom_call_latency = prom.Summary("data_crawler_scheduling_delay_seconds", labelnames=["source_name"],
-                                      documentation="The delay of starting a data crawling job")
 
     def __init__(self, executor_config: dict, redis_pool: redis.ConnectionPool,
-                 source_api: Optional[abstract_source.AbstractSourceAPI] = None, name: str = "<default>"):
+                 source_api: Optional[abstract_source.AbstractSourceAPI], name: str):
         """
         Initializes the executor and the connected source API but does not start any operation
 
@@ -187,31 +186,17 @@ class ThreadQueryExecutor:
         :param name: The name of the executor for debugging purpose
         """
 
-        self._config = executor_config
-
-        self._thread = threading.Thread(target=self._run_timed_execution)
-        self._termination_event = threading.Event()
-        self._startup_event = threading.Event()  # Mostly used for testing. Triggered when startup completes.
+        self._config = executor_config  # Expect protected scope. May be used by child classes as well
+        self._source_name = name  # Protected scope
 
         persistent_store = storage.PersistentAPIStorage(redis_pool, name)
 
         if source_api is None:
             source_api = self._resolve_source_api(self._config, name, persistent_store)
-        self._source_api = source_api
+        self._source_api = source_api  # Expect protected scope.
 
-        self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)
-        self._timer = _ExecutionTimer(self._config["polling"], self._logger)
-        self._data_sink = _RedisDataSink(self._config["redis"], redis_pool)
-
-        self._activity_status: ActivityStatus = ActivityStatus(None, None, self._timer.max_permitted_cycle_time)
-        self._activity_status_lock = threading.Lock()
-
-        self._source_name = name
-        self._prom_calls.labels(source_name=name, status="started")
-        self._prom_calls.labels(source_name=name, status="success")
-        self._prom_calls.labels(source_name=name, status="failed")
-        self._prom_source_duration.labels(source_name=name)
-        self._prom_call_latency.labels(source_name=name)
+        self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)  # Protected scope
+        self._data_sink = _RedisDataSink(self._config["redis"], redis_pool)  # Protected scope
 
     @staticmethod
     def _resolve_source_api(executor_config: dict, executor_name: str,
@@ -250,6 +235,68 @@ class ThreadQueryExecutor:
     def source_api(self) -> abstract_source.AbstractSourceAPI:
         """
         Returns the Source API object
+        """
+
+        return self._source_api
+
+    def _push_messages(self, messages: Iterable[dict]):
+        """
+        Pushes all messages to the redis data sink.
+
+        This function is assumed to be protected and may be used in child classes
+        :param messages: The iterable of generator that yields the messages
+        """
+        for message in messages:
+            self._data_sink.push_data(message)
+
+
+class ThreadQueryExecutor(_QueryExecutorBase):
+    """
+    Periodically executes the hosted query and pushes the results to the connected REDIS database
+
+    The long-running query operations are decoupled by a dedicated thread.
+    """
+
+    _prom_calls = prom.Counter("data_crawler_source_calls", labelnames=["source_name", "status"],
+                               documentation="Number of calls to the data source")
+    _prom_source_duration = prom.Summary("data_crawler_crawling_duration_seconds", labelnames=["source_name"],
+                                         documentation="The duration of crawling a given source")
+    _prom_call_latency = prom.Summary("data_crawler_scheduling_delay_seconds", labelnames=["source_name"],
+                                      documentation="The delay of starting a data crawling job")
+
+    def __init__(self, executor_config: dict, redis_pool: redis.ConnectionPool,
+                 source_api: Optional[abstract_source.AbstractSourceAPI] = None, name: str = "<default>"):
+        """
+        Initializes the executor and the connected source API but does not start any operation
+
+        :param executor_config: The executor-specific configuration stanza
+        :param redis_pool: The redis connection pool to draw the managed connections from.
+        :param source_api: The source API to use. In case a source is given, the corresponding section in the
+            configuration file will be ignored. Otherwise, the configuration will be parsed and the source will be
+            dynamically instantiated.
+        :param name: The name of the executor for debugging purpose
+        """
+        super(ThreadQueryExecutor, self).__init__(executor_config, redis_pool, source_api, name)
+
+        self._thread = threading.Thread(target=self._run_timed_execution)
+        self._termination_event = threading.Event()
+        self._startup_event = threading.Event()  # Mostly used for testing. Triggered when startup completes.
+
+        self._timer = _ExecutionTimer(self._config["polling"], self._logger)
+
+        self._activity_status: ActivityStatus = ActivityStatus(None, None, self._timer.max_permitted_cycle_time)
+        self._activity_status_lock = threading.Lock()
+
+        self._prom_calls.labels(source_name=name, status="started")
+        self._prom_calls.labels(source_name=name, status="success")
+        self._prom_calls.labels(source_name=name, status="failed")
+        self._prom_source_duration.labels(source_name=name)
+        self._prom_call_latency.labels(source_name=name)
+
+    @property
+    def source_api(self) -> abstract_source.AbstractSourceAPI:
+        """
+        Returns the Source API object
 
         The getter is mostly intended for testing purpose any may not be needed otherwise. It will raise an error in
         case the thread is already started.
@@ -257,7 +304,7 @@ class ThreadQueryExecutor:
 
         if self._thread.is_alive():
             raise AttributeError("The source_api is accessed while the local executor is already started")
-        return self._source_api
+        return super(ThreadQueryExecutor, self).source_api
 
     def start(self):
         """
@@ -352,8 +399,8 @@ class ThreadQueryExecutor:
 
         try:
             with self._prom_source_duration.labels(source_name=self._source_name).time():
-                for data in self._source_api.fetch_data_bundle():
-                    self._data_sink.push_data(data)
+                message_gen = self._source_api.fetch_data_bundle()
+                self._push_messages(message_gen)
             success = True
         except Exception as err:
             self._logger.error(f"Skip one sample due to a {type(err).__name__}: {err}\n{traceback.format_exc()}")
@@ -376,7 +423,7 @@ class ThreadQueryExecutor:
 
 class QuerySupervisor:
     """
-    Manages the collection of query executors (and therefore data sources)
+    Manages the collection of long-running query executors (and therefore data sources)
 
     The supervisor provides a unified interface to control the life cycle of the individual executors and to monitor
     their operation. In addition, it supports a restarting mechanism to gracefully restart failed executors.
@@ -507,3 +554,83 @@ class QuerySupervisor:
     def source_names(self) -> List[str]:
         """The list of managed sources. (Mostly for testing)"""
         return list(self._executors.keys())
+
+
+class OneShotQueryExecutor(_QueryExecutorBase):
+    """
+    Implements a one-shot query execution without waiting for any timing interval.
+
+    In contrast to the standard query execution, filtering is supported to specify the data to fetch.
+    """
+
+    def __init__(self, executor_config: dict, redis_pool: redis.ConnectionPool, name: str,
+                 source_api: Optional[abstract_source.AbstractSourceAPI] = None):
+        """
+        Initializes the executor and the connected source API but does not start any operation
+
+        :param executor_config: The executor-specific configuration stanza
+        :param redis_pool: The redis connection pool to draw the managed connections from.
+        :param name: The name of the executor for debugging purpose
+        :param source_api: The source API to use. In case a source is given, the corresponding section in the
+            configuration file will be ignored. Otherwise, the configuration will be parsed and the source will be
+            dynamically instantiated.
+        """
+        super(OneShotQueryExecutor, self).__init__(executor_config, redis_pool, source_api, name)
+
+        if not isinstance(self.source_api, history_source.AbstractMultiMessageHistorySourceMixin):
+            raise ValueError(f"The given data source '{name}' is not a history data source")
+
+    def execute_batch(self, filter_expressions: Iterable[Dict[str, Any]]):
+        """
+        Executes the batch of source invocations using the filter expressions.
+
+        The resulting messages of each invocation are written to the Redis data sink.
+
+        :param filter_expressions: The filter expressions. One dict per run.
+        """
+
+        assert isinstance(self._source_api, history_source.AbstractMultiMessageHistorySourceMixin)
+        assert isinstance(self._source_api, abstract_source.AbstractMultiMessageSourceAPI)
+
+        self._source_api.start()
+        try:
+            self._logger.debug(f"Start executing history batch on all {len(filter_expressions)} expressions")
+
+            for filter_clauses in filter_expressions:
+                message_gen = self._source_api.fetch_historic_data_bundle(filter_clauses)
+                self._push_messages(message_gen)
+
+            self._logger.debug(f"Finished history batch")
+        finally:
+            self._source_api.stop()
+
+
+def execute_one_shot_batches(source_config: Dict[str, dict], redis_pool: redis.ConnectionPool,
+                             filter_expressions: Iterable[Dict[str, Any]],
+                             target_sources: Iterable[str],
+                             debug_return=False) -> Dict[str, abstract_source.AbstractMultiMessageSourceAPI]:
+    """
+    Executes the listed sources and performs the query actions.
+
+    :param source_config: The global configuration of all data sources. The configuration will be filtered by the
+        target sources.
+    :param redis_pool: The connection pool for IO
+    :param filter_expressions: The filter expressions that are passed on to all listed target sources
+    :param target_sources: The selected sources that will be executed. All sources must support the history API. Each
+        entry is treated as a glob pattern that selects a subset of sources.
+    :param debug_return: Flag that indicates whether the sources should be collected and returned. Otherwise, an empty
+        dict is returned for performance and resource constraints reasons.
+    :return: The instantiated sources for debugging purpose. Most likely not used in production.
+    """
+
+    selected_sources = set(itertools.chain(*[fnmatch.filter(source_config.keys(), pt) for pt in target_sources]))
+    sources = {}
+
+    for source_name in selected_sources:
+        executor = OneShotQueryExecutor(source_config[source_name], redis_pool, source_name)
+        executor.execute_batch(filter_expressions)
+
+        if debug_return:
+            sources[source_name] = executor.source_api
+
+    return sources
