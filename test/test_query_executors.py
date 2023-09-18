@@ -546,3 +546,22 @@ def test_one_shot_executor_redis_export(mockup_service_config, redis_pool, redis
     assert messages[1][-1]["duplicate"] == '"config-key"'
     assert messages[1][-1]["history_invocations"] == '2'
     assert messages[1][-1]["data"] == '"another-test-nonsense"'
+
+
+def test_execute_one_shot_batches(mockup_executors_config, redis_pool):
+    """Tests the complete one shot cycle function"""
+
+    filters = [dict(start_time="2023-09-17T00:00:00Z", end_time="2023-09-18T00:00:00Z"),
+               dict(start_time="2023-09-18T00:00:00Z", end_time="2023-09-19T00:00:00Z")]
+    targets = ["non-existing*", "secon*"]
+
+    sources = query_executors.execute_one_shot_batches(mockup_executors_config, redis_pool, filters, targets,
+                                                       debug_return=True)
+
+    assert len(sources) == 1
+    api: MockupSourceAPI = sources["second"]
+
+    assert api.start_invocations == 1
+    assert api.fetch_invocations == 0
+    assert api.history_invocations == 2
+    assert api.stop_invocations == 1

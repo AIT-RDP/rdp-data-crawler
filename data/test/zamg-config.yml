@@ -1,0 +1,24 @@
+version: 1
+data sources:
+  zamg_measurements.KLAGENFURT-HTL1:
+    type: "data_crawler.sources.zamg.MeasurementStationData"
+    source parameter:
+      station id: 8989076
+      endpoint: TAWES
+      drop missing observations: True
+      initial history: "48h"
+    polling:
+      frequency: 10min
+      offset: 4.25min
+      jitter: 15s
+    redis:
+      stream: "measurements.zamg.KLAGENFURT-HTL1"
+      tags: # Additional Redis tags that will be appended
+        station: "KLAGENFURT-HTL1"
+        data_provider: "ZAMG"
+        device_name: null
+
+redis:
+  host: !env-template "${DATA_CRAWLER_REDIS_HOST}"
+  port: !env-template "${DATA_CRAWLER_REDIS_PORT}"
+  db: !env-template "${DATA_CRAWLER_REDIS_DB}"
