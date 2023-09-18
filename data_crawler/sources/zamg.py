@@ -9,12 +9,13 @@ from typing import Dict, Any, Optional, List
 
 import data_crawler.access.jsonpath as jx
 import data_crawler.sources.abc.http_cache as http_cache
+import data_crawler.sources.abc.history as history
 
 import pandas as pd
 import requests
 
 
-class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
+class MeasurementStationData(http_cache.GenericHTTPSourceAPI, history.AbstractTimedHistorySourceMixin):
     """
     Fetches the measurement station data provided in 10 minute resolution
 
@@ -170,35 +171,65 @@ class MeasurementStationData(http_cache.GenericHTTPSourceAPI):
         :return: The conventional Redis message
         """
 
-        if raw_data is None:
-            raw_data = self._fetch_next_raw_result()
-
-        decoded_message = self._decode_raw_message(raw_data)
-
-        if self._drop_excessive_time_stamps:
-            decoded_message = self._drop_leading_none_time_stamps(decoded_message)
+        now_ts = datetime.datetime.now(tz=datetime.timezone.utc)
+        decoded_message = self._fetch_message(self._last_query_ts, now_ts, raw_data)
 
         if len(decoded_message["observation_time"]) > 0:
             self._last_query_ts = datetime.datetime.fromisoformat(decoded_message["observation_time"][-1])
         else:
             self._logger.warning(f"No new data is available. The last observations are from {self._last_query_ts}.")
 
+        return decoded_message
+
+    def fetch_historic_data(self, start_time: datetime.datetime, end_time: datetime.datetime,
+                            filter_clauses: Dict[str, Any], raw_data: Optional[dict] = None) -> Dict[str, Any]:
+        """
+        Fetches the historic data and outputs it in a single message.
+
+        :param start_time: The interval start of the query period
+        :param end_time: The interval end of the query period
+        :param filter_clauses: any additional filter clauses. Will be gracefully ignored.
+        :param raw_data: Optional raw data that may be passed on for testing the decoding capabilities
+        :return: The resulting output message
+        """
+
+        if len(filter_clauses) > 0:
+            raise ValueError(f"Unsupported filter clauses: {list(filter_clauses.keys())}")
+
+        decoded_message = self._fetch_message(start_time, end_time, raw_data)
+        return decoded_message
+
+    def _fetch_message(self, start_time: datetime.datetime, end_time: datetime.datetime,
+                       raw_data: Optional[dict] = None) -> Dict[str, Any]:
+        """
+        Fetches and decodes the message according to the source configuration but does not advance any internal state
+        """
+
+        if raw_data is None:
+            raw_data = self._fetch_next_raw_result(start_time, end_time)
+
+        decoded_message = self._decode_raw_message(raw_data)
+
+        if self._drop_excessive_time_stamps:
+            decoded_message = self._drop_leading_none_time_stamps(decoded_message)
+
         if self._drop_missing_observations:
             decoded_message = self._drop_all_none_observations(decoded_message)
 
         return decoded_message
 
-    def _fetch_next_raw_result(self) -> Optional[str]:
+    def _fetch_next_raw_result(self, start_time: datetime.datetime, end_time: datetime.datetime) -> dict:
         """Fetches the raw data of the next period"""
 
-        end_ts = datetime.datetime.now(tz=datetime.timezone.utc)
+        end_time = end_time.astimezone(datetime.timezone.utc)
+        start_time = start_time.astimezone(datetime.timezone.utc)
 
         params = self._static_request_parameters.copy()
-        params["start"] = self._last_query_ts.isoformat()
-        params["end"] = end_ts.isoformat()
+        params["start"] = start_time.isoformat()
+        params["end"] = end_time.isoformat()
 
-        self._logger.debug(f"Try to fetch new readings starting from {self._last_query_ts.isoformat()} to "
-                           f"{end_ts.isoformat()}")
+        self._logger.debug(f"Try to fetch new readings starting from {start_time.isoformat()} to "
+                           f"{end_time.isoformat()}")
         response: requests.Response = self.session.get(self._endpoint_url, params=params)
         response.raise_for_status()
         return response.json()
