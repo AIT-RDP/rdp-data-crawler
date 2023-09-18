@@ -2,12 +2,13 @@
 Implements the main command line interface of the E3 data crawler
 """
 import dataclasses
+import itertools
 import logging
 import logging.config
 import signal
 import time
 import warnings
-from typing import Optional
+from typing import Optional, Iterable, List, Dict
 
 import click
 import prometheus_client as prom
@@ -87,6 +88,54 @@ def run(ctx):
     logger.info(f"Begin to shutdown the data crawler.")
     supervisor.stop()
     logger.info("Bye!")
+
+
+@cli.command("fetch")
+@click.option("-f", "--filter", "filter_expr", multiple=True, help="A filter expression as key=value pair")
+@click.argument("source_names", nargs=-1)
+@click.pass_context
+def fetch(ctx, filter_expr: Iterable[str], source_names: Iterable[str]):
+    """
+    Executes the selected sources once and fetches the results in a one-shot action.
+
+    The source names must match the corresponding names in the configuration file. Glob patterns are supported but most
+    likely must be escaped to avoid shell expansion. In case no source is specified, the command will gracefully exit
+    without executing a fetch operation.
+    """
+    config = ctx.obj.config
+    filter_configs = _parse_filter_expression(filter_expr)
+    redis_pool = _load_redis_connection_pool(config)
+
+    query_executors.execute_one_shot_batches(config["data sources"], redis_pool, filter_configs, source_names)
+
+
+def _parse_filter_expression(filter_expr: Iterable[str]) -> List[Dict[str, str]]:
+    """Parses the series of filter terms and does some basic count checking."""
+
+    # Parse the input
+    out_exp = {}
+    for i, exp in enumerate(filter_expr):
+        if "=" not in exp:
+            raise ValueError(f"The {i + 1}th filter expression is not a key=value pair: '{exp}'")
+        key, value = tuple(exp.split("=", maxsplit=1))
+        out_exp[key] = out_exp.get(key, []) + [value]
+
+    # Check the input
+    length_values_ind = sorted(len(val) for val in out_exp.values())
+    length_values = list(itertools.groupby(length_values_ind))
+    if len(length_values) > 1:
+        raise ValueError(f"Some filter keys are more often listed than others: "
+                         f"{ {k: len(v) for k, v in out_exp.items()} }")
+
+    # Transform the input to a record format
+    if len(length_values) <= 0:
+        return [{}]  # Output a single default configuration since there are no config items
+    else:
+        bucket_number = length_values[0][0]  # groupby returns (key, group) tuples
+        return [
+            {key: values[i] for key, values in out_exp.items()}
+            for i in range(bucket_number)
+        ]
 
 
 def _startup_prometheus_client(prometheus_config: Optional[dict] = None):

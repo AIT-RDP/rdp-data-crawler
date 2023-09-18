@@ -5,8 +5,10 @@ import abc
 import copy
 import dataclasses
 import datetime
+import fnmatch
 import importlib
 import inspect
+import itertools
 import json
 import logging
 import math
@@ -592,8 +594,43 @@ class OneShotQueryExecutor(_QueryExecutorBase):
 
         self._source_api.start()
         try:
+            self._logger.debug(f"Start executing history batch on all {len(filter_expressions)} expressions")
+
             for filter_clauses in filter_expressions:
                 message_gen = self._source_api.fetch_historic_data_bundle(filter_clauses)
                 self._push_messages(message_gen)
+
+            self._logger.debug(f"Finished history batch")
         finally:
             self._source_api.stop()
+
+
+def execute_one_shot_batches(source_config: Dict[str, dict], redis_pool: redis.ConnectionPool,
+                             filter_expressions: Iterable[Dict[str, Any]],
+                             target_sources: Iterable[str],
+                             debug_return=False) -> Dict[str, abstract_source.AbstractMultiMessageSourceAPI]:
+    """
+    Executes the listed sources and performs the query actions.
+
+    :param source_config: The global configuration of all data sources. The configuration will be filtered by the
+        target sources.
+    :param redis_pool: The connection pool for IO
+    :param filter_expressions: The filter expressions that are passed on to all listed target sources
+    :param target_sources: The selected sources that will be executed. All sources must support the history API. Each
+        entry is treated as a glob pattern that selects a subset of sources.
+    :param debug_return: Flag that indicates whether the sources should be collected and returned. Otherwise, an empty
+        dict is returned for performance and resource constraints reasons.
+    :return: The instantiated sources for debugging purpose. Most likely not used in production.
+    """
+
+    selected_sources = set(itertools.chain(*[fnmatch.filter(source_config.keys(), pt) for pt in target_sources]))
+    sources = {}
+
+    for source_name in selected_sources:
+        executor = OneShotQueryExecutor(source_config[source_name], redis_pool, source_name)
+        executor.execute_batch(filter_expressions)
+
+        if debug_return:
+            sources[source_name] = executor.source_api
+
+    return sources
