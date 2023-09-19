@@ -633,6 +633,8 @@ def execute_one_shot_batches(source_config: Dict[str, dict], redis_pool: redis.C
 
     for source_name in selected_sources:
         config = _merge_config(source_config[source_name], override_config)
+        logger.debug(f"Start one-shot runs of {source_name} with "
+                     f"{'original' if override_config == dict() else 'updated'} configuration {config}.")
         executor = OneShotQueryExecutor(config, redis_pool, source_name)
         executor.execute_batch(filter_expressions)
 
