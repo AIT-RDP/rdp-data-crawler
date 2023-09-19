@@ -94,7 +94,9 @@ def mockup_service_config(appended_test_path):
     return {
         "type": "test_query_executors.MockupSourceAPI",
         "source parameter": {
-            "key": "<keep it secret>"
+            "key": "<keep it secret>",
+            "some_list": [1, 2, 4],
+            "keep": "it"
         },
         "polling": {
             "frequency": "0.5s"
@@ -565,3 +567,23 @@ def test_execute_one_shot_batches(mockup_executors_config, redis_pool):
     assert api.fetch_invocations == 0
     assert api.history_invocations == 2
     assert api.stop_invocations == 1
+
+
+def test_execute_one_shot_batches_override(mockup_executors_config, redis_pool):
+    """Tests the override functionality of the configuration"""
+
+    filters = [dict(start_time="2023-09-17T00:00:00Z", end_time="2023-09-18T00:00:00Z")]
+    targets = ["non-existing*", "secon*"]
+    override = {"source parameter": {"key": "Some new key", "LetTheHammer": "Fall", "some_list": [1, 4, 16]}}
+
+    sources = query_executors.execute_one_shot_batches(mockup_executors_config, redis_pool, filters, targets,
+                                                       override_config=override, debug_return=True)
+
+    assert len(sources) == 1
+    api: MockupSourceAPI = sources["second"]
+
+    assert api.config["key"] == "Some new key"
+    assert "LetTheHammer" in api.config
+    assert api.config["LetTheHammer"] == "Fall"
+    assert api.config["some_list"] == [1, 4, 16]
+    assert api.config["keep"] == "it"

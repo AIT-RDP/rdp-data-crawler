@@ -607,7 +607,7 @@ class OneShotQueryExecutor(_QueryExecutorBase):
 
 def execute_one_shot_batches(source_config: Dict[str, dict], redis_pool: redis.ConnectionPool,
                              filter_expressions: Iterable[Dict[str, Any]],
-                             target_sources: Iterable[str],
+                             target_sources: Iterable[str], override_config: Optional[dict] = None,
                              debug_return=False) -> Dict[str, abstract_source.AbstractMultiMessageSourceAPI]:
     """
     Executes the listed sources and performs the query actions.
@@ -618,19 +618,51 @@ def execute_one_shot_batches(source_config: Dict[str, dict], redis_pool: redis.C
     :param filter_expressions: The filter expressions that are passed on to all listed target sources
     :param target_sources: The selected sources that will be executed. All sources must support the history API. Each
         entry is treated as a glob pattern that selects a subset of sources.
+    :param override_config: Some optional config stanzas that will be applied to every executed source. The
+        configuration wilkl be merged recursively.
     :param debug_return: Flag that indicates whether the sources should be collected and returned. Otherwise, an empty
         dict is returned for performance and resource constraints reasons.
     :return: The instantiated sources for debugging purpose. Most likely not used in production.
     """
 
+    if override_config is None:
+        override_config = {}
+
     selected_sources = set(itertools.chain(*[fnmatch.filter(source_config.keys(), pt) for pt in target_sources]))
     sources = {}
 
     for source_name in selected_sources:
-        executor = OneShotQueryExecutor(source_config[source_name], redis_pool, source_name)
+        config = _merge_config(source_config[source_name], override_config)
+        executor = OneShotQueryExecutor(config, redis_pool, source_name)
         executor.execute_batch(filter_expressions)
 
         if debug_return:
             sources[source_name] = executor.source_api
 
     return sources
+
+
+def _merge_config(cnf_dst, cnf_new):
+    """Recursively merges the base configuration cnf_dst and the cnf_new that overrides any existing config"""
+
+    if isinstance(cnf_dst, dict) != isinstance(cnf_new, dict):
+        raise ValueError(f"One of the configs to merge is not a dict: {cnf_dst}, {cnf_new}")
+
+    if isinstance(cnf_dst, list) != isinstance(cnf_new, list):
+        raise ValueError(f"One of the configs to merge is not a list: {cnf_dst}, {cnf_new}")
+
+    cnf_dst = copy.copy(cnf_dst)
+    if isinstance(cnf_dst, dict):  # Merge the dicts item-wise
+        for new_key, new_value in cnf_new.items():
+            cnf_dst[new_key] = _merge_config(cnf_dst.get(new_key, new_value), new_value)
+
+    elif isinstance(cnf_dst, list):  # Merge the list item wise
+        if len(cnf_dst) != len(cnf_new):
+            raise KeyError(f"Cannot merge two lists with different length: {cnf_dst}, {cnf_new}")
+
+        cnf_dst = [_merge_config(a, b) for a, b in zip(cnf_dst, cnf_new)]
+
+    else:  # It's a leaf, just return the new item
+        cnf_dst = cnf_new
+
+    return cnf_dst

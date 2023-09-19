@@ -92,9 +92,10 @@ def run(ctx):
 
 @cli.command("fetch")
 @click.option("-f", "--filter", "filter_expr", multiple=True, help="A filter expression as key=value pair")
+@click.option("-o", "--override", multiple=True, help="Overrides the specified source config of all configured sources")
 @click.argument("source_names", nargs=-1)
 @click.pass_context
-def fetch(ctx, filter_expr: Iterable[str], source_names: Iterable[str]):
+def fetch(ctx, filter_expr: Iterable[str], override: Iterable[str], source_names: Iterable[str]):
     """
     Executes the selected sources once and fetches the results in a one-shot action.
 
@@ -104,9 +105,11 @@ def fetch(ctx, filter_expr: Iterable[str], source_names: Iterable[str]):
     """
     config = ctx.obj.config
     filter_configs = _parse_filter_expression(filter_expr)
+    override_config = _parse_override_clauses(override)
     redis_pool = _load_redis_connection_pool(config)
 
-    query_executors.execute_one_shot_batches(config["data sources"], redis_pool, filter_configs, source_names)
+    query_executors.execute_one_shot_batches(config["data sources"], redis_pool, filter_configs, source_names,
+                                             override_config=override_config)
 
 
 def _parse_filter_expression(filter_expr: Iterable[str]) -> List[Dict[str, str]]:
@@ -136,6 +139,24 @@ def _parse_filter_expression(filter_expr: Iterable[str]) -> List[Dict[str, str]]
             {key: values[i] for key, values in out_exp.items()}
             for i in range(bucket_number)
         ]
+
+
+def _parse_override_clauses(override_clauses: Iterable[str]) -> dict:
+    """Parses the override syntax (dot-separated hierarchy) and returns the prototype dictionary"""
+
+    ret_dict = {}
+    for clause in override_clauses:
+        rec_key, value = tuple(clause.split("=", maxsplit=1))
+        level_names = rec_key.split(".")
+        assert len(level_names) >= 1
+
+        dst_dict = ret_dict
+        for level in level_names[:-1]:
+            dst_dict[level] = dst_dict.get(level, {})  # make sure there is an entry
+            dst_dict = dst_dict[level]
+        dst_dict[level_names[-1]] = value
+
+    return ret_dict
 
 
 def _startup_prometheus_client(prometheus_config: Optional[dict] = None):
