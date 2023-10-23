@@ -460,6 +460,35 @@ def test_query_supervisor_restart(mockup_executors_config, mockup_executors_exte
     supervisor.stop()
 
 
+def test_query_supervisor_logging(caplog: pytest.LogCaptureFixture, mockup_executors_config, mockup_executors_externals,
+                                  redis_pool):
+    """Tests the log messages when restarting some executors"""
+    caplog.set_level(logging.DEBUG, logger="data_crawler")
+    sup_config = {"dead timeout": "0.1s"}
+    supervisor = query_executors.QuerySupervisor(mockup_executors_config, sup_config, redis_pool,
+                                                 mockup_executors_externals)
+    supervisor.start()
+    supervisor.heartbeat()
+
+    mockup_executors_externals["second"].enable_fetch.clear()  # Block the execution
+    time.sleep(1.1)
+
+    supervisor.heartbeat()  # second: "stop-by-timeout"
+    assert "The source second does not complete its cycle in time" in caplog.text
+
+    supervisor.heartbeat()  # second: "blocking"
+    assert "Source second reached a timeout and is marked for restart" in caplog.text
+
+    mockup_executors_externals["second"].enable_fetch.set()
+    time.sleep(0.1)  # Give the second source some time to terminate
+
+    supervisor.heartbeat()  # second: "restarted"
+    assert "Restart the executor" in caplog.text
+
+    supervisor.heartbeat()
+    supervisor.stop()
+
+
 def test_one_shot_executor_api_instantiation(mockup_service_config, redis_pool):
     """Tests the API instantiation function using the mockup API"""
 
