@@ -479,6 +479,7 @@ class QuerySupervisor:
 
         for ex in self._executors.values():
             ex.start()
+        logger.debug(f"Started all {len(self._executors)} threads managed by the supervisor.")
 
     def stop(self):
         """Stops and joins all executor threads"""
@@ -488,6 +489,7 @@ class QuerySupervisor:
 
         for ex in self._executors.values():
             ex.join()
+        logger.debug(f"Stopped all {len(self._executors)} threads managed by the supervisor.")
 
     def heartbeat(self) -> Dict[str, str]:
         """
