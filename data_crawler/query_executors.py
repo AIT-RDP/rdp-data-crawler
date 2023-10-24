@@ -344,9 +344,13 @@ class ThreadQueryExecutor(_QueryExecutorBase):
     def _run_timed_execution(self):
         """Executes the queries until termination is signaled"""
 
-        self._source_api.start()
-        self._timer.reset()  # Reset after startup to avoid initial deadline misses
-        self._startup_event.set()  # Release the main thread (mostly to test the timing)
+        try:
+            self._source_api.start()
+            self._timer.reset()  # Reset after startup to avoid initial deadline misses
+        finally:
+            # Release the main thread (mostly to test the timing) However, to avoid deadlocks on crashed threads, always
+            # release the startup flag, even if startup fails. Dead threads will be picked up by the supervisor anyway.
+            self._startup_event.set()
 
         while True:
             timeout = self._timer.get_remaining_seconds()
