@@ -42,6 +42,10 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI, history.AbstractTimedH
     def start(self):
         """Counts the start and performs some basic checks"""
         assert self.start_invocations == self.stop_invocations
+
+        if self.config.get("raise_on_startup", False):
+            raise ValueError("Uups!")
+
         self.start_invocations += 1
 
     def fetch_data(self) -> Dict[str, Any]:
@@ -322,6 +326,22 @@ def test_thread_executor_fetch_error(mockup_service_config, redis_pool):
     assert 2 <= api.fetch_invocations <= 4
     assert ((api.fetch_ts[-1].microsecond < 0.1e6) or (api.fetch_ts[-1].microsecond > 0.9e6) or
             (0.4e6 < api.fetch_ts[-1].microsecond < 0.6e6))  # Check alignment
+
+
+def test_thread_executor_startup_error(mockup_service_config, redis_pool):
+    """Tests whether the API fetch function is correctly invoked"""
+
+    api = MockupSourceAPI(source_parameters={"raise_on_startup": True})
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config, redis_pool, source_api=api)
+
+    assert api.fetch_invocations == 0
+    assert api.start_invocations == 0
+
+    executor.start()
+    assert not executor.is_alive(), "Crash on startup expected"
+
+    executor.stop()
+    executor.join()
 
 
 def test_thread_executor_redis_export(mockup_service_config, redis_pool, redis_stream_name):
