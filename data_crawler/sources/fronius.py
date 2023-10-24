@@ -39,6 +39,7 @@ class FroniusInverterRealtimeData(abstract_source.AbstractSourceAPI):
         self._address = source_parameters["address"]
         self._device_id = int(source_parameters.get("device", 1))
         self._correct_device_time = bool(source_parameters.get("correct device time", False))
+        self._timeout = pd.to_timedelta(source_parameters.get("timeout", "30s")).total_seconds()
 
         self._extractors = self._compile_extractors()
 
@@ -115,7 +116,7 @@ class FroniusInverterRealtimeData(abstract_source.AbstractSourceAPI):
         _real_time_guard.wait_until_safe(self._address)  # Don't forget to be patient.
         resp = requests.get(f"http://{self._address}/solar_api/v1/GetInverterRealtimeData.cgi", params={
             "Scope": "Device", "DeviceId": self._device_id, "DataCollection": "CommonInverterData"
-        })
+        }, timeout=self._timeout)
         resp.raise_for_status()
         return resp.json()
 
@@ -140,6 +141,8 @@ class FroniusInverterPowerFlowRealtimeData(abstract_source.AbstractMultiMessageS
         self._address = source_parameters["address"]
         self._correct_device_time = bool(source_parameters.get("correct device time", False))
         self._device_tags = source_parameters.get("device tags", {})  # dict of device specific tags to append
+
+        self._timeout = pd.to_timedelta(source_parameters.get("timeout", "30s")).total_seconds()
 
     def fetch_data_bundle(self, raw_data: Optional[dict] = None) -> Generator[Dict[str, Any], None, None]:
         """
@@ -188,7 +191,7 @@ class FroniusInverterPowerFlowRealtimeData(abstract_source.AbstractMultiMessageS
         """Queries the current raw data from the inverter"""
 
         _real_time_guard.wait_until_safe(self._address)  # Don't forget to be patient.
-        resp = requests.get(f"http://{self._address}/solar_api/v1/GetPowerFlowRealtimeData.fcgi")
+        resp = requests.get(f"http://{self._address}/solar_api/v1/GetPowerFlowRealtimeData.fcgi", timeout=self._timeout)
         resp.raise_for_status()
         return resp.json()
 
@@ -260,6 +263,8 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
 
         self._store = persistent_store
         self._time_correction = self._fetch_historical_time_correction(persistent_store)
+
+        self._timeout = pd.to_timedelta(source_parameters.get("timeout", "3min")).total_seconds()
 
     @staticmethod
     def _fetch_historical_time_correction(store: storage.PersistentAPIStorage) -> Dict[
@@ -423,7 +428,7 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
               "&".join([f"Channel={urllib.parse.quote(chn)}" for chn in channels])
 
         _history_guard.wait_until_safe(self._address)
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=self._timeout)
         self._logger.debug(f"Tried to fetch history from {self._last_query_ts.isoformat()} to {ts_now.isoformat()}: "
                            f"{resp.request.url} - got {resp.status_code} {resp.reason}")
         resp.raise_for_status()
