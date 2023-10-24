@@ -4,6 +4,7 @@ Tests the fronius interface logic
 import datetime
 
 import pytest
+import requests
 
 import data_crawler.access.storage as storage
 import data_crawler.sources.fronius as fronius
@@ -98,6 +99,8 @@ def test_inverter_rt_data_parsing_night(inverter_rt_device_response_2, rt_parame
 def test_inverter_rt_data_fetch(rt_parameters):
     """Test fetching some data a local device. This test case may fail for most systems."""
 
+    rt_parameters["timeout"] = "2s"
+
     api = fronius.FroniusInverterRealtimeData(source_parameters=rt_parameters, executor_name="<test>")
     api.start()
     dt_now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -111,6 +114,19 @@ def test_inverter_rt_data_fetch(rt_parameters):
 
     assert dt_now - datetime.timedelta(minutes=50) <= datetime.datetime.fromisoformat(message["observation_time"])
     assert datetime.datetime.fromisoformat(message["observation_time"]) <= dt_now + datetime.timedelta(minutes=50)
+
+
+def test_inverter_rt_timeout(rt_parameters):
+    """Test the timeout mechanism by an unrealistically low timeout"""
+    rt_parameters["timeout"] = "0.1ms"
+
+    api = fronius.FroniusInverterRealtimeData(source_parameters=rt_parameters, executor_name="<test>")
+    api.start()
+
+    with pytest.raises(requests.Timeout):
+        api.fetch_data()
+
+    api.stop()
 
 
 inverter_pf_device_response_1 = helpers.get_json_fixture("data/test/fronius-solarapi/GetPowerFlowRealtimeData-1.json")
@@ -244,6 +260,7 @@ def test_inverter_pf_data_device_tags(inverter_pf_device_response_1, pf_paramete
 @pytest.mark.xfail(strict=False)
 def test_inverter_pf_data_fetch(pf_parameters):
     """Test fetching some data a local device. This test case may fail for most systems."""
+    pf_parameters["timeout"] = "2s"
 
     api = fronius.FroniusInverterPowerFlowRealtimeData(source_parameters=pf_parameters, executor_name="<test>")
     api.start()
@@ -257,6 +274,19 @@ def test_inverter_pf_data_fetch(pf_parameters):
 
     assert dt_now - datetime.timedelta(minutes=50) <= datetime.datetime.fromisoformat(messages[0]["observation_time"])
     assert datetime.datetime.fromisoformat(messages[0]["observation_time"]) <= dt_now + datetime.timedelta(minutes=50)
+
+
+def test_inverter_pf_timeout(pf_parameters):
+    """Tests the timeout mechanism with an unrealistically low timeout"""
+
+    pf_parameters["timeout"] = "0.1ms"
+    api = fronius.FroniusInverterPowerFlowRealtimeData(source_parameters=pf_parameters, executor_name="<test>")
+    api.start()
+
+    with pytest.raises(requests.Timeout):
+        list(api.fetch_data_bundle())
+
+    api.stop()
 
 
 inverter_archive_response_1 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-1.json")
@@ -579,6 +609,7 @@ def test_inverter_archive_device_tags(inverter_archive_response_1, archive_param
 def test_inverter_archive_fetch(archive_parameters, persistent_store):
     """Tests fetching an exemplary data logger"""
 
+    archive_parameters["timeout"] = "20s"
     del archive_parameters["data points"]  # Query all data points
 
     api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
