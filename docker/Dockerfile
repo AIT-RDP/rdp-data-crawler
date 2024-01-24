@@ -1,5 +1,5 @@
 # Do not use the alpine images as it is missing many dependencies
-FROM python:3.10
+FROM ${DOCKER_PROXY_PREFIX}python:3.10
 
 # Define GIT credential to access the modbus_crawler repo
 ARG MODBUS_GIT_USER
