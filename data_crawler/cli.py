@@ -207,3 +207,7 @@ def _load_redis_connection_pool(config: dict) -> redis.ConnectionPool:
     logger.debug(f"Redis connection to {host}:{port} using db {db} is alive.")
 
     return pool
+
+
+if __name__ == "__main__":
+    main()
