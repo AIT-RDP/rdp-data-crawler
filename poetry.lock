@@ -12,11 +12,6 @@ files = [
     {file = "async_timeout-4.0.3-py3-none-any.whl", hash = "sha256:7405140ff1230c310e51dc27b3145b9092d659ce68ff733fb0cefe3ee42be028"},
 ]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "cachecontrol"
 version = "0.13.1"
@@ -38,11 +33,6 @@ dev = ["CacheControl[filecache,redis]", "black", "build", "cherrypy", "mypy", "p
 filecache = ["filelock (>=3.8.0)"]
 redis = ["redis (>=2.10.5)"]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "certifi"
 version = "2023.11.17"
@@ -54,11 +44,6 @@ files = [
     {file = "certifi-2023.11.17-py3-none-any.whl", hash = "sha256:e036ab49d5b79556f99cfc2d9320b34cfbe5be05c5871b51de9329f0603b0474"},
     {file = "certifi-2023.11.17.tar.gz", hash = "sha256:9b469f3a900bf28dc19b8cfbf8019bf47f7fdd1a65a1d4ffb98fc14166beb4d1"},
 ]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "charset-normalizer"
@@ -160,11 +145,6 @@ files = [
     {file = "charset_normalizer-3.3.2-py3-none-any.whl", hash = "sha256:3e4d1f6587322d2788836a99c69062fbb091331ec940e02d12d179c1d53e25fc"},
 ]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "click"
 version = "8.1.7"
@@ -180,11 +160,6 @@ files = [
 [package.dependencies]
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "colorama"
 version = "0.4.6"
@@ -197,11 +172,6 @@ files = [
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "decorator"
 version = "5.1.1"
@@ -213,11 +183,6 @@ files = [
     {file = "decorator-5.1.1-py3-none-any.whl", hash = "sha256:b8c3f85900b9dc423225913c5aace94729fe1fa9763b38939a95226f02d37186"},
     {file = "decorator-5.1.1.tar.gz", hash = "sha256:637996211036b6385ef91435e4fae22989472f9d571faba8927ba8253acbc330"},
 ]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "exceptiongroup"
@@ -233,11 +198,6 @@ files = [
 
 [package.extras]
 test = ["pytest (>=6)"]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "hiredis"
@@ -358,11 +318,6 @@ files = [
     {file = "hiredis-2.3.2.tar.gz", hash = "sha256:733e2456b68f3f126ddaf2cd500a33b25146c3676b97ea843665717bda0c5d43"},
 ]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "idna"
 version = "3.6"
@@ -375,11 +330,6 @@ files = [
     {file = "idna-3.6.tar.gz", hash = "sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca"},
 ]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "iniconfig"
 version = "2.0.0"
@@ -391,11 +341,6 @@ files = [
     {file = "iniconfig-2.0.0-py3-none-any.whl", hash = "sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374"},
     {file = "iniconfig-2.0.0.tar.gz", hash = "sha256:2d91e135bf72d31a410b17c16da610a82cb55f6b0477d1a902134b24a455b8b3"},
 ]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "jsonpath-rw"
@@ -413,11 +358,6 @@ decorator = "*"
 ply = "*"
 six = "*"
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "lockfile"
 version = "0.12.2"
@@ -429,11 +369,6 @@ files = [
     {file = "lockfile-0.12.2-py2.py3-none-any.whl", hash = "sha256:6c3cb24f344923d30b2785d5ad75182c8ea7ac1b6171b08657258ec7429d50fa"},
     {file = "lockfile-0.12.2.tar.gz", hash = "sha256:6aed02de03cba24efabcd600b30540140634fc06cfa603822d508d5361e9f799"},
 ]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "modbus_crawler"
@@ -524,11 +459,6 @@ files = [
     {file = "msgpack-1.0.7.tar.gz", hash = "sha256:572efc93db7a4d27e404501975ca6d2d9775705c2d922390d878fcf768d92c87"},
 ]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "numpy"
 version = "1.26.3"
@@ -575,11 +505,6 @@ files = [
     {file = "numpy-1.26.3.tar.gz", hash = "sha256:697df43e2b6310ecc9d95f05d5ef20eacc09c7c4ecc9da3f235d39e71b7da1e4"},
 ]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "packaging"
 version = "23.2"
@@ -591,11 +516,6 @@ files = [
     {file = "packaging-23.2-py3-none-any.whl", hash = "sha256:8c491190033a9af7e1d931d0b5dacc2ef47509b34dd0de67ed209b5203fc88c7"},
     {file = "packaging-23.2.tar.gz", hash = "sha256:048fb0e9405036518eaaf48a55953c750c11e1a1b68e0dd1a9d62ed0c092cfc5"},
 ]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "pandas"
@@ -670,11 +590,6 @@ sql-other = ["SQLAlchemy (>=2.0.0)", "adbc-driver-postgresql (>=0.8.0)", "adbc-d
 test = ["hypothesis (>=6.46.1)", "pytest (>=7.3.2)", "pytest-xdist (>=2.2.0)"]
 xml = ["lxml (>=4.9.2)"]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "pluggy"
 version = "1.3.0"
@@ -691,11 +606,6 @@ files = [
 dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "ply"
 version = "3.11"
@@ -707,11 +617,6 @@ files = [
     {file = "ply-3.11-py2.py3-none-any.whl", hash = "sha256:096f9b8350b65ebd2fd1346b12452efe5b9607f7482813ffca50c22722a807ce"},
     {file = "ply-3.11.tar.gz", hash = "sha256:00c7c1aaa88358b9c765b6d3000c6eec0ba42abca5351b095321aef446081da3"},
 ]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "prometheus-client"
@@ -727,11 +632,6 @@ files = [
 
 [package.extras]
 twisted = ["twisted"]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "pymodbus"
@@ -753,11 +653,6 @@ development = ["bandit (==1.7.4)", "codespell (==2.2.2)", "coverage (==7.1.0)", 
 documentation = ["Sphinx (==5.3.0)", "recommonmark (==0.7.1)", "sphinx-rtd-theme (==1.1.1)"]
 repl = ["aiohttp (==3.8.3)", "click (>=8.0.0)", "prompt-toolkit (==3.0.36)", "pygments (==2.14.0)", "typer[all] (==0.7.0)"]
 serial = ["pyserial (>=3.5)"]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "pyrdp-commons"
@@ -804,11 +699,6 @@ tomli = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
 [package.extras]
 testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "python-dateutil"
 version = "2.8.2"
@@ -823,11 +713,6 @@ files = [
 
 [package.dependencies]
 six = ">=1.5"
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "python-dotenv"
@@ -844,11 +729,6 @@ files = [
 [package.extras]
 cli = ["click (>=5.0)"]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "pytz"
 version = "2023.3.post1"
@@ -860,11 +740,6 @@ files = [
     {file = "pytz-2023.3.post1-py2.py3-none-any.whl", hash = "sha256:ce42d816b81b68506614c11e8937d3aa9e41007ceb50bfdcb0749b921bf646c7"},
     {file = "pytz-2023.3.post1.tar.gz", hash = "sha256:7b4fddbeb94a1eba4b557da24f19fdf9db575192544270a9101d8509f9f43d7b"},
 ]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "pyyaml"
@@ -892,7 +767,6 @@ files = [
     {file = "PyYAML-6.0.1-cp311-cp311-win_amd64.whl", hash = "sha256:bf07ee2fef7014951eeb99f56f39c9bb4af143d8aa3c21b1677805985307da34"},
     {file = "PyYAML-6.0.1-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:855fb52b0dc35af121542a76b9a84f8d1cd886ea97c84703eaa6d88e37a2ad28"},
     {file = "PyYAML-6.0.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:40df9b996c2b73138957fe23a16a4f0ba614f4c0efce1e9406a184b6d07fa3a9"},
-    {file = "PyYAML-6.0.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a08c6f0fe150303c1c6b71ebcd7213c2858041a7e01975da3a99aed1e7a378ef"},
     {file = "PyYAML-6.0.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6c22bec3fbe2524cde73d7ada88f6566758a8f7227bfbf93a408a9d86bcc12a0"},
     {file = "PyYAML-6.0.1-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:8d4e9c88387b0f5c7d5f281e55304de64cf7f9c0021a3525bd3b1c542da3b0e4"},
     {file = "PyYAML-6.0.1-cp312-cp312-win32.whl", hash = "sha256:d483d2cdf104e7c9fa60c544d92981f12ad66a457afae824d146093b8c294c54"},
@@ -927,11 +801,6 @@ files = [
     {file = "PyYAML-6.0.1.tar.gz", hash = "sha256:bfdf460b1736c775f2ba9f6a92bca30bc2095067b8a9d77876d1fad6cc3b4a43"},
 ]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "redis"
 version = "5.0.1"
@@ -950,11 +819,6 @@ async-timeout = {version = ">=4.0.2", markers = "python_full_version <= \"3.11.2
 [package.extras]
 hiredis = ["hiredis (>=1.0.0)"]
 ocsp = ["cryptography (>=36.0.1)", "pyopenssl (==20.0.1)", "requests (>=2.26.0)"]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "requests"
@@ -978,11 +842,6 @@ urllib3 = ">=1.21.1,<3"
 socks = ["PySocks (>=1.5.6,!=1.5.7)"]
 use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "schedule"
 version = "1.2.1"
@@ -994,11 +853,6 @@ files = [
     {file = "schedule-1.2.1-py2.py3-none-any.whl", hash = "sha256:14cdeb083a596aa1de6dc77639a1b2ac8bf6eaafa82b1c9279d3612823063d01"},
     {file = "schedule-1.2.1.tar.gz", hash = "sha256:843bc0538b99c93f02b8b50e3e39886c06f2d003b24f48e1aa4cadfa3f341279"},
 ]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "setuptools"
@@ -1017,11 +871,6 @@ docs = ["furo", "jaraco.packaging (>=9)", "jaraco.tidelift (>=1.4)", "pygments-g
 testing = ["build[virtualenv]", "filelock (>=3.4.0)", "flake8 (<5)", "flake8-2020", "ini2toml[lite] (>=0.9)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "pip (>=19.1)", "pip-run (>=8.8)", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=1.3)", "pytest-flake8", "pytest-mypy (>=0.9.1)", "pytest-perf", "pytest-timeout", "pytest-xdist", "tomli-w (>=1.0.0)", "virtualenv (>=13.0.0)", "wheel"]
 testing-integration = ["build[virtualenv]", "filelock (>=3.4.0)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "pytest", "pytest-enabler", "pytest-xdist", "tomli", "virtualenv (>=13.0.0)", "wheel"]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "six"
 version = "1.16.0"
@@ -1033,11 +882,6 @@ files = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
 ]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "tomli"
@@ -1051,11 +895,6 @@ files = [
     {file = "tomli-2.0.1.tar.gz", hash = "sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f"},
 ]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [[package]]
 name = "tzdata"
 version = "2023.4"
@@ -1067,11 +906,6 @@ files = [
     {file = "tzdata-2023.4-py2.py3-none-any.whl", hash = "sha256:aa3ace4329eeacda5b7beb7ea08ece826c28d761cda36e747cfbf97996d39bf3"},
     {file = "tzdata-2023.4.tar.gz", hash = "sha256:dd54c94f294765522c77399649b4fefd95522479a664a0cec87f41bebc6148c9"},
 ]
-
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
 
 [[package]]
 name = "urllib3"
@@ -1090,12 +924,7 @@ brotli = ["brotli (>=1.0.9)", "brotlicffi (>=0.8.0)"]
 socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
 
-[package.source]
-type = "legacy"
-url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-reference = "gitlab-pyrdp-commons"
-
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "4b69490bb65d0574108fba81eacaee7bd354e6a28ca0f2b68f12dbc5b297dfd5"
+content-hash = "79c485b7dd623723d1f041f76ec829c25459c15ae075abbdb020827405035128"
