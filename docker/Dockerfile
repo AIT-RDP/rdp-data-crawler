@@ -1,7 +1,8 @@
 # Do not use the alpine images as it is missing many dependencies
 FROM ${DOCKER_PROXY_PREFIX}python:3.10 as builder
 
-RUN pip install poetry
+COPY requirements-dev.txt ./
+RUN pip install -r requirements-dev.txt
 
 ENV POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_IN_PROJECT=1 \
