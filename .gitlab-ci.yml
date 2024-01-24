@@ -30,7 +30,7 @@ test_python_3_10:
     # Authenticate the third-party dependencies
     - poetry config repositories.gitlab-intern-ees-lachs-modbus-crawler https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler
     - poetry config http-basic.gitlab-intern-ees-lachs-modbus-crawler gitlab-ci-token ${CI_JOB_TOKEN}
-    - poetry config http-basic.gitlab-pyrdp-commons gitlab-ci-token ${CI_JOB_TOKEN}
+    - poetry config http-basic.gitlab-pyrdp-commons gitlab-ci-token ${TOKEN_PYRDP_COMMONS}
     # Install the dependencies
     - poetry install --with dev
     # Test the code
