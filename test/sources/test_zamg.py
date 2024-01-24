@@ -139,7 +139,11 @@ def test_measurement_station_history_online(endpoint, station_id, measurement_st
 
     api = zamg.MeasurementStationData(source_parameters=measurement_station_parameters, executor_name="<test>")
 
-    filter_clauses = dict(start_time="2023-09-17T00:00:00Z", end_time="2023-09-18T00:00:00Z")
+    utc = datetime.timezone.utc
+    end_time = datetime.datetime.now(tz=utc) - datetime.timedelta(hours=48)
+    start_time = end_time - datetime.timedelta(hours=24)
+
+    filter_clauses = dict(start_time=start_time.isoformat(), end_time=end_time.isoformat())
     response_data = api.fetch_historic_data_bundle(filter_clauses)
     assert response_data is not None
 
@@ -151,13 +155,12 @@ def test_measurement_station_history_online(endpoint, station_id, measurement_st
     assert response_length > 23
 
     first_ts = datetime.datetime.fromisoformat(response_data["observation_time"][0])
-    utc = datetime.timezone.utc
-    assert datetime.datetime(2023, 9, 16, 23, 50, 0, tzinfo=utc) <= first_ts
-    assert first_ts <= datetime.datetime(2023, 9, 17, 0, 10, 0, tzinfo=utc)
+    assert start_time - datetime.timedelta(minutes=10) <= first_ts
+    assert first_ts <= start_time + datetime.timedelta(minutes=10)
 
     last_ts = datetime.datetime.fromisoformat(response_data["observation_time"][-1])
-    assert datetime.datetime(2023, 9, 17, 23, 50, 0, tzinfo=utc) <= last_ts
-    assert last_ts <= datetime.datetime(2023, 9, 18, 0, 10, 0, tzinfo=utc)
+    assert end_time - datetime.timedelta(minutes=10) <= last_ts
+    assert last_ts <= end_time + datetime.timedelta(minutes=10)
 
     mandatory_measurements = [
         "air_temperature_2m", "air_pressure_at_sea_level", "dew_point_temperature_2m",
