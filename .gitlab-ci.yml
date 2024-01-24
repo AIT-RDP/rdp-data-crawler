@@ -15,12 +15,12 @@ variables:
 test_python_3_10:
   stage: build  # Docker-image creation and tests can run in parallel
   services:
-    - name: docker.io/redis
+    - name: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/redis
       alias: redis
   tags:
     - docker
     - x86_64
-  image: python:3.10
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/python:3.10
   variables:
     DATA_CRAWLER_REDIS_HOST: "redis"
     DATA_CRAWLER_REDIS_PORT: "6379"
