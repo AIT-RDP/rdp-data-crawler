@@ -34,7 +34,7 @@ test_python_3_10:
     # Install the dependencies
     - poetry install --with dev
     # Test the code
-    - PYTHONPATH="${PYTHONPATH}:.:test" pytest --junitxml=report.xml --log-cli-level=INFO test
+    - PYTHONPATH="${PYTHONPATH}:.:test" poetry run pytest --junitxml=report.xml --log-cli-level=INFO test
   artifacts:  # Collect test results
     when: always
     paths:
