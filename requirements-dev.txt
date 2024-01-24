@@ -1,0 +1,2 @@
+poetry==1.3.2
+dunamai==1.15.0
