@@ -9,7 +9,7 @@ ENV POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_CREATE=1 \
     POETRY_CACHE_DIR=/tmp/poetry_cache
 
-# Define credential to access the modbus_crawler repo
+# Define credential to access the modbus_crawler repo. Note that the CI_JOB_TOKEN will not work in the external process
 ARG MODBUS_GIT_USER
 ARG MODBUS_GIT_PASSWORD
 ARG TOKEN_PYRDP_COMMONS
