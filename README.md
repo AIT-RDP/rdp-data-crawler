@@ -2,7 +2,29 @@
 
 Periodically fetches publicly available forecast and measurement information and stores it into Redis streams.
 
-## Development setup (Windows)
+## Poetry Development Setup
+
+On Windows, one may want to setup a clean conda environment to install poetry. Alternatively, a generic poetry 
+installation may be used.
+```shell
+conda create -n rdp-data-crawler python=3.11
+conda activate rdp-data-crawler
+conda install poetry
+```
+
+In case you have a dedicated conda environment that is not shared among poetry projects, make sure to directly install 
+the packages within the conda environment. Otherwise, an additional virtualenv may be created which often creates 
+troubles and redundancies.
+```shell
+poetry config --local virtualenvs.create false
+```
+
+Having your pyton/poetry base setup ready, one can install the development dependencies as follows.
+```shell
+poetry install  # Make sure the correct conda environment is activated, if you have one
+```
+
+## Legacy Development setup (Windows)
 
 Create and activate the conda development environment (Contains some development packages that are not needed for 
 productive usage):
@@ -11,12 +33,14 @@ conda env create -f .\environment-win.yml
 conda activate e3-data-crawler
 ```
 
+## Run the test cases
+
 To run the test cases, a development instance of Redis is needed. E.g. spin up one by using podman or docker:
 ```shell
 podman run -p 6379:6379 -it docker.io/redis
 ```
 
-To configure the parameters of the test suite, the following environment vairables can be set:
+To configure the parameters of the test suite, the following environment variables can be set:
 ```shell
 REM Your e-mail to send to some public APIs that require contact details 
 set DATA_CRAWLER_CONTACT="<contact details and e-mail>"

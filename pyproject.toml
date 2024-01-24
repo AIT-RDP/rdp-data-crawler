@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "rdp-data-crawler"
+version = "0.4.0"
+description = "Data crawler that actively polls data sources and pushes the results to redis."
+authors = ["Michael Spiegel <michael.spiegel@ait.ac.at>"]
+readme = "README.md"
+packages = [{include = "data_crawler"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+requests = "^2.31.0"
+cachecontrol = "^0.13.1"
+lockfile = "^0.12.2"
+pandas = "^2.2.0"
+click = "^8.1.7"
+redis = "^5.0.1"
+hiredis = "^2.3.2"
+prometheus-client = "^0.19.0"
+jsonpath-rw = "^1.4.0"
+pymodbus = "3.2.2"
+pyrdp-commons = {version = "^0.0.0.post6+ab49c8f", source = "gitlab-pyrdp-commons"}
+modbus-crawler = {git = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler", rev = "master"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2.1"
+
+
+[[tool.poetry.source]]
+name = "gitlab-pyrdp-commons"
+url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
+default = false
+secondary = false
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
