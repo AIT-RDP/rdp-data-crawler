@@ -20,6 +20,7 @@ jsonpath-rw = "^1.4.0"
 pymodbus = "3.2.2"
 pyrdp-commons = {version = "=0.0.0.post33.dev0+8ddc4b3", source = "gitlab-pyrdp-commons"}
 modbus-crawler = {git = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler", rev = "master"}
+filelock = "^3.13.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
