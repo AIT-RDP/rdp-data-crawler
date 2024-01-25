@@ -26,15 +26,62 @@ test_python_3_10:
     DATA_CRAWLER_REDIS_PORT: "6379"
     DATA_CRAWLER_REDIS_DB: 0
   script:
-    - pip install --no-cache-dir -r requirements.txt
-    - pip install --no-cache-dir pytest==7.1  # Dedicated testing requirements
-    - PYTHONPATH="${PYTHONPATH}:.:test" pytest --junitxml=report.xml --log-cli-level=INFO test
+    - pip install --no-cache-dir -r requirements-dev.txt
+    # Authenticate the third-party dependencies
+    - poetry config repositories.gitlab-intern-ees-lachs-modbus-crawler https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler
+    - poetry config http-basic.gitlab-intern-ees-lachs-modbus-crawler gitlab-ci-token ${CI_JOB_TOKEN}
+    - poetry config http-basic.gitlab-pyrdp-commons gitlab-ci-token ${CI_JOB_TOKEN}
+    # Install the dependencies
+    - poetry install --with dev
+    # Test the code
+    - PYTHONPATH="${PYTHONPATH}:.:test" poetry run pytest --junitxml=report.xml --log-cli-level=INFO test
   artifacts:  # Collect test results
     when: always
     paths:
       - report.xml
     reports:
       junit: report.xml
+
+# =============================================================================
+# Build the installable package
+# =============================================================================
+
+.build-package:
+  stage: release
+  tags:
+    - docker
+    - x86_64
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/python:3.10
+  variables:
+    VERSION_FORMAT: "{base}.post{distance}.dev+{commit}"
+  script:
+    - pip install -r requirements-dev.txt
+    # Guess the version number (no versioneer needed)
+    - DST_VERSION=$(dunamai from git --format "${VERSION_FORMAT}")
+    - echo Write destination version $DST_VERSION
+    - poetry version "$DST_VERSION"
+    # Build the project
+    - poetry build
+    # Push the package
+    - poetry config repositories.gitlab-intern ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi
+    - poetry config http-basic.gitlab-intern gitlab-ci-token ${CI_JOB_TOKEN}
+    - poetry publish --repository gitlab-intern
+
+build-package-main:
+  extends: .build-package
+  variables:
+    VERSION_FORMAT: "{base}.post{distance}+{commit}"
+  only:
+    - main
+    - master
+
+build-package-development:
+  extends: .build-package
+  variables:
+    VERSION_FORMAT: "{base}.post{distance}.dev+{commit}"
+  only:
+    - development
+    - 44-provide-python-packages-for-project-extension
 
 # =============================================================================
 # Create, test and push the docker images
@@ -56,8 +103,7 @@ build-images:
     - docker info
     - docker login -u $CI_DEPENDENCY_PROXY_USER -p $CI_DEPENDENCY_PROXY_PASSWORD $CI_DEPENDENCY_PROXY_SERVER
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build --pull --file docker/Dockerfile -t $CONTAINER_TEST_IMAGE
-          --build-arg MODBUS_GIT_USER --build-arg MODBUS_GIT_PASSWORD .
+    - docker build --pull --file docker/Dockerfile -t $CONTAINER_TEST_IMAGE --build-arg MODBUS_GIT_USER --build-arg MODBUS_GIT_PASSWORD --build-arg TOKEN_PYRDP_COMMONS .
     - docker push $CONTAINER_TEST_IMAGE
 
 # Template that pushes a release image to $CONTAINER_RELEASE_IMAGE
