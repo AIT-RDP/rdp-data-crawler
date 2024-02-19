@@ -21,7 +21,7 @@ cloud_area_fraction_high;%;Float;no;Cloud cover higher than 5000m above the grou
 cloud_area_fraction_medium;%;Float;no;Cloud cover between 2000 and 5000m above the ground
 cloud_area_fraction_low;%;Float;no;Cloud cover lower than 2000m above the ground
 fog_area_fraction;%;Float;no;Amount of surrounding area covered in fog (horizontal view under a 1000 meters)
-global_horizontal_irradiation;W/m^2;Float;no;Global horizontal irraadiation
+global_horizontal_irradiation;W/m^2;Float;no;Global horizontal irradiation
 diffuse_irradiation;W/m^2;Float;no;Diffuse Irradiation
 uv_index;1;Float;no;Ultraviolet index 0 (low), 11+ (extreme)
 visibility;km;Float;no;Visibility
@@ -70,3 +70,6 @@ E_P_imp_interval;Wh;Float;no;Imported energy, per measurement interval
 error_code;1;Integer;no;Current error of the device. (Device specific)
 status_code;1;Integer;no;Current status of the device. (Device specific)
 device_temperature_1;°C;Float;no;Internal device temperature, channel 1
+location;;String;no;Name of the location
+day_ahead_prices;€/MWh;Float;no;Prices of the day-ahead market
+day_ahead_resolution;min;Integer;no;Resolution of the day-ahead forecasts (15, 30, 60)
