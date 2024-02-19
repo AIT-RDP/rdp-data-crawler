@@ -19,6 +19,15 @@ troubles and redundancies.
 poetry config --local virtualenvs.create false
 ```
 
+In case your current user does not have access to the
+[PyRDP Commons](https://gitlab-intern.ait.ac.at/ees/rdp/generic-components/pyrdp-commons) repository, use an access
+token.
+Replace `$TOKEN_PYRDP_COMMONS` with the value of the token.
+Furthermore, this token is defined as a group variable of the GitLab group `EES/RDP`.
+```shell
+poetry config http-basic.gitlab-pyrdp-commons __token__ $TOKEN_PYRDP_COMMONS
+```
+
 Having your pyton/poetry base setup ready, one can install the development dependencies as follows.
 ```shell
 poetry install  # Make sure the correct conda environment is activated, if you have one
