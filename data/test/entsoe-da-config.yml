@@ -1,7 +1,7 @@
 version: 1
 data sources:
   entsoe.DA:
-    type: "data_crawler.sources.entsoe.ENTSOETransparency"
+    type: "data_crawler.sources.entsoe_da.ENTSOEDATransparency"
     source parameter:
       api_key: !env-template "${DATA_CRAWLER_ENTSO_E_API_KEY}"
       day_ahead_prices:
