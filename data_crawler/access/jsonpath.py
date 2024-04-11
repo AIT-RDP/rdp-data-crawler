@@ -5,7 +5,7 @@ Implements helper classes that use jsonpath expressions to extract some informat
 import datetime
 from typing import Dict, Any
 
-import jsonpath_rw
+import jsonpath_ng as jsonpath
 import pandas as pd
 
 
@@ -27,7 +27,7 @@ class PathExtractor:
         """
 
         self._target_key = target_key
-        self._src_expression = jsonpath_rw.parse(src_path)
+        self._src_expression = jsonpath.parse(src_path)
         self._is_list = bool(is_list)
         self._drop_missing = bool(drop_missing)
         self._dst_format = dst_format
@@ -131,7 +131,7 @@ class OptionalPathExtractor(PathExtractor):
 
         super(OptionalPathExtractor, self).__init__(target_key, src_path, is_list=is_list, dst_format=dst_format)
 
-        self._base_expression = jsonpath_rw.parse(base_path)
+        self._base_expression = jsonpath.parse(base_path)
         self._default_value = default_value
 
     def _extract_raw_results(self, raw_data: dict) -> list:
