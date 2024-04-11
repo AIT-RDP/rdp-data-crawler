@@ -16,13 +16,16 @@ click = "^8.1.7"
 redis = "^5.0.1"
 hiredis = "^2.3.2"
 prometheus-client = "^0.19.0"
-pymodbus = "3.2.2"
 pyrdp-commons = {version = "=0.0.0.post33.dev0+8ddc4b3", source = "gitlab-pyrdp-commons"}
-modbus-crawler = {git = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler", rev = "master"}
+modbus-crawler = {git = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler", rev = "master", optional = true}
+pymodbus = {version = "3.2.2", optional = true}
 filelock = "^3.13.1"
 entsoe-py = "^0.6.6"
 pydantic = "^2.6.1"
 jsonpath-ng = "^1.6.1"
+
+[tool.poetry.extras]
+modbus = ["modbus-crawler", "pymodbus"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
