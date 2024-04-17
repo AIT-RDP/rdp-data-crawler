@@ -35,9 +35,9 @@ class AbstractMultiMessageHistorySourceMixin(abc.ABC):
         yield {}
 
 
-class AbstractTimedHistorySourceMixin(AbstractMultiMessageHistorySourceMixin):
+class AbstractTimedMultiMessageHistorySourceMixin(AbstractMultiMessageHistorySourceMixin):
     """
-    Implements the history mixin returning a single message generated from a range of historic time stamps.
+    Implements the history mixin returning multiple messages generated from a range of historic time stamps.
 
     The class is mostly intended to unify the user interface by a common set of parameters
     """
@@ -80,6 +80,43 @@ class AbstractTimedHistorySourceMixin(AbstractMultiMessageHistorySourceMixin):
 
         del filter_clauses["start_time"]
         del filter_clauses["end_time"]
+
+        yield from self.fetch_timed_historic_data_bundle(start_time, end_time, filter_clauses)
+
+    @abc.abstractmethod
+    def fetch_timed_historic_data_bundle(self, start_time: datetime.datetime, end_time: datetime.datetime,
+                                         filter_clauses: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
+        """
+        Fetches a bundle of messages that can be filtered by a time interval.
+
+        The time interval may either limit the number of messages or the corresponding content
+
+        :param start_time: The first time stamp that marks the continuous history interval. Always inclusive.
+        :param end_time: The last time stamp that marks the continuous history interval. Should be exclusive.
+        :param filter_clauses: Any additional arguments passed on as filter expressions
+        :return: Yields the fetched messages
+        """
+
+        yield {}
+
+
+class AbstractTimedHistorySourceMixin(AbstractTimedMultiMessageHistorySourceMixin):
+    """
+    Implements the history mixin returning a single message generated from a range of historic time stamps.
+
+    The class is mostly intended to unify the user interface by a common set of parameters
+    """
+
+    def fetch_timed_historic_data_bundle(self, start_time: datetime.datetime, end_time: datetime.datetime,
+                                         filter_clauses: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
+        """
+        Fetches the single message and returns it in an iterator
+
+        :param start_time: The first time stamp that marks the continuous history interval. Always inclusive.
+        :param end_time: The last time stamp that marks the continuous history interval. Should be exclusive.
+        :param filter_clauses: Any additional arguments passed on as filter expressions
+        :return: Yields the fetched message
+        """
 
         yield self.fetch_historic_data(start_time, end_time, filter_clauses)
 
