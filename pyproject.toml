@@ -23,11 +23,9 @@ filelock = "^3.13.1"
 entsoe-py = "^0.6.6"
 pydantic = "^2.6.1"
 jsonpath-ng = "^1.6.1"
-scipy = {version = "^1.13.0", optional = true}
 
 [tool.poetry.extras]
 modbus = ["modbus-crawler", "pymodbus"]
-computations = ["scipy"]  # Additional computations
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"

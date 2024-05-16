@@ -251,3 +251,82 @@ def test_tawes_station_parsing_full_message(tawes_station_parameters, simplified
     assert response_data["snow_depth"] == [10.0, 20.0, 30.0, None]
 
     assert response_data["air_pressure"] == [None] * 4
+
+
+@pytest.fixture()
+def nwp_parameters_minimal() -> dict:
+    """Returns an exemplary configuration of a minimal NWP configuration"""
+
+    return {
+        "latitude": 48.2687266,
+        "longitude": 16.4268531,
+        "cache": {"directory": ".cache-test-persistent"}  # Avoid too frequent calls that may be expensive
+    }
+
+
+@pytest.fixture()
+def simplified_nwp_response() -> dict:
+    """Returns a simplified Geosphere base response"""
+
+    file = os.path.join(__file__, "../../../data/test/geosphere.at-forecast-nwp-v1-1h-2500m-reduced.json")
+    file = os.path.abspath(file)
+
+    with open(file, "r") as f:
+        data = json.load(f)
+    return data
+
+
+@pytest.mark.xfail(string=False, raises=requests.exceptions.HTTPError, reason="ZAMG servers are notoriously unreliable")
+def test_nwp_online_call(nwp_parameters_minimal):
+    """Test an online NWP (AROME) call"""
+
+    api = zamg.NumericalWeatherPredictionData(source_parameters=nwp_parameters_minimal, executor_name="<test>")
+    result = api.fetch_data()
+
+    assert result is not None
+    assert result["latitude"] == pytest.approx(48.2687266, abs=0.01)
+    assert result["longitude"] == pytest.approx(16.4268531, abs=0.01)
+    assert result["forecast_time"] is not None
+
+    expected_lists = [
+        "observation_time", "convective_available_potential_energy", "convective_inhibition", "air_temperature_2m",
+        "air_temperature_min_2m", "air_temperature_max_2m", "relative_humidity_2m", "snow_surface_mass", "air_pressure",
+        "wind_direction_10m", "wind_speed_10m", "global_horizontal_irradiation", "rainfall_total_1h"
+    ]
+    assert all(ex in result for ex in expected_lists)
+    assert all(isinstance(result[ex], list) for ex in expected_lists)
+
+
+def test_nwp_basic_parsing_and_computations(nwp_parameters_minimal, simplified_nwp_response):
+    """Tests the parsing logic using the simplified response"""
+
+    api = zamg.NumericalWeatherPredictionData(source_parameters=nwp_parameters_minimal, executor_name="<test>")
+    result = api.fetch_data(raw_data=simplified_nwp_response)
+
+    assert result is not None
+    assert result["forecast_time"] == "2024-05-16T09:00+00:00"
+    assert result["observation_time"] == [
+        "2024-05-16T14:00:00+00:00",
+        "2024-05-16T15:00:00+00:00",
+        "2024-05-16T16:00:00+00:00",
+        "2024-05-16T17:00:00+00:00",
+        "2024-05-16T18:00:00+00:00",
+        "2024-05-16T19:00:00+00:00",
+        "2024-05-16T20:00:00+00:00",
+        "2024-05-16T21:00:00+00:00"
+    ]
+
+    assert result["convective_available_potential_energy"] == [30, 13.5, 0.6, 0, 0.3, 0.1, 0, 0.1]
+    assert result["convective_inhibition"] == [-0.6, -0.5, 0, 0, 0, 0, 0, 0]
+    assert result["global_horizontal_irradiation"] == pytest.approx([
+        None, 195.981, 36.414, 21.275, 18.002, 0.408, 0, 0
+    ], abs=1e-2)
+
+    assert result["air_temperature_min_2m"] == [20.43, 21.85, 20.92, 20.35, 20.27, 20.83, 20.3, 20.07]
+    assert result["air_temperature_max_2m"] == [22.06, 22.16, 21.94, 20.91, 20.98, 20.98, 20.86, 20.35]
+    assert result["air_temperature_2m"] == [20.4, 20.0, -0.2, 55.0, 20.8, 21, 20.8, 20.3]
+
+    assert result["_rainfall_mass_total"] == [0.034, 5.833, 11.821, 22.305, 22.305, 22.301, 22.305, 22.305]
+    assert result["rainfall_total_1h"] == pytest.approx([
+        None, 5.809418, 5.988901, 10.636204, 0, 0, 0, 0
+    ], abs=1e-5)
