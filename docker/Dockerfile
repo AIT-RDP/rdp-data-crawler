@@ -22,7 +22,7 @@ RUN touch README.md
 RUN poetry config http-basic.gitlab-pyrdp-commons __token__ ${TOKEN_PYRDP_COMMONS} && \
     poetry config repositories.gitlab-intern-ees-lachs-modbus-crawler https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler && \
     poetry config http-basic.gitlab-intern-ees-lachs-modbus-crawler ${MODBUS_GIT_USER} ${MODBUS_GIT_PASSWORD} && \
-    poetry install --without dev -E modbus --no-root && \
+    poetry install --without dev --all-extras --no-root && \
     rm -rf $POETRY_CACHE_DIR
 
 # Build the runtime image

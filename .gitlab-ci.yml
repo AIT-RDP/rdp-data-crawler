@@ -32,7 +32,7 @@ test_python_3_10:
     - poetry config http-basic.gitlab-intern-ees-lachs-modbus-crawler gitlab-ci-token ${CI_JOB_TOKEN}
     - poetry config http-basic.gitlab-pyrdp-commons gitlab-ci-token ${CI_JOB_TOKEN}
     # Install the dependencies
-    - poetry install --with dev -E modbus
+    - poetry install --with dev --all-extras
     # Test the code
     - PYTHONPATH="${PYTHONPATH}:.:test" poetry run pytest --junitxml=report.xml --log-cli-level=INFO test
   artifacts:  # Collect test results
