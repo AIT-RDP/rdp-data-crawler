@@ -1,0 +1,140 @@
+{
+  "reference_time": "2024-05-16T09:00+00:00",
+  "media_type": "application/json",
+  "type": "FeatureCollection",
+  "version": "v1",
+  "timestamps": [
+    "2024-05-16T14:00+00:00",
+    "2024-05-16T15:00+00:00",
+    "2024-05-16T16:00+00:00",
+    "2024-05-16T17:00+00:00",
+    "2024-05-16T18:00+00:00",
+    "2024-05-16T19:00+00:00",
+    "2024-05-16T20:00+00:00",
+    "2024-05-16T21:00+00:00"
+  ],
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          16.417999999999836,
+          48.2730000000002
+        ]
+      },
+      "properties": {
+        "parameters": {
+          "cape": {
+            "name": "Convective available potential energy",
+            "unit": "m2 s-2",
+            "data": [30, 13.5, 0.6, 0, 0.3, 0.1, 0, 0.1]
+          },
+          "cin": {
+            "name": "Convective inhibition",
+            "unit": "J kg-1",
+            "data": [-0.6, -0.5, 0, 0, 0, 0, 0, 0]
+          },
+          "grad": {
+            "name": "surface global radiation",
+            "unit": "Ws m-2",
+            "data": [
+              9687904,
+              10393436,
+              10524528,
+              10601120,
+              10665928,
+              10667400,
+              10667400,
+              10667400
+            ]
+          },
+          "mnt2m": {
+            "name": "minimum 2m temperature in the last forecast period",
+            "unit": "degree Celsius",
+            "data": [20.43, 21.85, 20.92, 20.35, 20.27, 20.83,  20.3,  20.07]
+          },
+          "mxt2m": {
+            "name": "maximum 2m temperature in the last forecast period",
+            "unit": "degree Celsius",
+            "data": [22.06, 22.16, 21.94, 20.91, 20.98, 20.98, 20.86, 20.35]
+          },
+          "rain_acc": {
+            "name": "total rainfall amount",
+            "unit": "kg m-2",
+            "data": [0.034, 5.833, 11.821, 22.305, 22.305, 22.301, 22.305, 22.305]
+          },
+          "rh2m": {
+            "name": "relative humidity 2m above ground",
+            "unit": "%",
+            "data": [42.99, 42.46, 47.69, 44.52, 39.67, 39.19, 46.76, 41.74]
+          },
+          "rr_acc": {
+            "name": "total precipitation amount",
+            "unit": "kg m-2",
+            "data": [0.034, 5.833, 11.821, 22.305, 22.305, 22.301, 22.305, 22.305]
+          },
+          "snow_acc": {
+            "name": "total surface snow amount",
+            "unit": "kg m-2",
+            "data": [0, 0, 0, 0, 0, 0, 0, 1.2]
+          },
+          "snowlmt": {
+            "name": "snowlimit",
+            "unit": "m",
+            "data": [2490.9, 2213.6, 2575.7, 2554.7, 2304.7, 2538.7, 2199.4, 2356.5]
+          },
+          "sp": {
+            "name": "surface pressure",
+            "unit": "Pa",
+            "data": [
+              99316.15,
+              99276.88,
+              99232.91,
+              99196.56,
+              99195.98,
+              99217.67,
+              99211.81,
+              99133.25
+            ]
+          },
+          "sundur_acc": {
+            "name": "sunshine duration accumulated",
+            "unit": "s",
+            "data": [0, 0, 493.1, 2674.7, 5038.6, 7655.3, 10557.9, 12793.4]
+          },
+          "t2m": {
+            "name": "2m temperature",
+            "unit": "degree Celsius",
+            "data": [20.4, 20.0, -0.2, 55.0, 20.8, 21, 20.8, 20.3]
+          },
+          "tcc": {
+            "name": "Total cloud cover",
+            "unit": "1",
+            "data": [1, 1, 0.9, 0.5, 1.0, 1, 1, 1]
+          },
+          "u10m": {
+            "name": "10m wind speed in eastward direction",
+            "unit": "m s-1",
+            "data": [-4.4, -4.5, -1.9, -2.8, -4.9, -4, -2.9, -5.8]
+          },
+          "v10m": {
+            "name": "10m wind speed in northward direction",
+            "unit": "m s-1",
+            "data": [4.9, 4.3, 5.1, 3.9, 2.4, 3.5, 3.8, 3.8]
+          },
+          "ugust": {
+            "name": "u component of maximum wind gust",
+            "unit": "m s-1",
+            "data": [-8.2, -7.9, -8.6, -3.3, -9.4, -9.8, -7.7, -11.3]
+          },
+          "vgust": {
+            "name": "v compoment of maximum wind gust",
+            "unit": "m s-1",
+            "data": [9.2, 9.6, 8.2, 9.5, 5.1, 6.1, 6.6, 7.3]
+          }
+        }
+      }
+    }
+  ]
+}
