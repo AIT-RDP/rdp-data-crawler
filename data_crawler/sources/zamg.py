@@ -391,7 +391,48 @@ class NumericalWeatherPredictionData(_AbstractGeosphereTimeSeriesAPI):
             "v10m": _PRef("_wind_speed_v_10m"),  # [m s-1] wind speed in northward direction
             "ugust": _PRef("_wind_speed_gust_u_10m"),  # [m s-1]
             "vgust": _PRef("_wind_speed_gust_v_10m"),  # [m s-1]
-        }, type="timeseries", mode="forecast", resource_id="nwp-v1-1h-2500m")
+        }, type="timeseries", mode="forecast", resource_id="nwp-v1-1h-2500m"),
+        "ensemble": _EndpointConfig(parameter_mapping={
+            "cape_p10": _PRef("convective_available_potential_energy_p10"),  # [m2 s-2]
+            "cape_p50": _PRef("convective_available_potential_energy"),  # [m2 s-2]
+            "cape_p90": _PRef("convective_available_potential_energy_p90"),  # [m2 s-2]
+            "grad_p10": _PRef("global_horizontal_irradiation_p10"),  # [Ws m-2]
+            "grad_p50": _PRef("global_horizontal_irradiation"),  # [Ws m-2]
+            "grad_p90": _PRef("global_horizontal_irradiation_p90"),  # [Ws m-2]
+            "mnt2m_p10": _PRef("air_temperature_min_2m_p10"),  # [degC]
+            "mnt2m_p50": _PRef("air_temperature_min_2m"),  # [degC]
+            "mnt2m_p90": _PRef("air_temperature_min_2m_p90"),  # [degC]
+            "mxt2m_p10": _PRef("air_temperature_max_2m_p10"),  # [degC]
+            "mxt2m_p50": _PRef("air_temperature_max_2m"),  # [degC]
+            "mxt2m_p90": _PRef("air_temperature_max_2m_p90"),  # [degC]
+            "rain_p10": _PRef("_rainfall_mass_total_1h_p10"),  # [kg m-2] Non-accumulated
+            "rain_p50": _PRef("_rainfall_mass_total_1h"),  # [kg m-2] Non-accumulated
+            "rain_p90": _PRef("_rainfall_mass_total_1h_p90"),  # [kg m-2] Non-accumulated
+            "rr_p10": _PRef("_precipitation_mass_total_1h_p10"),  # [kg m-2] Accumulated since start of the forecast
+            "rr_p50": _PRef("_precipitation_mass_total_1h"),  # [kg m-2] Accumulated since start of the forecast
+            "rr_p90": _PRef("_precipitation_mass_total_1h_p90"),  # [kg m-2] Accumulated since start of the forecast
+            "snow_p10": _PRef("snow_surface_mass_p10"),  # [kg m-2] amount on the solid ground
+            "snow_p50": _PRef("snow_surface_mass"),  # [kg m-2] amount on the solid ground
+            "snow_p90": _PRef("snow_surface_mass_p90"),  # [kg m-2] amount on the solid ground
+            "snowlmt_p10": _PRef("snowlimit_p10"),  # [m above ground]
+            "snowlmt_p50": _PRef("snowlimit"),  # [m above ground]
+            "snowlmt_p90": _PRef("snowlimit_p90"),  # [m above ground]
+            "sundur_p10": _PRef("sunshine_fraction_p10", scaling=1/3600*100),  # [s] sunshine duration in he interval
+            "sundur_p50": _PRef("sunshine_fraction", scaling=1/3600*100),  # [s] sunshine duration in the interval
+            "sundur_p90": _PRef("sunshine_fraction_p90", scaling=1/3600*100),  # [s] sunshine duration in the interval
+            "t2m_p10": _PRef("air_temperature_2m_p10"),  # [degC]
+            "t2m_p50": _PRef("air_temperature_2m"),  # [degC]
+            "t2m_p90": _PRef("air_temperature_2m_p90"),  # [degC]
+            "tcc_p10": _PRef("cloud_area_fraction_p10", scaling=100),  # [1]
+            "tcc_p50": _PRef("cloud_area_fraction", scaling=100),  # [1]
+            "tcc_p90": _PRef("cloud_area_fraction_p90", scaling=100),  # [1]
+            "u10m_p10": _PRef("_wind_speed_u_10m_p10"),  # [m s-1] wind speed in eastward direction
+            "u10m_p50": _PRef("_wind_speed_u_10m"),  # [m s-1] wind speed in eastward direction
+            "u10m_p90": _PRef("_wind_speed_u_10m_p90"),  # [m s-1] wind speed in eastward direction
+            "v10m_p10": _PRef("_wind_speed_v_10m_p10"),  # [m s-1] wind speed in northward direction
+            "v10m_p50": _PRef("_wind_speed_v_10m"),  # [m s-1] wind speed in northward direction
+            "v10m_p90": _PRef("_wind_speed_v_10m_p90"),  # [m s-1] wind speed in northward direction
+        }, type="timeseries", mode="forecast", resource_id="ensemble-v1-1h-2500m")
     }
 
     def __init__(self, source_parameters, executor_name, **kwargs):
@@ -432,54 +473,71 @@ class NumericalWeatherPredictionData(_AbstractGeosphereTimeSeriesAPI):
 
         out_message = self.fetch_message(raw_data=raw_data)
         out_message = self._extend_computed_outputs(out_message)
+        out_message = self._extend_computed_outputs(out_message, post="_p10")
+        out_message = self._extend_computed_outputs(out_message, post="_p90")
         return out_message
 
-    def _extend_computed_outputs(self, message: Dict[str, Any]) -> Dict[str, Any]:
+    def _extend_computed_outputs(self, message: Dict[str, Any], post="") -> Dict[str, Any]:
         """Generates the outputs that need further computation."""
 
         time = [datetime.datetime.fromisoformat(ts) for ts in message["observation_time"]]
 
-        if "_wind_speed_u_10m" in message and "_wind_speed_v_10m" in message:
-            message["wind_speed_10m"], message["wind_direction_10m"] = self._to_abs_dir(
-                message["_wind_speed_u_10m"], message["_wind_speed_v_10m"]
+        if f"_wind_speed_u_10m{post}" in message and f"_wind_speed_v_10m{post}" in message:
+            message[f"wind_speed_10m{post}"], message[f"wind_direction_10m{post}"] = self._to_abs_dir(
+                message[f"_wind_speed_u_10m{post}"], message[f"_wind_speed_v_10m{post}"]
             )
 
-        if "_wind_speed_gust_u_10m" in message and "_wind_speed_gust_v_10m" in message:
-            message["wind_speed_gust_10m"], message["wind_direction_gust_10m"] = self._to_abs_dir(
-                message["_wind_speed_gust_u_10m"], message["_wind_speed_gust_v_10m"]
+        if f"_wind_speed_gust_u_10m{post}" in message and f"_wind_speed_gust_v_10m{post}" in message:
+            message[f"wind_speed_gust_10m{post}"], message[f"wind_direction_gust_10m{post}"] = self._to_abs_dir(
+                message[f"_wind_speed_gust_u_10m{post}"], message[f"_wind_speed_gust_v_10m{post}"]
             )
 
-        if "_global_horizontal_irradiation_acc" in message:
-            message["global_horizontal_irradiation"] = self._to_cnt_derivative(
-                time, message["_global_horizontal_irradiation_acc"], "_global_horizontal_irradiation_acc"
+        if f"_global_horizontal_irradiation_acc{post}" in message:
+            message[f"global_horizontal_irradiation{post}"] = self._to_cnt_derivative(
+                time, message[f"_global_horizontal_irradiation_acc{post}"], f"_global_horizontal_irradiation_acc{post}"
             )
 
-        if "_sunshine_duration_total" in message:
-            message["sunshine_fraction"] = self._to_cnt_derivative(
-                time, message["_sunshine_duration_total"], "_sunshine_duration_total", scaling=100
+        if f"_sunshine_duration_total{post}" in message:
+            message[f"sunshine_fraction{post}"] = self._to_cnt_derivative(
+                time, message[f"_sunshine_duration_total{post}"], f"_sunshine_duration_total{post}", scaling=100
             )
 
-        if "_rainfall_mass_total" in message and "air_temperature_2m" in message:
+        if f"_rainfall_mass_total{post}" in message and f"air_temperature_2m{post}" in message:
             rain_mass_rate = self._to_cnt_derivative(
-                time, message["_rainfall_mass_total"], "_rainfall_mass_total"
+                time, message[f"_rainfall_mass_total{post}"], f"_rainfall_mass_total{post}"
             )
-            temperature = message["air_temperature_2m"]
+            temperature = message[f"air_temperature_2m{post}"]
             rain_1h = self._to_1h_precipitation_rain(rain_mass_rate, temperature)
             if rain_1h is not None:
-                message["rainfall_total_1h"] = rain_1h
+                message[f"rainfall_total_1h{post}"] = rain_1h
 
-        if "_precipitation_mass_total" in message and "air_temperature_2m" in message:
+        if f"_rainfall_mass_total_1h{post}" in message and f"air_temperature_2m{post}" in message:
+            rain_mass_rate = message[f"_rainfall_mass_total_1h{post}"]
+            temperature = message[f"air_temperature_2m{post}"]
+            rain_1h = self._to_1h_precipitation_rain(rain_mass_rate, temperature, scale=1.0)
+            if rain_1h is not None:
+                message[f"rainfall_total_1h{post}"] = rain_1h
+
+        if f"_precipitation_mass_total{post}" in message and f"air_temperature_2m{post}" in message:
             prec_mass_rate = self._to_cnt_derivative(
-                time, message["_precipitation_mass_total"], "_precipitation_mass_total"
+                time, message[f"_precipitation_mass_total{post}"], f"_precipitation_mass_total{post}"
             )
-            temperature = message["air_temperature_2m"]
+            temperature = message[f"air_temperature_2m{post}"]
             precipitation_1h = self._to_1h_precipitation_rain(prec_mass_rate, temperature)
             if precipitation_1h is not None:
-                message["precipitation_total_1h"] = precipitation_1h
+                message[f"precipitation_total_1h{post}"] = precipitation_1h
+
+        if f"_precipitation_mass_total_1h{post}" in message and f"air_temperature_2m{post}" in message:
+            prec_mass_rate = message[f"_precipitation_mass_total_1h{post}"]
+            temperature = message[f"air_temperature_2m{post}"]
+            precipitation_1h = self._to_1h_precipitation_rain(prec_mass_rate, temperature, scale=1.0)
+            if precipitation_1h is not None:
+                message[f"precipitation_total_1h{post}"] = precipitation_1h
 
         return message
 
-    def _to_1h_precipitation_rain(self, rain_mass_rate: List[float], temperature: List[float]) -> Optional[List[float]]:
+    def _to_1h_precipitation_rain(self, rain_mass_rate: List[float], temperature: List[float],
+                                  scale: float = 3600.0) -> Optional[List[float]]:
         """Estimates the rain mass rate based on the temperature estimate and tabulated data"""
 
         try:
@@ -513,7 +571,7 @@ class NumericalWeatherPredictionData(_AbstractGeosphereTimeSeriesAPI):
         temperature = temperature.clip(lower=density_at_saturation_pressure.index[0],
                                        upper=density_at_saturation_pressure.index[-1])
         density = np.interp(temperature, density_at_saturation_pressure.index, density_at_saturation_pressure)
-        precipitation_1h = rain_mass_rate * 3600 / density
+        precipitation_1h = rain_mass_rate * scale / density
 
         # Convert to a list of values having None instead of NaN for unification
         precipitation_1h = list(x if not math.isnan(x) else None for x in precipitation_1h)

@@ -82,3 +82,5 @@ device_temperature_1;°C;Float;no;Internal device temperature, channel 1
 location;;String;no;Name of the location
 day_ahead_prices;€/MWh;Float;no;Prices of the day-ahead market
 day_ahead_resolution;min;Integer;no;Resolution of the day-ahead forecasts (15, 30, 60)
+<data_point>_p10;-;-;no;10% percentile of data point <data_point>
+<data_point>_p90;-;-;no;90% percentile of data point <data_point>
