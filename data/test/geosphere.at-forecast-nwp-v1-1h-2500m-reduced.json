@@ -72,7 +72,7 @@
           "rr_acc": {
             "name": "total precipitation amount",
             "unit": "kg m-2",
-            "data": [0.034, 5.833, 11.821, 22.305, 22.305, 22.301, 22.305, 22.305]
+            "data": [0.0, 5.833, 11.821, 22.305, 22.305, 22.301, 22.305, 22.305]
           },
           "snow_acc": {
             "name": "total surface snow amount",
@@ -116,22 +116,22 @@
           "u10m": {
             "name": "10m wind speed in eastward direction",
             "unit": "m s-1",
-            "data": [-4.4, -4.5, -1.9, -2.8, -4.9, -4, -2.9, -5.8]
+            "data": [-4.4, -4.5, 1.9, 2.8, -4.9, -4, -2.9, -5.8]
           },
           "v10m": {
             "name": "10m wind speed in northward direction",
             "unit": "m s-1",
-            "data": [4.9, 4.3, 5.1, 3.9, 2.4, 3.5, 3.8, 3.8]
+            "data": [4.9, -4.3, 5.1, -3.9, 2.4, 3.5, 3.8, 3.8]
           },
           "ugust": {
             "name": "u component of maximum wind gust",
             "unit": "m s-1",
-            "data": [-8.2, -7.9, -8.6, -3.3, -9.4, -9.8, -7.7, -11.3]
+            "data": [-5.8, -2.9, -4, -4.9, 2.8, 1.9, -4.5, -4.4]
           },
           "vgust": {
             "name": "v compoment of maximum wind gust",
             "unit": "m s-1",
-            "data": [9.2, 9.6, 8.2, 9.5, 5.1, 6.1, 6.6, 7.3]
+            "data": [3.8, 3.8, 3.5, 2.4, -3.9, 5.1, -4.3, 4.9]
           }
         }
       }

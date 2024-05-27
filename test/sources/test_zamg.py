@@ -27,7 +27,8 @@ def measurement_station_parameters() -> dict:
     return {
         "station id": "20209",
         "data points": ["DD", "FF", "GSX", "HSX", "P", "RF", "RR", "RRM", "TL", "TP"],
-        "initial history": "96h"
+        "initial history": "96h",
+        "timeout": "10s"
     }
 
 
@@ -86,7 +87,8 @@ def test_measurement_station_drop_missing_observations(measurement_station_param
         assert key not in response_data
 
 
-@pytest.mark.xfail(string=False, raises=requests.exceptions.HTTPError, reason="ZAMG servers are notoriously unreliable")
+@pytest.mark.xfail(string=False, raises=(requests.exceptions.HTTPError, requests.exceptions.ConnectionError),
+                   reason="ZAMG servers are notoriously unreliable")
 @pytest.mark.parametrize("endpoint,station_id", [
     ("climate", "20209"),
     ("tawes", "8989076")
@@ -125,7 +127,8 @@ def test_measurement_station_online(endpoint, station_id, measurement_station_pa
     assert response_data is not None
 
 
-@pytest.mark.xfail(string=False, raises=requests.exceptions.HTTPError, reason="ZAMG servers are notoriously unreliable")
+@pytest.mark.xfail(string=False, raises=(requests.exceptions.HTTPError, requests.exceptions.ConnectionError),
+                   reason="ZAMG servers are notoriously unreliable")
 @pytest.mark.parametrize("endpoint,station_id", [
     ("climate", "20209"),
     ("tawes", "8989076")
@@ -191,7 +194,8 @@ def tawes_station_parameters() -> dict:
         "station id": "8989076",
         "endpoint": "TAWES",
         "data points": ["DD", "FFAM", "GLOW", "P", "RFAM", "RR", "RRM", "TL", "TP", "SCHNEE"],
-        "initial history": "48h"
+        "initial history": "48h",
+        "timeout": "10s"
     }
 
 
@@ -260,7 +264,8 @@ def nwp_parameters_minimal() -> dict:
     return {
         "latitude": 48.2687266,
         "longitude": 16.4268531,
-        "cache": {"directory": ".cache-test-persistent"}  # Avoid too frequent calls that may be expensive
+        "cache": {"directory": ".cache-test-persistent"},  # Avoid too frequent calls that may be expensive
+        "timeout": "10s"
     }
 
 
@@ -276,7 +281,8 @@ def simplified_nwp_response() -> dict:
     return data
 
 
-@pytest.mark.xfail(string=False, raises=requests.exceptions.HTTPError, reason="ZAMG servers are notoriously unreliable")
+@pytest.mark.xfail(string=False, raises=(requests.exceptions.HTTPError, requests.exceptions.ConnectionError),
+                   reason="ZAMG servers are notoriously unreliable")
 def test_nwp_online_call(nwp_parameters_minimal):
     """Test an online NWP (AROME) call"""
 
@@ -322,6 +328,9 @@ def test_nwp_basic_parsing_and_computations(nwp_parameters_minimal, simplified_n
         None, 195.981, 36.414, 21.275, 18.002, 0.408, 0, 0
     ], abs=1e-2)
 
+    assert result["cloud_area_fraction"] == [100, 100, 90, 50, 100, 100, 100, 100]
+    assert result["sunshine_fraction"] == pytest.approx([None, 0, 13.7, 60.6, 65.7, 72.7, 80.6, 62.1], abs=1e-1)
+
     assert result["air_temperature_min_2m"] == [20.43, 21.85, 20.92, 20.35, 20.27, 20.83, 20.3, 20.07]
     assert result["air_temperature_max_2m"] == [22.06, 22.16, 21.94, 20.91, 20.98, 20.98, 20.86, 20.35]
     assert result["air_temperature_2m"] == [20.4, 20.0, -0.2, 55.0, 20.8, 21, 20.8, 20.3]
@@ -330,3 +339,30 @@ def test_nwp_basic_parsing_and_computations(nwp_parameters_minimal, simplified_n
     assert result["rainfall_total_1h"] == pytest.approx([
         None, 5.809418, 5.988901, 10.636204, 0, 0, 0, 0
     ], abs=1e-5)
+
+    assert result["_precipitation_mass_total"] == [0.0, 5.833, 11.821, 22.305, 22.305, 22.301, 22.305, 22.305]
+    assert result["precipitation_total_1h"] == pytest.approx([
+        None, 5.843479, 5.988901, 10.636204, 0, 0, 0, 0
+    ], abs=1e-5)
+
+    assert result["relative_humidity_2m"] == [42.99, 42.46, 47.69, 44.52, 39.67, 39.19, 46.76, 41.74]
+
+    assert result["wind_direction_10m"] == pytest.approx([
+        138.08, 46.30, 200.43, 324.32, 116.10, 131.19, 142.65, 123.23
+    ], abs=1e-2)
+    assert result["wind_speed_10m"] == pytest.approx([
+        6.59, 6.22, 5.44, 4.80, 5.46, 5.32, 4.78, 6.93
+    ], abs=1e-2)
+
+    assert result["wind_direction_gust_10m"] == pytest.approx([
+        123.23, 142.65, 131.19, 116.10, 324.32, 200.43, 46.30, 138.08
+    ], abs=1e-2)
+    assert result["wind_speed_gust_10m"] == pytest.approx([
+        6.93, 4.78, 5.32, 5.46, 4.80, 5.44, 6.22, 6.59
+    ], abs=1e-2)
+
+    assert result["air_pressure"] == pytest.approx([
+        993.1615, 992.7688, 992.3291, 991.9656, 991.9598, 992.1767, 992.1181, 991.3325
+    ], abs=1e-4)
+    assert result["snowlimit"] == [2490.9, 2213.6, 2575.7, 2554.7, 2304.7, 2538.7, 2199.4, 2356.5]
+    assert result["snow_surface_mass"] == [0, 0, 0, 0, 0, 0, 0, 1.2]

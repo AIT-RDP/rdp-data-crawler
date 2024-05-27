@@ -25,7 +25,7 @@ cloud_area_fraction_low;%;Float;no;Cloud cover lower than 2000m above the ground
 fog_area_fraction;%;Float;no;Amount of surrounding area covered in fog (horizontal view under a 1000 meters)
 global_horizontal_irradiation;W/m^2;Float;no;Global horizontal irradiation
 diffuse_irradiation;W/m^2;Float;no;Diffuse Irradiation
-sunshine_duration;s;Float;no;Sunshine duration within the last time interval
+sunshine_fraction;%;Float;no;Fraction of sunshine time within the last time interval
 uv_index;1;Float;no;Ultraviolet index 0 (low), 11+ (extreme)
 visibility;km;Float;no;Visibility
 wind_direction_10m;°;Float;no;Direction the wind is coming from (0° is north, 90° east, etc.) at 10m above ground
