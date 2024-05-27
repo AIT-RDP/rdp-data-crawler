@@ -74,6 +74,8 @@ class _AbstractGeosphereTimeSeriesAPI(http_cache.GenericHTTPSourceAPI, abc.ABC):
         self._drop_missing_observations = source_parameters.get("drop missing observations", False)
         self._drop_excessive_time_stamps = source_parameters.get("drop excessive time stamps", True)
 
+        self._timeout = pd.to_timedelta(source_parameters.get("timeout", "60s")).total_seconds()
+
     @staticmethod
     def _resolve_endpoint_url(endpoint: _EndpointConfig) -> str:
         """Returns the base URL of the particular endpoint"""
@@ -207,7 +209,7 @@ class _AbstractGeosphereTimeSeriesAPI(http_cache.GenericHTTPSourceAPI, abc.ABC):
         if dynamic_request_parameters is not None:
             params.update(dynamic_request_parameters)
 
-        response: requests.Response = self.session.get(self._endpoint_url, params=params)
+        response: requests.Response = self.session.get(self._endpoint_url, params=params, timeout=self._timeout)
         response.raise_for_status()
         return response.json()
 
@@ -442,9 +444,19 @@ class NumericalWeatherPredictionData(_AbstractGeosphereTimeSeriesAPI):
                 message["_wind_speed_u_10m"], message["_wind_speed_v_10m"]
             )
 
+        if "_wind_speed_gust_u_10m" in message and "_wind_speed_gust_v_10m" in message:
+            message["wind_speed_gust_10m"], message["wind_direction_gust_10m"] = self._to_abs_dir(
+                message["_wind_speed_gust_u_10m"], message["_wind_speed_gust_v_10m"]
+            )
+
         if "_global_horizontal_irradiation_acc" in message:
             message["global_horizontal_irradiation"] = self._to_cnt_derivative(
                 time, message["_global_horizontal_irradiation_acc"], "_global_horizontal_irradiation_acc"
+            )
+
+        if "_sunshine_duration_total" in message:
+            message["sunshine_fraction"] = self._to_cnt_derivative(
+                time, message["_sunshine_duration_total"], "_sunshine_duration_total", scaling=100
             )
 
         if "_rainfall_mass_total" in message and "air_temperature_2m" in message:
@@ -452,9 +464,18 @@ class NumericalWeatherPredictionData(_AbstractGeosphereTimeSeriesAPI):
                 time, message["_rainfall_mass_total"], "_rainfall_mass_total"
             )
             temperature = message["air_temperature_2m"]
-            precipitation_1h = self._to_1h_precipitation_rain(rain_mass_rate, temperature)
+            rain_1h = self._to_1h_precipitation_rain(rain_mass_rate, temperature)
+            if rain_1h is not None:
+                message["rainfall_total_1h"] = rain_1h
+
+        if "_precipitation_mass_total" in message and "air_temperature_2m" in message:
+            prec_mass_rate = self._to_cnt_derivative(
+                time, message["_precipitation_mass_total"], "_precipitation_mass_total"
+            )
+            temperature = message["air_temperature_2m"]
+            precipitation_1h = self._to_1h_precipitation_rain(prec_mass_rate, temperature)
             if precipitation_1h is not None:
-                message["rainfall_total_1h"] = precipitation_1h
+                message["precipitation_total_1h"] = precipitation_1h
 
         return message
 
@@ -519,15 +540,15 @@ class NumericalWeatherPredictionData(_AbstractGeosphereTimeSeriesAPI):
         return absolute, direction
 
     def _to_cnt_derivative(self, time: List[datetime.datetime], values: List[float],
-                           measurement: str = "<unknown>") -> List[float]:
+                           measurement: str = "<unknown>", scaling=1.0) -> List[float]:
         """
         Computes the discrete derivative of the given counter.
 
         Since the first values may not be passed on to the forecast in case it is fetched later on, the counters may not
         start at zero. To avoid invalid first samples, the first element returned is always None. It is also assumed
-        that the integral of values was performed using the units seconds abd that the counter always counts upwards.
-        Since it is observed that some conters slightly count downwards, any negative derivative will be rounded to zero
-        and added to the next number. to cancel out subsequent faults.
+        that the integral of values was performed using the units seconds and that the counter always counts upwards.
+        Since it is observed that some counters slightly count downwards, any negative derivative will be rounded to
+        zero and added to the next number. to cancel out subsequent faults.
         """
         assert len(time) == len(values)
 
@@ -544,5 +565,5 @@ class NumericalWeatherPredictionData(_AbstractGeosphereTimeSeriesAPI):
             else:
                 carry = 0.0
 
-            ret.append(dv / dt)
+            ret.append(dv / dt * scaling)
         return ret
