@@ -366,3 +366,122 @@ def test_nwp_basic_parsing_and_computations(nwp_parameters_minimal, simplified_n
     ], abs=1e-4)
     assert result["snowlimit"] == [2490.9, 2213.6, 2575.7, 2554.7, 2304.7, 2538.7, 2199.4, 2356.5]
     assert result["snow_surface_mass"] == [0, 0, 0, 0, 0, 0, 0, 1.2]
+
+
+@pytest.fixture()
+def ensemble_parameters_minimal() -> dict:
+    """Returns an exemplary configuration of a minimal NWP configuration"""
+
+    return {
+        "latitude": 48.2687266,
+        "longitude": 16.4268531,
+        "endpoint": "ensemble",
+        "cache": {"directory": ".cache-test-persistent"},  # Avoid too frequent calls that may be expensive
+        "timeout": "10s"
+    }
+
+
+@pytest.fixture()
+def simplified_ensemble_response() -> dict:
+    """Returns a simplified Geosphere base response"""
+
+    file = os.path.join(__file__, "../../../data/test/geosphere.at-forecast-ensemble-v1-1h-2500m-reduced.json")
+    file = os.path.abspath(file)
+
+    with open(file, "r") as f:
+        data = json.load(f)
+    return data
+
+
+@pytest.mark.xfail(string=False, raises=(requests.exceptions.HTTPError, requests.exceptions.ConnectionError),
+                   reason="ZAMG servers are notoriously unreliable")
+def test_ensemble_online_call(ensemble_parameters_minimal):
+    """Test an online Ensemble forecast call"""
+
+    api = zamg.NumericalWeatherPredictionData(source_parameters=ensemble_parameters_minimal, executor_name="<test>")
+    result = api.fetch_data()
+
+    assert result is not None
+    assert result["latitude"] == pytest.approx(48.2687266, abs=0.01)
+    assert result["longitude"] == pytest.approx(16.4268531, abs=0.01)
+    assert result["forecast_time"] is not None
+
+    expected_lists = [
+        "observation_time", "convective_available_potential_energy", "convective_available_potential_energy_p10",
+        "convective_available_potential_energy_p90", "air_temperature_2m", "air_temperature_2m_p10",
+        "air_temperature_2m_p90", "air_temperature_min_2m", "air_temperature_min_2m_p10", "air_temperature_min_2m_p90",
+        "air_temperature_max_2m", "air_temperature_max_2m_p10", "air_temperature_max_2m_p90", "snow_surface_mass",
+        "snow_surface_mass_p10", "snow_surface_mass_p90", "wind_direction_10m", "wind_direction_10m_p10",
+        "wind_direction_10m_p90", "wind_speed_10m", "wind_speed_10m_p10", "wind_speed_10m_p90",
+        "global_horizontal_irradiation", "global_horizontal_irradiation_p10", "global_horizontal_irradiation_p90",
+        "rainfall_total_1h", "rainfall_total_1h_p10", "rainfall_total_1h_p90"
+    ]
+    assert all(ex in result for ex in expected_lists)
+    assert all(isinstance(result[ex], list) for ex in expected_lists)
+
+
+def test_ensemble_basic_parsing_and_computations(ensemble_parameters_minimal, simplified_ensemble_response):
+    """Tests the parsing logic using the simplified response"""
+
+    api = zamg.NumericalWeatherPredictionData(source_parameters=ensemble_parameters_minimal, executor_name="<test>")
+    result = api.fetch_data(raw_data=simplified_ensemble_response)
+
+    assert result is not None
+    assert result["forecast_time"] == "2024-05-27T00:00+00:00"
+    assert result["observation_time"] == [
+        "2024-05-27T10:00:00+00:00", "2024-05-27T11:00:00+00:00",
+        "2024-05-27T12:00:00+00:00", "2024-05-27T13:00:00+00:00"
+    ]
+
+    assert result["convective_available_potential_energy_p10"] == [167.1, 38.8, 11.9, 6.9]
+    assert result["convective_available_potential_energy"] == [269.8, 205.2, 125, 57.3]
+    assert result["convective_available_potential_energy_p90"] == [493.2, 339.2, 243.1, 299.2]
+
+    assert result["global_horizontal_irradiation_p10"] == [781.7, 775.8, 740.5, 639.9]
+    assert result["global_horizontal_irradiation"] == [840.2, 838.6, 827.6, 732.2]
+    assert result["global_horizontal_irradiation_p90"] == [852.1, 883.7, 882.6, 798.5]
+
+    assert result["air_temperature_min_2m_p10"] == [23.09, 24.34, 24.98, 23.59]
+    assert result["air_temperature_min_2m"] == [23.94, 24.97, 25.58, 25.52]
+    assert result["air_temperature_min_2m_p90"] == [24.52, 26.09, 26.56, 26.2]
+
+    assert result["air_temperature_max_2m_p10"] == [24.64, 25.2, 25.39, 25.81]
+    assert result["air_temperature_max_2m"] == [25.03, 25.69, 26.33, 26.45]
+    assert result["air_temperature_max_2m_p90"] == [26.14, 27.39, 27.2, 26.86]
+
+    assert result["rainfall_total_1h_p10"] == pytest.approx([0.100296, 0.0, 0.0, 0.0], abs=1e-5)
+    assert result["rainfall_total_1h"] == pytest.approx([0.200592, 0.0, 0.0, 0.0], abs=1e-5)
+    assert result["rainfall_total_1h_p90"] == pytest.approx([0.561832, 0.050173, 0.038130, 0.003010], abs=1e-5)
+
+    assert result["precipitation_total_1h_p10"] == pytest.approx([0.0, 0.401196, 0.0, 0.0], abs=1e-5)
+    assert result["precipitation_total_1h"] == pytest.approx([0.0, 0.501579, 0.0, 0.0], abs=1e-5)
+    assert result["precipitation_total_1h_p90"] == pytest.approx([0.0, 0.602081, 0.0, 0.0], abs=1e-5)
+
+    assert result["snow_surface_mass_p10"] == [0, 0.0, 0.2, 0]
+    assert result["snow_surface_mass"] == [0, 0.0, 0.3, 0]
+    assert result["snow_surface_mass_p90"] == [0, 0.0, 0.4, 0]
+
+    assert result["snowlimit_p10"] == [2462, 2486, 2502, 2520]
+    assert result["snowlimit"] == [2492, 2512, 2534, 2580]
+    assert result["snowlimit_p90"] == [2530, 2562, 2566, 2644]
+
+    assert result["sunshine_fraction_p10"] == pytest.approx([41.1, 0, 0, 0], abs=1e-1)
+    assert result["sunshine_fraction"] == pytest.approx([85.5, 54.1, 6.3, 0.0], abs=1e-1)
+    assert result["sunshine_fraction_p90"] == pytest.approx([95.3, 84.1, 57.3, 46.6], abs=1e-1)
+
+    assert result["air_temperature_2m_p10"] == [25.0, 25.1,  25.3,  23.7]
+    assert result["air_temperature_2m"] == [25, 25.7, 26,  25.8]
+    assert result["air_temperature_2m_p90"] == [26.1, 26.8, 26.6, 26.4]
+
+    assert result["cloud_area_fraction_p10"] == [20, 40, 50, 60]
+    assert result["cloud_area_fraction"] == [60, 80, 90, 90]
+    assert result["cloud_area_fraction_p90"] == [80, 90, 90, 90]
+
+    assert result["wind_speed_10m_p10"] == pytest.approx([3.2, 4.0, 4.5, 4.3], abs=1e-1)
+    assert result["wind_direction_10m_p10"] == pytest.approx([128.7, 131.0, 126.9, 134.1], abs=1e-1)
+
+    assert result["wind_speed_10m"] == pytest.approx([3.7, 4.1, 4.3, 4.4], abs=1e-1)
+    assert result["wind_direction_10m"] == pytest.approx([145.0, 140.9, 135.9, 161.6], abs=1e-1)
+
+    assert result["wind_speed_10m_p90"] == pytest.approx([3.5, 4.3, 4.9, 5.8], abs=1e-1)
+    assert result["wind_direction_10m_p90"] == pytest.approx([158.5, 157.0, 157.1, 208.8], abs=1e-1)
