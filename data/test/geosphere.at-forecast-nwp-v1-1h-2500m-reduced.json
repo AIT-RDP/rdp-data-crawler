@@ -106,7 +106,7 @@
           "t2m": {
             "name": "2m temperature",
             "unit": "degree Celsius",
-            "data": [20.4, 20.0, -0.2, 55.0, 20.8, 21, 20.8, 20.3]
+            "data": [20.0, -0.2, 55.0, 20.8, 21, 20.8, 20.3, 20.4]
           },
           "tcc": {
             "name": "Total cloud cover",

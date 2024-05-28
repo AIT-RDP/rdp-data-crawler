@@ -603,14 +603,15 @@ class NumericalWeatherPredictionData(_AbstractGeosphereTimeSeriesAPI):
         Computes the discrete derivative of the given counter.
 
         Since the first values may not be passed on to the forecast in case it is fetched later on, the counters may not
-        start at zero. To avoid invalid first samples, the first element returned is always None. It is also assumed
+        start at zero. To avoid invalid first samples, the derivative will be set at the first sample of the interval
+        and the last. The last sample of the sequence will always be None to have equal-length lists. It is also assumed
         that the integral of values was performed using the units seconds and that the counter always counts upwards.
         Since it is observed that some counters slightly count downwards, any negative derivative will be rounded to
-        zero and added to the next number. to cancel out subsequent faults.
+        zero and added to the next number to cancel out subsequent faults.
         """
         assert len(time) == len(values)
 
-        ret: List[Optional[float]] = [None] if len(time) > 0 else []  # Return an empty array, if no elements are given
+        ret: List[Optional[float]] = []
         carry = 0.0
         for i in range(1, len(time)):
             dt = (time[i] - time[i - 1]).total_seconds()
@@ -624,4 +625,7 @@ class NumericalWeatherPredictionData(_AbstractGeosphereTimeSeriesAPI):
                 carry = 0.0
 
             ret.append(dv / dt * scaling)
+
+        if len(values) > 0:
+            ret.append(None)  # Append the last None to get equal-length lists
         return ret
