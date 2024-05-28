@@ -325,24 +325,24 @@ def test_nwp_basic_parsing_and_computations(nwp_parameters_minimal, simplified_n
     assert result["convective_available_potential_energy"] == [30, 13.5, 0.6, 0, 0.3, 0.1, 0, 0.1]
     assert result["convective_inhibition"] == [-0.6, -0.5, 0, 0, 0, 0, 0, 0]
     assert result["global_horizontal_irradiation"] == pytest.approx([
-        None, 195.981, 36.414, 21.275, 18.002, 0.408, 0, 0
+        195.981, 36.414, 21.275, 18.002, 0.408, 0, 0, None
     ], abs=1e-2)
 
     assert result["cloud_area_fraction"] == [100, 100, 90, 50, 100, 100, 100, 100]
-    assert result["sunshine_fraction"] == pytest.approx([None, 0, 13.7, 60.6, 65.7, 72.7, 80.6, 62.1], abs=1e-1)
+    assert result["sunshine_fraction"] == pytest.approx([0, 13.7, 60.6, 65.7, 72.7, 80.6, 62.1, None], abs=1e-1)
 
     assert result["air_temperature_min_2m"] == [20.43, 21.85, 20.92, 20.35, 20.27, 20.83, 20.3, 20.07]
     assert result["air_temperature_max_2m"] == [22.06, 22.16, 21.94, 20.91, 20.98, 20.98, 20.86, 20.35]
-    assert result["air_temperature_2m"] == [20.4, 20.0, -0.2, 55.0, 20.8, 21, 20.8, 20.3]
+    assert result["air_temperature_2m"] == [20.0, -0.2, 55.0, 20.8, 21, 20.8, 20.3, 20.4]
 
     assert result["_rainfall_mass_total"] == [0.034, 5.833, 11.821, 22.305, 22.305, 22.301, 22.305, 22.305]
     assert result["rainfall_total_1h"] == pytest.approx([
-        None, 5.809418, 5.988901, 10.636204, 0, 0, 0, 0
+        5.809418, 5.988901, 10.636204, 0, 0, 0, 0, None
     ], abs=1e-5)
 
     assert result["_precipitation_mass_total"] == [0.0, 5.833, 11.821, 22.305, 22.305, 22.301, 22.305, 22.305]
     assert result["precipitation_total_1h"] == pytest.approx([
-        None, 5.843479, 5.988901, 10.636204, 0, 0, 0, 0
+        5.843479, 5.988901, 10.636204, 0, 0, 0, 0, None
     ], abs=1e-5)
 
     assert result["relative_humidity_2m"] == [42.99, 42.46, 47.69, 44.52, 39.67, 39.19, 46.76, 41.74]
