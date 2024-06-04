@@ -9,6 +9,8 @@ import abc
 import datetime
 from typing import Generator, Dict, Any
 
+from data_crawler.sources.abc.message import MessageData
+
 
 class AbstractMultiMessageHistorySourceMixin(abc.ABC):
     """
@@ -18,7 +20,7 @@ class AbstractMultiMessageHistorySourceMixin(abc.ABC):
     """
 
     @abc.abstractmethod
-    def fetch_historic_data_bundle(self, filter_clauses: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
+    def fetch_historic_data_bundle(self, filter_clauses: Dict[str, Any]) -> Generator[MessageData, None, None]:
         """
         Fetches the historic remote data into a bundle of multiple messages.
 
@@ -42,7 +44,7 @@ class AbstractTimedMultiMessageHistorySourceMixin(AbstractMultiMessageHistorySou
     The class is mostly intended to unify the user interface by a common set of parameters
     """
 
-    def fetch_historic_data_bundle(self, filter_clauses: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
+    def fetch_historic_data_bundle(self, filter_clauses: Dict[str, Any]) -> Generator[MessageData, None, None]:
         """
         Fetches the historic remote data into a bundle of multiple messages.
 
@@ -85,7 +87,7 @@ class AbstractTimedMultiMessageHistorySourceMixin(AbstractMultiMessageHistorySou
 
     @abc.abstractmethod
     def fetch_timed_historic_data_bundle(self, start_time: datetime.datetime, end_time: datetime.datetime,
-                                         filter_clauses: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
+                                         filter_clauses: Dict[str, Any]) -> Generator[MessageData, None, None]:
         """
         Fetches a bundle of messages that can be filtered by a time interval.
 
@@ -108,7 +110,7 @@ class AbstractTimedHistorySourceMixin(AbstractTimedMultiMessageHistorySourceMixi
     """
 
     def fetch_timed_historic_data_bundle(self, start_time: datetime.datetime, end_time: datetime.datetime,
-                                         filter_clauses: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
+                                         filter_clauses: Dict[str, Any]) -> Generator[MessageData, None, None]:
         """
         Fetches the single message and returns it in an iterator
 
@@ -122,7 +124,7 @@ class AbstractTimedHistorySourceMixin(AbstractTimedMultiMessageHistorySourceMixi
 
     @abc.abstractmethod
     def fetch_historic_data(self, start_time: datetime.datetime, end_time: datetime.datetime,
-                            filter_clauses: Dict[str, Any]) -> Dict[str, Any]:
+                            filter_clauses: Dict[str, Any]) -> MessageData:
         """
         Fetches the historic data and returns it in one single message
 

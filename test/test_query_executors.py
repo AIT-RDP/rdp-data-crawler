@@ -8,13 +8,14 @@ import os
 import threading
 import time
 import warnings
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import pytest
 import redis
 
 import data_crawler.query_executors as query_executors
 import data_crawler.sources.abc.abstract_source as abstract_sources
+import data_crawler.sources.abc.message as msg
 import data_crawler.sources.abc.history as history
 import data_crawler.access.storage as storage
 
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 class MockupSourceAPI(abstract_sources.AbstractSourceAPI, history.AbstractTimedHistorySourceMixin):
     """Test API source that just counts function invocations"""
 
-    def __init__(self, source_parameters, **kwargs):
+    def __init__(self, source_parameters, metadata: Optional[dict[str, Any]] = None, **kwargs):
         """Stores the configuration and initializes the object"""
         self.kwargs = kwargs
 
@@ -38,6 +39,7 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI, history.AbstractTimedH
 
         self.enable_fetch = threading.Event()
         self.enable_fetch.set()
+        self._metadata = metadata
 
     def start(self):
         """Counts the start and performs some basic checks"""
@@ -48,7 +50,7 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI, history.AbstractTimedH
 
         self.start_invocations += 1
 
-    def fetch_data(self) -> Dict[str, Any]:
+    def fetch_data(self) -> msg.MessageData:
         """Generates some content and returns it"""
 
         self.fetch_ts.append(datetime.datetime.utcnow())
@@ -61,11 +63,15 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI, history.AbstractTimedH
 
         self.enable_fetch.wait()
 
-        return {
+        payload = {
             "invocations": self.fetch_invocations,
             "data": "some-test-nonsense",
             "duplicate": "api-key"
         }
+        if self._metadata is not None:
+            return msg.Message(payload=payload, metadata=self._metadata)
+        else:
+            return payload
 
     def fetch_historic_data(self, start_time: datetime.datetime, end_time: datetime.datetime,
                             filter_clauses: Dict[str, Any]) -> Dict[str, Any]:
@@ -118,19 +124,28 @@ def mockup_service_config(appended_test_path):
 
 
 @pytest.fixture()
-def redis_stream_name(redis_pool) -> str:
-    """Returns the name of a managed REDIS stream"""
-
-    redis_client = redis.Redis(connection_pool=redis_pool)
-    stream_name = "test.stream"
-
-    stream_content = redis_client.xrange(stream_name)  # Read to implicitly create the stream
-    if len(stream_content) == 0:
-        warnings.warn(f"There are already {len(stream_content)} items in the redis stream '{stream_name}'")
-    yield stream_name
-
-    redis_client.xtrim(stream_name, maxlen=0)
-    redis_client.delete(stream_name)  # Delete the stream again
+def mockup_service_config_dynamic(appended_test_path):
+    """Returns the novel, dynamic sink configuration"""
+    return {
+        "type": "test_query_executors.MockupSourceAPI",
+        "source parameter": {
+            "key": "<keep it secret>",
+            "some_list": [1, 2, 4],
+            "keep": "it"
+        },
+        "polling": {
+            "frequency": "0.5s"
+        },
+        "sink_type": "data_crawler.sinks.redis.RedisStream",
+        "sink_parameters": {
+            "tags": {
+                "source type": "mockup-test",
+                "empty": "",
+                "my-number": 0.2,
+                "duplicate": "config-key"
+            },
+        },
+    }
 
 
 def test_thread_executor_lifecycle(mockup_service_config, redis_pool):
@@ -397,6 +412,39 @@ def test_thread_executor_redis_templated_export(mockup_service_config, redis_poo
     assert messages is not None
     assert 2 <= len(messages) <= 3
     assert len(messages) == api.fetch_invocations
+
+
+def test_thread_executor_sink_dynamic_config(mockup_service_config_dynamic, redis_pool, redis_stream_name):
+    """Tests the executor's capabilities in writing Redis streams using metadata"""
+
+    api = MockupSourceAPI(source_parameters={}, metadata=dict(stream=redis_stream_name))
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config_dynamic, redis_pool, source_api=api)
+
+    redis_client = redis.Redis(connection_pool=redis_pool)
+
+    executor.start()
+    time.sleep(0.51)
+    executor.stop()
+    executor.join()
+
+    messages = redis_client.xrange(redis_stream_name)
+    assert messages is not None
+    assert 2 <= len(messages) <= 3
+    assert len(messages) == api.fetch_invocations
+
+    assert messages[0][-1]["source type"] == '"mockup-test"'
+    assert messages[0][-1]["empty"] == '""'
+    assert messages[0][-1]["my-number"] == '0.2'
+    assert messages[0][-1]["duplicate"] == '"config-key"'
+    assert messages[0][-1]["invocations"] == '1'  # Number of invocations including the current one
+    assert messages[0][-1]["data"] == '"some-test-nonsense"'
+
+    assert messages[1][-1]["source type"] == '"mockup-test"'
+    assert messages[1][-1]["empty"] == '""'
+    assert messages[1][-1]["my-number"] == '0.2'
+    assert messages[1][-1]["duplicate"] == '"config-key"'
+    assert messages[1][-1]["invocations"] == '2'
+    assert messages[1][-1]["data"] == '"some-test-nonsense"'
 
 
 @pytest.fixture()

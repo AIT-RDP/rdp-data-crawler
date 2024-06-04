@@ -5,6 +5,7 @@ Specifies the abstract source API to query external services
 import abc
 from collections.abc import Generator
 from typing import Dict, Any
+from data_crawler.sources.abc.message import MessageData
 
 
 class AbstractMultiMessageSourceAPI(abc.ABC):
@@ -24,11 +25,11 @@ class AbstractMultiMessageSourceAPI(abc.ABC):
         """Just for type checking"""
 
     @abc.abstractmethod
-    def fetch_data_bundle(self) -> Generator[Dict[str, Any], None, None]:
+    def fetch_data_bundle(self) -> Generator[MessageData, None, None]:
         """
         Fetches the remote data into a bundle of multiple messages.
 
-        The function may be overriden in case multiple values need to be returned
+        The function may be overridden in case multiple values need to be returned
 
         :returns: The function will return a generator that yields one message at a time.
         """
@@ -60,7 +61,7 @@ class AbstractSourceAPI(AbstractMultiMessageSourceAPI, abc.ABC):
         """Just for type checking"""
         super(AbstractSourceAPI, self).__init__(**kwargs)
 
-    def fetch_data_bundle(self) -> Generator[Dict[str, Any], None, None]:
+    def fetch_data_bundle(self) -> Generator[MessageData, None, None]:
         """
         Fetches the remote data into a bundle of multiple messages.
 
@@ -74,7 +75,7 @@ class AbstractSourceAPI(AbstractMultiMessageSourceAPI, abc.ABC):
             yield data
 
     @abc.abstractmethod
-    def fetch_data(self) -> Dict[str, Any]:
+    def fetch_data(self) -> MessageData:
         """
         Fetches the data from the external API and returns it.
 

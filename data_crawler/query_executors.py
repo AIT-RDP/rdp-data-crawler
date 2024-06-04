@@ -22,8 +22,10 @@ import pandas as pd
 import prometheus_client as prom
 import redis
 
+import data_crawler.sinks.abc.abstract_sink as abstract_sink
 import data_crawler.sources.abc.abstract_source as abstract_source
 import data_crawler.sources.abc.history as history_source
+import data_crawler.sources.abc.message as msg
 
 import data_crawler.access.storage as storage
 
@@ -196,20 +198,12 @@ class _QueryExecutorBase(abc.ABC):
         self._source_api = source_api  # Expect protected scope.
 
         self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)  # Protected scope
-        self._data_sink = _RedisDataSink(self._config["redis"], redis_pool)  # Protected scope
+        self._data_sink = self._resolve_sink_api(executor_config, name, redis_pool)  # Protected scope
 
     @staticmethod
-    def _resolve_source_api(executor_config: dict, executor_name: str,
-                            persistent_store: storage.PersistentAPIStorage) -> abstract_source.AbstractMultiMessageSourceAPI:
-        """
-        Tries to load ind instantiate the source API
+    def _load_api_class(type_name: str) -> type:
+        """Dynamically resolves a dot-separated type and returns it"""
 
-        :param executor_config: The configuration of the entire executor
-        :param executor_name: The executor's name for debugging purposes
-        :return: The newly instantiated source API object
-        """
-
-        type_name = executor_config["type"]
         name_components = str(type_name).split(".")
         if len(name_components) < 2:
             raise KeyError(f"The API type configuration '{type_name}' is invalid. Cannot separate the package and "
@@ -223,12 +217,64 @@ class _QueryExecutorBase(abc.ABC):
         if not inspect.isclass(api_class):
             raise ModuleNotFoundError(f"The specified source API '{type_name}' ({api_class}) is not an class.")
 
+        return api_class
+
+    @staticmethod
+    def _resolve_source_api(
+            executor_config: dict, executor_name: str,
+            persistent_store: storage.PersistentAPIStorage
+    ) -> abstract_source.AbstractMultiMessageSourceAPI:
+        """
+        Tries to load ind instantiate the source API
+
+        :param executor_config: The configuration of the entire executor
+        :param executor_name: The executor's name for debugging purposes
+        :return: The newly instantiated source API object
+        """
+
+        type_name = executor_config["type"]
+        api_class = _QueryExecutorBase._load_api_class(type_name)
+
         if not issubclass(api_class, abstract_source.AbstractMultiMessageSourceAPI):
             raise ModuleNotFoundError(f"The specified source API class '{type_name}' ({api_class}) is not an "
                                       f"AbstractMultiMessageSourceAPI.")
 
         api_object = api_class(source_parameters=executor_config["source parameter"], executor_name=executor_name,
                                persistent_store=persistent_store)
+        return api_object
+
+    @staticmethod
+    def _resolve_sink_api(executor_config: dict, executor_name: str,
+                          redis_pool: redis.ConnectionPool) -> abstract_sink.AbstractSinkAPI:
+        """
+        Tries to dynamically load the sink API and its configuration
+        :param executor_config: The overall configuration of the executor
+        :param executor_name: The name of the current executor that can be passed on to the sink for identification
+        :param redis_pool: The common connection pool to the managed Redis database
+        :return: The initialized sink
+        """
+
+        if "redis" in executor_config:
+            # Legacy configuration syntax
+            if "sink_type" in executor_config or "sink_parameters" in executor_config:
+                raise ValueError("Cannot set 'sink_type' or 'sink_parameters' options when the legacy 'redis' "
+                                 "configuration is supplied. Consider to only use the new syntax instead.")
+
+            sink_type = "data_crawler.sinks.redis.RedisStream"
+            sink_parameters = executor_config["redis"]
+
+        else:
+            # New, dynamic sink configuration syntax
+            sink_type = executor_config["sink_type"]
+            sink_parameters = executor_config["sink_parameters"]
+
+        api_class = _QueryExecutorBase._load_api_class(sink_type)
+        if not issubclass(api_class, abstract_sink.AbstractSinkAPI):
+            raise ModuleNotFoundError(f"The specified source API class '{sink_type}' ({api_class}) is not an "
+                                      f"AbstractSinkAPI.")
+
+        config = api_class.parameter_model().model_validate(sink_parameters)
+        api_object = api_class.create(config, executor_name=executor_name, redis_pool=redis_pool)
         return api_object
 
     @property
@@ -246,8 +292,14 @@ class _QueryExecutorBase(abc.ABC):
         This function is assumed to be protected and may be used in child classes
         :param messages: The iterable of generator that yields the messages
         """
+
+        meta_class = self._data_sink.metadata_model()
+
         for message in messages:
-            self._data_sink.push_data(message)
+            if isinstance(message, msg.Message):
+                self._data_sink.insert_data(message.payload, meta_class.model_validate(message.metadata, strict=True))
+            else:
+                self._data_sink.insert_data(message, meta_class())
 
 
 class ThreadQueryExecutor(_QueryExecutorBase):
