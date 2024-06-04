@@ -129,35 +129,6 @@ class _ExecutionTimer:
         return datetime.timedelta(seconds=max_time)
 
 
-class _RedisDataSink:
-    """Helper class that relays data to a redis stream according to the configuration"""
-
-    def __init__(self, redis_config: dict, redis_pool: redis.ConnectionPool):
-        """
-        Initializes the data sink
-
-        :param redis_config: The executor-specific redis configuration
-        :param redis_pool:  The connection pool to use at the redis client
-        """
-
-        self._client = redis.Redis(connection_pool=redis_pool)
-        self._stream_template = string.Template(redis_config["stream"])
-        self._tags = redis_config.get("tags", {})
-
-    def push_data(self, message: Dict[str, Any]):
-        """
-        Write the received message to the Redis stream
-
-        :param message: The message as received by the source API
-        """
-
-        message = message.copy()  # To be on the safe side. Remove if it turns out to be a performance bottleneck
-        message.update(self._tags)
-
-        encoded_message = {key: json.dumps(val) for key, val in message.items()}
-        self._client.xadd(self._stream_template.substitute(message), encoded_message)
-
-
 @dataclasses.dataclass()
 class ActivityStatus:
     """Groups the execution activity status information for debugging and fault detection"""
