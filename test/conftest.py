@@ -5,6 +5,7 @@ Configures unit tests globally
 import logging
 import os
 import sys
+import warnings
 
 import redis
 import pytest
@@ -27,6 +28,22 @@ def redis_pool() -> redis.ConnectionPool:
 
     client.ping()
     return pool
+
+
+@pytest.fixture()
+def redis_stream_name(redis_pool) -> str:
+    """Returns the name of a managed REDIS stream"""
+
+    redis_client = redis.Redis(connection_pool=redis_pool)
+    stream_name = "test.stream"
+
+    stream_content = redis_client.xrange(stream_name)  # Read to implicitly create the stream
+    if len(stream_content) == 0:
+        warnings.warn(f"There are already {len(stream_content)} items in the redis stream '{stream_name}'")
+    yield stream_name
+
+    redis_client.xtrim(stream_name, maxlen=0)
+    redis_client.delete(stream_name)  # Delete the stream again
 
 
 @pytest.fixture()
