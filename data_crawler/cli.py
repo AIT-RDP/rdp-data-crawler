@@ -53,7 +53,7 @@ def cli(ctx: click.Context, config_file, env):
 
     logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s: %(message)s", level=logging.DEBUG)
     logger.debug("Parse main YAML configuration file '%s'", config_file)
-    config = pyrdp_commons.cli.setup_app(config_file, env)
+    config = pyrdp_commons.cli.setup_app(config_file, env, supported_config_versions={1, 2})
 
     ctx.obj = CommandContextInfo(config=config)
 
