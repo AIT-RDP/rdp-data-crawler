@@ -3,17 +3,12 @@ Implements the logic to periodically execute API calls in a dedicated context
 """
 import abc
 import copy
-import dataclasses
 import datetime
 import fnmatch
 import importlib
 import inspect
 import itertools
-import json
 import logging
-import math
-import random
-import string
 import threading
 import traceback
 from typing import Optional, Dict, Any, List, Iterable
@@ -24,118 +19,14 @@ import redis
 
 import data_crawler.sinks.abc.abstract_sink as abstract_sink
 import data_crawler.sources.abc.abstract_source as abstract_source
+import data_crawler.sources.abc.active_source_sync as active_sync_source
 import data_crawler.sources.abc.history as history_source
 import data_crawler.sources.abc.message as msg
+import data_crawler.sources._sync_wrapper as _sync_wrapper
 
 import data_crawler.access.storage as storage
 
 logger = logging.getLogger(__name__)
-
-
-class _ExecutionTimer:
-    """A helper class that computes the time until the next query should be performed"""
-
-    def __init__(self, timer_config: dict, logger: logging.Logger):
-        """
-        Initializes the timer
-
-        :param timer_config: The configuration snippet describing the timing behavior
-        :param logger: A logger to pase some debug information to
-        """
-
-        self._logger = logger
-
-        freq_name = timer_config["frequency"]
-        self._timer_interval = pd.Timedelta(freq_name).total_seconds()
-
-        # Offset from the start of the current year, UTC. The start of the current year was chosen to mitigate some
-        # issues with leap seconds. Right now, leap-seconds on June, 30 are not encountered.
-        offset_name = timer_config.get("offset", "0s")
-        self._offset = pd.Timedelta(offset_name).total_seconds()
-
-        # Configure time slots that may be used to shift the queries to avoid concurrent access to some device
-        slot_id = timer_config.get("slot id", 0)
-        slot_count = int(timer_config.get("slot count", 1))
-        if slot_id is None or str(slot_id).lower() == "false" or int(slot_id) < 0:
-            self._logger.info(f"The timer is disabled by slot '{slot_id}'. No query will be performed.")
-            self._timer_interval = 3600.0 * 24 * 356 * 100  # Once every 100 Years
-            slot_id = 0
-        slot_id = int(slot_id)
-        if slot_id >= slot_count:
-            raise ValueError(f"Invalid slot id {slot_id} on {slot_count} slot(s) in total.")
-        self._offset += (self._timer_interval / slot_count) * slot_id
-
-        # The uniformly distributed random jitter to apply. (Symmetrically around the offset)
-        self._jitter = pd.Timedelta(timer_config.get("jitter", "0s")).total_seconds()
-        self._rnd = random.Random()
-
-        # Configure immediate fetch operation
-        self._force_initial = bool(timer_config.get("force initial", True))
-
-        self._logger.debug(f"Set timer interval to {self._timer_interval}s ({freq_name}) aligning to an offset of "
-                           f"{self._offset}s ({offset_name}) +/-{self._jitter}s.")
-
-        self._next_tick_actual = 0.0  # Pre-reset default value to satisfy the linter
-        self._next_tick_nominal = 0.0  # Pre-reset default value to satisfy the linter
-        self.reset()
-
-    def reset(self):
-        """Clears the state and instructs the timer to fire immediately"""
-        date_now = datetime.datetime.utcnow()
-        base_date = datetime.datetime(date_now.year, 1, 1, 0, 0, 0, tzinfo=date_now.tzinfo)
-        base_date += pd.Timedelta(seconds=self._offset - self._timer_interval)
-
-        num_skip = (date_now - base_date).total_seconds() / self._timer_interval
-        # Floor to immediately trigger a tick or ceil to wait for the next tick to appear:
-        num_skip = math.floor(num_skip) if self._force_initial else math.ceil(num_skip)
-        base_date += pd.Timedelta(seconds=num_skip * self._timer_interval)
-
-        # Set the nominal and actual tick as needed. Don't forget to also jitter the first tick, as needed
-        self._next_tick_nominal = base_date.timestamp()
-        if self._force_initial:
-            # Use the current time as base for jitter since the last sample may be likely overdue.
-            self._next_tick_actual = date_now.timestamp() + self._rnd.uniform(0, self._jitter)
-        else:
-            # Just jitter the nominal base date. It should point to the next instance of time
-            self._next_tick_actual = base_date.timestamp() + self._rnd.uniform(-self._jitter, self._jitter)
-
-    def get_remaining_seconds(self) -> float:
-        """
-        Returns the number of seconds until the timer fires next
-
-        The number may be negative in case it should already be fired
-        """
-        now = datetime.datetime.utcnow().timestamp()  # Unify with reset function.
-        return self._next_tick_actual - now
-
-    def operation_done(self):
-        """Indicates that the operation was just completed and that the time can advance to the next step."""
-
-        self._next_tick_nominal += self._timer_interval
-        self._next_tick_actual = self._next_tick_nominal + self._rnd.uniform(-self._jitter, self._jitter)
-
-        remaining = self.get_remaining_seconds()
-        if remaining > self._timer_interval + 2 * self._jitter:  # Skip some queries
-            num_skip = math.floor(remaining / self._timer_interval)
-            self._next_tick_actual += self._timer_interval * num_skip
-            self._next_tick_nominal += self._timer_interval * num_skip
-            self._logger.warning(f"Skipped {num_skip} queries since the previous queries were too much delayed.")
-
-    @property
-    def max_permitted_cycle_time(self) -> datetime.timedelta:
-        """Returns the maximum interval between two timer ticks. Note that this may not be the nominal time."""
-
-        max_time = self._timer_interval + 2 * self._jitter
-        return datetime.timedelta(seconds=max_time)
-
-
-@dataclasses.dataclass()
-class ActivityStatus:
-    """Groups the execution activity status information for debugging and fault detection"""
-
-    last_wakeup: Optional[datetime.datetime]
-    last_cycle_complete: Optional[datetime.datetime]
-    max_permitted_cycle_time: datetime.timedelta  # The maximum allowed time, not the measured one
 
 
 class _QueryExecutorBase(abc.ABC):
@@ -147,7 +38,9 @@ class _QueryExecutorBase(abc.ABC):
     """
 
     def __init__(self, executor_config: dict, redis_pool: redis.ConnectionPool,
-                 source_api: Optional[abstract_source.AbstractSourceAPI], name: str):
+                 source_api: Optional[
+                     abstract_source.AbstractSourceAPI | active_sync_source.AbstractSyncActiveSourceAPI],
+                 name: str):
         """
         Initializes the executor and the connected source API but does not start any operation
 
@@ -166,6 +59,8 @@ class _QueryExecutorBase(abc.ABC):
 
         if source_api is None:
             source_api = self._resolve_source_api(self._config, name, persistent_store)
+        if isinstance(source_api, abstract_source.AbstractMultiMessageSourceAPI):
+            source_api = _sync_wrapper.SyncPollingExecutor(source_api, executor_config, name)
         self._source_api = source_api  # Expect protected scope.
 
         self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)  # Protected scope
@@ -194,7 +89,7 @@ class _QueryExecutorBase(abc.ABC):
     def _resolve_source_api(
             executor_config: dict, executor_name: str,
             persistent_store: storage.PersistentAPIStorage
-    ) -> abstract_source.AbstractMultiMessageSourceAPI:
+    ) -> abstract_source.AbstractMultiMessageSourceAPI | active_sync_source.AbstractSyncActiveSourceAPI:
         """
         Tries to load ind instantiate the source API
 
@@ -206,12 +101,20 @@ class _QueryExecutorBase(abc.ABC):
         type_name = executor_config["type"]
         api_class = _QueryExecutorBase._load_api_class(type_name)
 
-        if not issubclass(api_class, abstract_source.AbstractMultiMessageSourceAPI):
+        if issubclass(api_class, abstract_source.AbstractMultiMessageSourceAPI):
+            # Instantiate the legacy object that expects synchronous polling
+            api_object = api_class(source_parameters=executor_config["source parameter"], executor_name=executor_name,
+                                   persistent_store=persistent_store)
+        elif issubclass(api_class, active_sync_source.AbstractSyncActiveSourceAPI):
+            # Instantiate the new active interface
+            api_parameters = api_class.parameter_model().model_validate(executor_config["source parameter"])
+            api_object = api_class.create(api_parameters, executor_name=executor_name,
+                                          persistent_store=persistent_store)
+        else:
+            # No appropriate class found
             raise ModuleNotFoundError(f"The specified source API class '{type_name}' ({api_class}) is not an "
-                                      f"AbstractMultiMessageSourceAPI.")
+                                      f"AbstractMultiMessageSourceAPI or AbstractSyncActiveSourceAPI.")
 
-        api_object = api_class(source_parameters=executor_config["source parameter"], executor_name=executor_name,
-                               persistent_store=persistent_store)
         return api_object
 
     @staticmethod
@@ -249,14 +152,20 @@ class _QueryExecutorBase(abc.ABC):
         return api_object
 
     @property
-    def source_api(self) -> abstract_source.AbstractSourceAPI:
+    def source_api(
+            self
+    ) -> active_sync_source.AbstractSyncActiveSourceAPI | abstract_source.AbstractMultiMessageSourceAPI:
         """
-        Returns the Source API object
+        Returns the Source API object.
+
+        For compatibility reasons, any polling-based API will be unwrapped and directly returned.
         """
+        if isinstance(self._source_api, _sync_wrapper.SyncPollingExecutor):
+            return self._source_api.source_api
+        else:
+            return self._source_api
 
-        return self._source_api
-
-    def _push_messages(self, messages: Iterable[dict]):
+    def _push_messages(self, messages: Iterable[dict | msg.Message]):
         """
         Pushes all messages to the redis data sink.
 
@@ -280,13 +189,6 @@ class ThreadQueryExecutor(_QueryExecutorBase):
     The long-running query operations are decoupled by a dedicated thread.
     """
 
-    _prom_calls = prom.Counter("data_crawler_source_calls", labelnames=["source_name", "status"],
-                               documentation="Number of calls to the data source")
-    _prom_source_duration = prom.Summary("data_crawler_crawling_duration_seconds", labelnames=["source_name"],
-                                         documentation="The duration of crawling a given source")
-    _prom_call_latency = prom.Summary("data_crawler_scheduling_delay_seconds", labelnames=["source_name"],
-                                      documentation="The delay of starting a data crawling job")
-
     def __init__(self, executor_config: dict, redis_pool: redis.ConnectionPool,
                  source_api: Optional[abstract_source.AbstractSourceAPI] = None, name: str = "<default>"):
         """
@@ -301,23 +203,14 @@ class ThreadQueryExecutor(_QueryExecutorBase):
         """
         super(ThreadQueryExecutor, self).__init__(executor_config, redis_pool, source_api, name)
 
-        self._thread = threading.Thread(target=self._run_timed_execution)
+        self._thread = threading.Thread(target=self._run_api)
         self._termination_event = threading.Event()
         self._startup_event = threading.Event()  # Mostly used for testing. Triggered when startup completes.
 
-        self._timer = _ExecutionTimer(self._config["polling"], self._logger)
-
-        self._activity_status: ActivityStatus = ActivityStatus(None, None, self._timer.max_permitted_cycle_time)
-        self._activity_status_lock = threading.Lock()
-
-        self._prom_calls.labels(source_name=name, status="started")
-        self._prom_calls.labels(source_name=name, status="success")
-        self._prom_calls.labels(source_name=name, status="failed")
-        self._prom_source_duration.labels(source_name=name)
-        self._prom_call_latency.labels(source_name=name)
-
     @property
-    def source_api(self) -> abstract_source.AbstractSourceAPI:
+    def source_api(
+            self
+    ) -> active_sync_source.AbstractSyncActiveSourceAPI | abstract_source.AbstractMultiMessageSourceAPI:
         """
         Returns the Source API object
 
@@ -338,16 +231,17 @@ class ThreadQueryExecutor(_QueryExecutorBase):
         self._thread.start()
         self._startup_event.wait()
 
-    def stop(self):
+    def shutdown(self):
         """
-        Signals to stop the executor but does not wait until it is actually stopped.
+        Signals to shutdown the executor but does not wait until it is actually stopped.
         """
         assert not self._termination_event.is_set(), "The executor has already been stopped"
         self._termination_event.set()
+        self._source_api.shutdown()
 
-    def is_stop_triggered(self) -> bool:
+    def is_shutdown_triggered(self) -> bool:
         """
-        Returns whether the stop procedure was already triggered
+        Returns whether the shutdown procedure was already triggered
         """
         return self._termination_event.is_set()
 
@@ -364,87 +258,35 @@ class ThreadQueryExecutor(_QueryExecutorBase):
         self._termination_event.clear()
         self._startup_event.clear()
 
-    def _run_timed_execution(self):
-        """Executes the queries until termination is signaled"""
+    def _run_api(self):
+        """Executes the queries until the source terminates"""
 
         try:
             self._source_api.start()
-            self._timer.reset()  # Reset after startup to avoid initial deadline misses
         finally:
             # Release the main thread (mostly to test the timing) However, to avoid deadlocks on crashed threads, always
             # release the startup flag, even if startup fails. Dead threads will be picked up by the supervisor anyway.
             self._startup_event.set()
 
-        while True:
-            timeout = self._timer.get_remaining_seconds()
-            if timeout > 0:
-                term_flag = self._termination_event.wait(timeout=timeout)
-            else:
-                term_flag = self._termination_event.is_set()
-
-            if term_flag:
-                self._logger.debug("Shut down the API crawler")
-                break
-
-            self._log_start_of_cycle()
-            try:
-                success = self._fetch_once()
-            finally:
-                self._timer.operation_done()
-            self._log_end_of_cycle(success)
-
-        self._source_api.stop()
-
-    def _log_start_of_cycle(self):
-        """Logs the start of the cycle and performs some basic sanity checks"""
-
-        ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
-        timeout = self._timer.get_remaining_seconds()
-        if timeout > 0.0:
-            self._logger.error(f"The timer didn't awaited its timeout. {timeout} seconds left.")
-            assert False, "The event didn't awaited its timeout."
-
-        self._prom_calls.labels(source_name=self._source_name, status="started").inc(1)
-        self._prom_call_latency.labels(source_name=self._source_name).observe(-timeout)
-
-        with self._activity_status_lock:
-            self._activity_status.last_wakeup = ts_now
-
-    def _log_end_of_cycle(self, success: bool):
-        """Logs the end of the cycle"""
-
-        ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
-
-        status = "success" if success else "failed"
-        self._prom_calls.labels(source_name=self._source_name, status=status).inc(1)
-
-        with self._activity_status_lock:
-            self._activity_status.last_cycle_complete = ts_now
-
-    def _fetch_once(self) -> bool:
-        """Performs one fetch and insert operation and returns the success status of the operations"""
-
         try:
-            with self._prom_source_duration.labels(source_name=self._source_name).time():
-                message_gen = self._source_api.fetch_data_bundle()
-                self._push_messages(message_gen)
-            success = True
-        except Exception as err:
-            self._logger.error(f"Skip one sample due to a {type(err).__name__}: {err}\n{traceback.format_exc()}")
-            success = False
-        return success
+            for message in self._source_api.run():
+                self._push_messages([message])
+        except Exception as ex:
+            self._logger.error(f"Received a '{ex.__class__}' error within the execution cycle. Exit the channel."
+                               f"{traceback.format_exc()}")
+        finally:
+            self._source_api.stop()
 
-    def get_activity_status(self) -> ActivityStatus:
+    def get_activity_status(self) -> active_sync_source.ActivityStatus:
         """
         Returns a copy of the current activity status in a thread-save way
         :return: The current activity status
         """
 
-        with self._activity_status_lock:
-            return copy.copy(self._activity_status)
+        return self._source_api.get_activity_status()
 
     def is_alive(self):
-        """Returns whether the executer thread is currently alive (running or waiting)"""
+        """Returns whether the executor thread is currently alive (running or waiting)"""
         return self._thread.is_alive()
 
 
@@ -512,7 +354,7 @@ class QuerySupervisor:
         """Stops and joins all executor threads"""
 
         for ex in self._executors.values():
-            ex.stop()
+            ex.shutdown()
 
         for ex in self._executors.values():
             ex.join()
@@ -547,12 +389,12 @@ class QuerySupervisor:
             elif (
                     status.last_wakeup is not None and
                     ts_now - status.last_wakeup > status.max_permitted_cycle_time + self._dead_timeout and
-                    not self._executors[ex_name].is_stop_triggered()  # Avoid duplicate stop calls
+                    not self._executors[ex_name].is_shutdown_triggered()  # Avoid duplicate shutdown calls
             ):
                 logger.warning(f"The source {ex_name} does not complete its cycle in time (last wakeup at "
                                f"{status.last_wakeup} and last complete cycle {status.last_cycle_complete}, max cycle "
                                f"time {status.max_permitted_cycle_time}). Issue an asynchronous stop signal.")
-                self._executors[ex_name].stop()  # Don't wait for joins to not block the entire supervisor.
+                self._executors[ex_name].shutdown()  # Don't wait for joins to not block the entire supervisor.
                 ex_status[ex_name] = "stop-by-timeout"
                 self._prom_source_status.labels(source_name=ex_name).set(1)
 
@@ -619,7 +461,9 @@ class OneShotQueryExecutor(_QueryExecutorBase):
         """
 
         assert isinstance(self._source_api, history_source.AbstractMultiMessageHistorySourceMixin)
-        assert isinstance(self._source_api, abstract_source.AbstractMultiMessageSourceAPI)
+        assert isinstance(self._source_api, active_sync_source.AbstractSyncActiveSourceAPI)
+
+        filter_expressions = list(filter_expressions)
 
         self._source_api.start()
         try:
@@ -637,7 +481,7 @@ class OneShotQueryExecutor(_QueryExecutorBase):
 def execute_one_shot_batches(source_config: Dict[str, dict], redis_pool: redis.ConnectionPool,
                              filter_expressions: Iterable[Dict[str, Any]],
                              target_sources: Iterable[str], override_config: Optional[dict] = None,
-                             debug_return=False) -> Dict[str, abstract_source.AbstractMultiMessageSourceAPI]:
+                             debug_return=False) -> Dict[str, active_sync_source.AbstractSyncActiveSourceAPI]:
     """
     Executes the listed sources and performs the query actions.
 

@@ -162,6 +162,16 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
         self._prom_source_duration.labels(source_name=self._source_name)
         self._prom_call_latency.labels(source_name=self._source_name)
 
+    @property
+    def source_api(self) -> abstract_source.AbstractMultiMessageSourceAPI:
+        """
+        Returns the encapsulated source API
+
+        The function is mainly intended for debugging purpose and should hardly be necessary.
+        """
+
+        return self._source_api
+
     @classmethod
     def create(cls, source_parameters: active_source_sync.SourceParameters | dict,
                **kwargs) -> active_source_sync.AbstractSyncActiveSourceAPI:
