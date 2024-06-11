@@ -243,7 +243,7 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI):
 
     def get_activity_status(self) -> active_source_sync.ActivityStatus:
         """Returns the current activity status"""
-        with self._activity_status_lock.acquire():
+        with self._activity_status_lock:
             return copy.copy(self._activity_status)
 
     @staticmethod
