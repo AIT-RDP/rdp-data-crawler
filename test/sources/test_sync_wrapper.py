@@ -20,7 +20,7 @@ def mockup_source_config_base(appended_test_path) -> dict:
     """Returns the configuration of a simple mockup service"""
 
     return {
-        "type": "sources.mockup.MockupSourceAPI",
+        "type": "sources.mockup.PassiveMockupSourceAPI",
         "source parameter": {
             "key": "<keep it secret>",
             "some_list": [1, 2, 4],
@@ -33,10 +33,10 @@ def mockup_source_config_base(appended_test_path) -> dict:
     }
 
 
-def create_mockup_api(config: dict, metadata: Optional[dict] = None) -> mockup.MockupSourceAPI:
+def create_mockup_api(config: dict, metadata: Optional[dict] = None) -> mockup.PassiveMockupSourceAPI:
     """Instantiates the mockup API from the given config"""
 
-    return mockup.MockupSourceAPI(config["source parameter"], metadata=metadata)
+    return mockup.PassiveMockupSourceAPI(config["source parameter"], metadata=metadata)
 
 
 @contextlib.contextmanager

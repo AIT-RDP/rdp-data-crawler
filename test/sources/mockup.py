@@ -11,7 +11,7 @@ import data_crawler.sources.abc.message as msg
 import data_crawler.sources.abc.history as history
 
 
-class MockupSourceAPI(abstract_sources.AbstractSourceAPI, history.AbstractTimedHistorySourceMixin):
+class PassiveMockupSourceAPI(abstract_sources.AbstractSourceAPI, history.AbstractTimedHistorySourceMixin):
     """Test API source that just counts function invocations"""
 
     def __init__(self, source_parameters, metadata: Optional[dict[str, Any]] = None, **kwargs):
