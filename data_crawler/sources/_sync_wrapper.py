@@ -8,7 +8,7 @@ import math
 import random
 import threading
 import traceback
-from typing import Generator, Iterable
+from typing import Generator, Iterable, Dict, Any
 
 import pandas as pd
 import prometheus_client as prom
@@ -16,7 +16,8 @@ import prometheus_client as prom
 import data_crawler.sources.abc.message as msg
 import data_crawler.sources.abc.abstract_source as abstract_source
 import data_crawler.sources.abc.active_source_sync as active_source_sync
-from data_crawler.sources.abc.active_source_sync import SourceParameters
+import data_crawler.sources.abc.history as history
+from data_crawler.sources.abc.message import MessageData
 
 
 class _ExecutionTimer:
@@ -116,7 +117,8 @@ class _ExecutionTimer:
         return datetime.timedelta(seconds=max_time)
 
 
-class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI):
+class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
+                          history.AbstractMultiMessageHistorySourceMixin):
     """
     Wraps the abstract sources and provides an active interface for them
 
@@ -161,7 +163,7 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI):
         self._prom_call_latency.labels(source_name=self._source_name)
 
     @classmethod
-    def create(cls, source_parameters: SourceParameters | dict,
+    def create(cls, source_parameters: active_source_sync.SourceParameters | dict,
                **kwargs) -> active_source_sync.AbstractSyncActiveSourceAPI:
         """Raises an error as the wrapper needs to be transparently inserted and may nto be dynamically instantiated"""
         raise NotImplementedError("The SyncPollingExecutor cannot be automatically instantiated.")
@@ -246,6 +248,15 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI):
         with self._activity_status_lock:
             return copy.copy(self._activity_status)
 
+    def fetch_historic_data_bundle(self, filter_clauses: Dict[str, Any]) -> Generator[MessageData, None, None]:
+        """Relays the history call to the encapsulated API"""
+
+        if isinstance(self._source_api, history.AbstractMultiMessageHistorySourceMixin):
+            yield from self._source_api.fetch_historic_data_bundle(filter_clauses)
+        else:
+            raise ValueError(f"The data source of '{self._source_name}' - {self._source_name.__class__} is not a "
+                             f"history data source")
+
     @staticmethod
-    def parameter_model() -> type[SourceParameters] | None:
+    def parameter_model() -> type[active_source_sync.SourceParameters] | None:
         return None  # Do not enforce a specific parameter model.

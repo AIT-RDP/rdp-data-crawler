@@ -42,7 +42,7 @@ class MockupSourceAPI(abstract_sources.AbstractSourceAPI, history.AbstractTimedH
     def fetch_data(self) -> msg.MessageData:
         """Generates some content and returns it"""
 
-        self.fetch_ts.append(datetime.datetime.utcnow())
+        self.fetch_ts.append(datetime.datetime.now(tz=datetime.timezone.utc))
         self.fetch_invocations += 1
 
         assert self.start_invocations == self.stop_invocations + 1
