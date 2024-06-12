@@ -22,12 +22,12 @@ class ActivityStatus:
     """
 
     # The datetime of the last wakeup that triggers fetching or processing external information.
-    last_wakeup: Optional[datetime.datetime]
+    last_wakeup: datetime.datetime | None
     # The datetime when the last processing cycle was completed.
-    last_cycle_complete: Optional[datetime.datetime]
+    last_cycle_complete: datetime.datetime | None
 
     # The maximum allowed time, between two event emissions. In case no such limit can be given, None is to be returned
-    max_permitted_cycle_time: Optional[datetime.timedelta]
+    max_permitted_cycle_time: datetime.timedelta | None
 
 
 class SourceParameters(pydantic.BaseModel):
@@ -45,7 +45,7 @@ class AbstractSyncActiveSourceAPI(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def create(cls, source_parameters: SourceParameters | dict, **kwargs) -> "AbstractSyncActiveSourceAPI":
+    def create(cls, source_parameters: SourceParameters, **kwargs) -> "AbstractSyncActiveSourceAPI":
         """
         Factory function that creates an ActiveSyncSourceAPI
         :param source_parameters: The source parameters according to the parameter model. In case no parameter model is
