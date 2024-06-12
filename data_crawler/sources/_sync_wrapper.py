@@ -173,7 +173,7 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
         return self._source_api
 
     @classmethod
-    def create(cls, source_parameters: active_source_sync.SourceParameters | dict,
+    def create(cls, source_parameters: active_source_sync.SourceParameters,
                **kwargs) -> active_source_sync.AbstractSyncActiveSourceAPI:
         """Raises an error as the wrapper needs to be transparently inserted and may nto be dynamically instantiated"""
         raise NotImplementedError("The SyncPollingExecutor cannot be automatically instantiated.")
@@ -268,5 +268,5 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
                              f"history data source")
 
     @staticmethod
-    def parameter_model() -> type[active_source_sync.SourceParameters] | None:
-        return None  # Do not enforce a specific parameter model.
+    def parameter_model() -> type[active_source_sync.SourceParameters]:
+        return active_source_sync.SourceParameters  # Do not enforce a specific parameter model.
