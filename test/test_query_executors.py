@@ -20,7 +20,6 @@ import data_crawler.sources.abc.message as msg
 import data_crawler.sources.abc.history as history
 import data_crawler.access.storage as storage
 
-
 import sources.mockup as mockup
 
 logger = logging.getLogger(__name__)
@@ -311,6 +310,98 @@ def test_thread_executor_sink_dynamic_config(mockup_service_config_dynamic, redi
     assert messages[1][-1]["duplicate"] == '"config-key"'
     assert messages[1][-1]["invocations"] == '2'
     assert messages[1][-1]["data"] == '"some-test-nonsense"'
+
+
+@pytest.fixture()
+def mockup_service_config_active(appended_test_path):
+    """Configures a mockup service form the active API"""
+    return {
+        "type": "sources.mockup.ActiveMockupSourceAPI",
+        "source parameter": {},
+        "sink_type": "data_crawler.sinks.redis.RedisStream",
+        "sink_parameters": {
+            "tags": {
+                "source type": "active-mockup-test",
+                "empty": "",
+                "my-number": 0.2,
+                "duplicate": "config-key"
+            },
+        },
+    }
+
+
+def test_thread_executor_active_api_instantiation(mockup_service_config_active, redis_pool):
+    """Tests the dynamic instantiation process of the active API"""
+
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config_active, redis_pool)
+
+    assert isinstance(executor.source_api, mockup.ActiveMockupSourceAPI)
+    api: mockup.ActiveMockupSourceAPI = executor.source_api
+
+    assert isinstance(api.config, mockup.ActiveMockupSourceParameters)
+    assert api.config == mockup.ActiveMockupSourceParameters()
+
+    assert api.start_exec == []
+    assert api.run_exec == []
+    assert api.shutdown_exec == []
+    assert api.stop_exec == []
+
+
+def test_thread_executor_active_api_lifecycle_calls(mockup_service_config_active: dict, redis_pool, redis_stream_name):
+    """Tests the default lifecycle of the thread query executor in an end-to-end fashion"""
+
+    mockup_service_config_active["sink_parameters"]["stream"] = redis_stream_name
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config_active, redis_pool)
+
+    assert isinstance(executor.source_api, mockup.ActiveMockupSourceAPI)
+    api: mockup.ActiveMockupSourceAPI = executor.source_api
+
+    # Perform a standard life cycle
+    executor.start()
+    time.sleep(0.51)
+    executor.shutdown()
+    executor.join()
+
+    # Check the API invocations
+    assert api.start_exec == [0]
+    assert api.run_exec == [1]
+    assert len(api.shutdown_exec) == 1
+    assert len(api.stop_exec) == 1
+    assert 3 <= len(api.run_message_exec) <= 7
+    assert all(i > 1 for i in api.run_message_exec), "Run must be executed strictly after start"
+    assert all(i < api.stop_exec[0] for i in api.run_message_exec), "Run must be executed strictly before stop"
+    assert api.shutdown_exec[0] < api.stop_exec[0], "Shutdown must be called before stop"
+
+
+def test_thread_executor_active_api_lifecycle_message(mockup_service_config_active: dict, redis_pool,
+                                                      redis_stream_name):
+    """Tests the default lifecycle of the thread query executor in an end-to-end fashion"""
+
+    mockup_service_config_active["sink_parameters"]["stream"] = redis_stream_name
+    executor = query_executors.ThreadQueryExecutor(mockup_service_config_active, redis_pool)
+
+    assert isinstance(executor.source_api, mockup.ActiveMockupSourceAPI)
+    api: mockup.ActiveMockupSourceAPI = executor.source_api
+
+    redis_client = redis.Redis(connection_pool=redis_pool)
+
+    # Perform a standard life cycle
+    executor.start()
+    time.sleep(0.51)
+    executor.shutdown()
+    executor.join()
+
+    # Fetch and check the messages
+    messages = redis_client.xrange(redis_stream_name)
+    assert messages is not None
+    assert 3 <= len(messages) <= 7
+    assert len(messages) == len(api.run_message_exec)
+
+    assert messages[0][-1]["source type"] == '"active-mockup-test"'
+    assert messages[0][-1]["empty"] == '""'
+    assert messages[0][-1]["my-number"] == '0.2'
+    assert messages[0][-1]["duplicate"] == '"config-key"'
+    assert messages[0][-1]["message"] == '"got it"'
 
 
 @pytest.fixture()

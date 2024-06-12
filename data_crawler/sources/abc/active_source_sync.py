@@ -122,12 +122,11 @@ class AbstractSyncActiveSourceAPI(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def parameter_model() -> type[SourceParameters] | None:
+    def parameter_model() -> type[SourceParameters]:
         """
         Pydantic model for the parameters the source expects.
 
-        Derive from :class:`SourceParameters` to create a model for a new sink. In case None is returned, the plan
-            dictionary must be passed on the the setup function for compatibility reasons.
+        Derive from :class:`SourceParameters` to create a model for a new sink.
 
         :return: Pydantic model for the sink parameters
         """
