@@ -12,7 +12,6 @@ from data_crawler.sources.abc.message import MessageData
 import data_crawler.sources.abc.abstract_source as abstract_source
 import data_crawler.access.jsonpath as jx
 
-print("${env:DATA_CRAWLER_KNMI_API_KEY}")
 
 class WeatherStationsKNMI(abstract_source.AbstractMultiMessageSourceAPI):
     """Queries the KNMI for the weather station measurements in the Netherlands"""
