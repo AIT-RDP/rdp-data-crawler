@@ -8,20 +8,20 @@ packages = [{include = "data_crawler"}]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
-requests = "^2.31.0"
-cachecontrol = "^0.13.1"
+requests = "^2.31"
+cachecontrol = "~0"
 lockfile = "^0.12.2"
 pandas = "^2.2.0"
 click = "^8.1.7"
-redis = "^5.0.1"
+redis = "^5.0"
 hiredis = "^2.3.2"
-prometheus-client = "^0.19.0"
-pyrdp-commons = {version = "=0.0.0.post33.dev0+8ddc4b3", source = "gitlab-pyrdp-commons"}
+prometheus-client = "~0"
+pyrdp-commons = {version = "=0.0.0.post77.dev0+2754b1b", source = "gitlab-pyrdp-commons"}
 modbus-crawler = {git = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler", rev = "master", optional = true}
 pymodbus = {version = "3.2.2", optional = true}
 filelock = "^3.13.1"
-entsoe-py = "^0.6.6"
-pydantic = "^2.6.1"
+entsoe-py = "~0"
+pydantic = "^2.6"
 jsonpath-ng = "^1.6.1"
 
 [tool.poetry.extras]
