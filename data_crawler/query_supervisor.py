@@ -54,9 +54,13 @@ class AsyncQuerySupervisor:
 
         self._redis_pool = redis_pool
         self._ext_sources = ext_sources
-        self._source_config = source_config
+        self._source_config_dynamic = source_config
+
         self._executors_lock = asyncio.Lock()
         self._executors = self._create_executors(source_config, redis_pool, ext_sources)
+        # Static configuration image to avoid concurrency issues. Will be locked by self._executors_lock as well.
+        self._source_config = source_config.to_built_in_container()
+
         self._config_observer: Optional[asyncio.Task] = None
 
         for name in self._executors.keys():
@@ -121,33 +125,36 @@ class AsyncQuerySupervisor:
         The function will block as long as there may be new configuration changes. It can be safely cancelled to stop
         listening to new changes. Do not call this function more than once at it will overwrite the outdated listeners
         """
-        current_config = self._source_config.to_built_in_container()  # Static image to detect any changes
 
         async def _handle_changes(event: commons.ChangeEvent):
-            new_config = self._source_config.to_built_in_container()
-
-            # Compute new and removed channels
-            new_channels = set(new_config.keys()).difference(current_config.keys())
-            removed_channels = set(current_config.keys()).difference(new_config.keys())
-
-            # Filter the updated channels
-            updated_channels = set(current_config.keys()).intersection(new_config.keys())
-            updated_channels = set(filter(lambda chn: new_config[chn] != current_config[chn], updated_channels))
-
-            # do the restarts
             async with self._executors_lock:
+                new_config = self._source_config_dynamic.to_built_in_container()
+                current_config = self._source_config  # Static image of the current config
+
+                # Compute new and removed channels
+                new_channels = set(new_config.keys()).difference(current_config.keys())
+                removed_channels = set(current_config.keys()).difference(new_config.keys())
+
+                # Filter the updated channels
+                updated_channels = set(current_config.keys()).intersection(new_config.keys())
+                updated_channels = set(filter(lambda chn: new_config[chn] != current_config[chn], updated_channels))
+
+                # Apply the new configuration and do the restarts
+                self._source_config = new_config
                 await self._restart_executor_batch(new_channels, removed_channels, updated_channels)
 
         try:
-            self._source_config.set_on_change(_handle_changes)
-            await self._source_config.watch_and_fire()
+            self._source_config_dynamic.set_on_change(_handle_changes)
+            await self._source_config_dynamic.watch_and_fire()
         finally:
-            self._source_config.set_on_change(None)
+            self._source_config_dynamic.set_on_change(None)
 
     async def _restart_executor_batch(self, new_channels: Iterable[str], removed_channels: Iterable[str],
                                       updated_channels: Iterable[str]):
         """
         Stops and starts a batch of executors
+
+        It is assumed that the executor data is already locked.
         :param new_channels: The new channels to just start
         :param removed_channels: The outdated channels to just stop
         :param updated_channels: The channels to do a full update cycle
