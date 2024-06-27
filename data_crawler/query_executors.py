@@ -2,6 +2,7 @@
 Implements the logic to periodically execute API calls in a dedicated context
 """
 import abc
+import asyncio
 import copy
 import datetime
 import fnmatch
@@ -15,6 +16,7 @@ from typing import Optional, Dict, Any, List, Iterable
 
 import pandas as pd
 import prometheus_client as prom
+import pyrdp_commons as commons
 import redis
 
 import data_crawler.sinks.abc.abstract_sink as abstract_sink
@@ -290,12 +292,14 @@ class ThreadQueryExecutor(_QueryExecutorBase):
         return self._thread.is_alive()
 
 
-class QuerySupervisor:
+class AsyncQuerySupervisor:
     """
     Manages the collection of long-running query executors (and therefore data sources)
 
     The supervisor provides a unified interface to control the life cycle of the individual executors and to monitor
-    their operation. In addition, it supports a restarting mechanism to gracefully restart failed executors.
+    their operation. In addition, it supports a restarting mechanism to gracefully restart failed executors. To be able
+    to efficiently watch for configuration changes or failed query executors, the supervisor is implemented as an
+    asynchronous component.
     """
 
     _prom_source_status = prom.Gauge("data_crawler_source_status", labelnames=["source_name"],
@@ -305,10 +309,13 @@ class QuerySupervisor:
     _prom_supervisor_heartbeat = prom.Counter("data_crawler_supervisor_heartbeat",
                                               documentation="Number of heartbeat invocations")
 
-    def __init__(self, source_config: Dict[str, dict], supervisor_config: dict, redis_pool: redis.ConnectionPool,
+    def __init__(self, source_config: commons.ConfigDict, supervisor_config: dict,
+                 redis_pool: redis.ConnectionPool,
                  ext_sources: Optional[Dict[str, abstract_source.AbstractSourceAPI]] = None):
         """
-        :param source_config: The dictionary of configured data source indexed by their unique name used for debugging
+        :param source_config: The configuration container of configured data source indexed by their unique name used
+            for debugging. It is expected that the supervisor can watch for configuration changes at the configuration
+            container. Hence, the previous dict-based interface is not sufficient anymore.
         :param supervisor_config: The configuration snippet of the supervisor
         :param redis_pool: The redis connection pool to draw the managed connections from
         :param ext_sources: Externally supplied data sources to test the supervisor
@@ -323,15 +330,19 @@ class QuerySupervisor:
         self._ext_sources = ext_sources
         self._source_config = source_config
         self._executors = self._create_executors(source_config, redis_pool, ext_sources)
+        self._config_observer: Optional[asyncio.Task] = None
 
         for name in self._executors.keys():
             self._prom_source_restarted.labels(source_name=name)
             self._prom_source_status.labels(source_name=name).set(4)
 
     @staticmethod
-    def _create_executors(source_config: Dict[str, dict], redis_pool: redis.ConnectionPool,
+    def _create_executors(source_config: commons.ConfigDict, redis_pool: redis.ConnectionPool,
                           ext_sources: Dict[str, abstract_source.AbstractSourceAPI]) -> Dict[str, ThreadQueryExecutor]:
         """Creates the collection of executors"""
+
+        # Only supply the build in containers to avoid concurrency issues when changing the content dynamically.
+        source_config = source_config.to_built_in_container()
 
         # preserve order, hence do not use sets here
         sources = list(source_config.keys()) + [src for src in ext_sources.keys() if src not in source_config]
@@ -343,16 +354,31 @@ class QuerySupervisor:
         }
         return ret
 
-    def start(self):
-        """Starts up all executors"""
+    async def start(self):
+        """Starts up all executors as well as the background task that watches the configuration"""
+
+        assert self._config_observer is None, "the start() function must not me called beforehand"
 
         for ex in self._executors.values():
             ex.start()
         logger.debug(f"Started all {len(self._executors)} threads managed by the supervisor.")
 
-    def stop(self):
+        self._config_observer = asyncio.Task(self._watch_for_config_changes(), name="Configuration Change Observer")
+        logger.debug(f"Start to listen for externally induced configuration changes")
+
+    async def stop(self):
         """Stops and joins all executor threads"""
 
+        # Stop watching for configuration changes and make sure the reloading logic is not operational anymore.
+        assert self._config_observer is not None, "The start() function must be successfully called before"
+        self._config_observer.cancel()
+        try:
+            await self._config_observer
+        except asyncio.CancelledError:
+            pass  # We cancelled the execution so this should be fine.
+        logger.debug(f"Stopped listening for configuration changes")
+
+        # Shutdown and join the executors
         for ex in self._executors.values():
             ex.shutdown()
 
@@ -360,12 +386,61 @@ class QuerySupervisor:
             ex.join()
         logger.debug(f"Stopped all {len(self._executors)} threads managed by the supervisor.")
 
-    def heartbeat(self) -> Dict[str, str]:
+    async def _watch_for_config_changes(self):
+        """
+        Watches for configuration changes and restart the appropriate sources
+
+        The function will block as long as there may be new configuration changes. It can be safely cancelled to stop
+        listening to new changes. Do not call this function more than once at it will overwrite the outdated listeners
+        """
+        current_config = self._source_config.to_built_in_container()  # Static image to detect any changes
+
+        async def _handle_changes(event: commons.ChangeEvent):
+            new_config = self._source_config.to_built_in_container()
+
+            # Compute new and removed channels
+            new_channels = set(new_config.keys()).difference(current_config.keys())
+            removed_channels = set(current_config.keys()).difference(new_config.keys())
+
+            # Filter the updated channels
+            updated_channels = set(current_config.keys()).intersection(new_config.keys())
+            updated_channels = set(filter(lambda chn: new_config[chn] != current_config[chn], updated_channels))
+
+            # do the restarts
+            await self._restart_executor_batch(new_channels, removed_channels, updated_channels)
+
+        try:
+            self._source_config.set_on_change(_handle_changes)
+            await self._source_config.watch_and_fire()
+        finally:
+            self._source_config.set_on_change(None)
+
+    async def _restart_executor_batch(self, new_channels: Iterable[str], removed_channels: Iterable[str],
+                                      updated_channels: Iterable[str]):
+        """
+        Stops and starts a batch of executors
+        :param new_channels: The new channels to just start
+        :param removed_channels: The outdated channels to just stop
+        :param updated_channels: The channels to do a full update cycle
+        """
+
+        for chn in itertools.chain(updated_channels, removed_channels):
+            self._executors[chn].shutdown()
+
+        for chn in itertools.chain(updated_channels, removed_channels):
+            # Since the executor is still not asynchronous, we need to use the blocking join.
+            self._executors[chn].join()
+
+        for chn in itertools.chain(updated_channels, new_channels):
+            self._start_executor(chn)
+
+    async def heartbeat(self) -> Dict[str, str]:
         """
         Performs the check and repair policy of the supervisor
 
         It is advised to regularly call the heartbeat function to be able to collect statistics and repair any failed
-        source.
+        source. The function will return as soon as all check and repair operations are done. In order to support
+        testing, a non-blocking design was chosen that returns the status of each executor for further assessment.
 
         :return: A dictionary of status messages per source
         """
@@ -387,7 +462,7 @@ class QuerySupervisor:
                 self._prom_source_restarted.labels(source_name=ex_name).inc(1)
 
             elif (
-                    status.last_wakeup is not None and
+                    status.last_wakeup is not None and status.max_permitted_cycle_time is not None and
                     ts_now - status.last_wakeup > status.max_permitted_cycle_time + self._dead_timeout and
                     not self._executors[ex_name].is_shutdown_triggered()  # Avoid duplicate shutdown calls
             ):
@@ -399,7 +474,7 @@ class QuerySupervisor:
                 self._prom_source_status.labels(source_name=ex_name).set(1)
 
             elif (
-                    status.last_wakeup is not None and
+                    status.last_wakeup is not None and status.max_permitted_cycle_time is not None and
                     ts_now - status.last_wakeup > status.max_permitted_cycle_time + self._dead_timeout
             ):
                 logger.debug(f"Source {ex_name} reached a timeout and is marked for restart but has not stopped yet.")
