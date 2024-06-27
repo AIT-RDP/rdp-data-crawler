@@ -157,6 +157,10 @@ class AsyncQuerySupervisor:
             # Since the executor is still not asynchronous, we need to use the blocking join.
             self._executors[chn].join()
 
+        for chn in removed_channels:
+            # Delete the executors that are no longer needed
+            del self._executors[chn]
+
         for chn in itertools.chain(updated_channels, new_channels):
             self._start_executor(chn)
 
