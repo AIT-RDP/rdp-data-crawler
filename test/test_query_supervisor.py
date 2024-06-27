@@ -141,8 +141,9 @@ async def test_query_supervisor_life_cycle(mockup_executors_config_container, mo
 
 
 @pytest.mark.asyncio
-async def test_query_supervisor_restart(mockup_executors_config_container, mockup_executors_externals, redis_pool):
-    """Tests the friendly restart policy of the query supervisor"""
+async def test_query_supervisor_restart_passive(mockup_executors_config_container, mockup_executors_externals,
+                                                redis_pool):
+    """Tests the friendly restart policy of the query supervisor targeting a passive source"""
     mockup_executors_config_container = await mockup_executors_config_container
 
     sup_config = {"dead timeout": "0.1s"}
@@ -167,6 +168,46 @@ async def test_query_supervisor_restart(mockup_executors_config_container, mocku
 
     status = await supervisor.heartbeat()
     assert status == {"first": "ok", "second": "restarted", "third": "ok"}
+
+    await asyncio.sleep(0.6)
+
+    status = await supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "ok", "third": "ok"}
+
+    await supervisor.stop()
+
+
+@pytest.mark.asyncio
+async def test_query_supervisor_restart_active(mockup_executors_config_container, mockup_executors_externals,
+                                               redis_pool):
+    """Tests the friendly restart policy of the query supervisor targeting an active source"""
+    mockup_executors_config_container = await mockup_executors_config_container
+
+    # Custom configuration changes
+    mockup_executors_externals["third"].config.track_activity = True
+
+    sup_config = {"dead timeout": "0.1s"}
+    supervisor = query_supervisor.AsyncQuerySupervisor(mockup_executors_config_container, sup_config,
+                                                       redis_pool,
+                                                       mockup_executors_externals)
+    await supervisor.start()
+
+    status = await supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "ok", "third": "ok"}
+
+    mockup_executors_externals["third"].enable_run.clear()  # Block the execution
+    await asyncio.sleep(1.1)
+
+    status = await supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "ok", "third": "stop-by-timeout"}
+    status = await supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "ok", "third": "blocking"}
+
+    mockup_executors_externals["third"].enable_run.set()
+    await asyncio.sleep(0.1)  # Give the second source some time to terminate
+
+    status = await supervisor.heartbeat()
+    assert status == {"first": "ok", "second": "ok", "third": "restarted"}
 
     await asyncio.sleep(0.6)
 

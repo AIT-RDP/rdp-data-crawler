@@ -96,6 +96,7 @@ class ActiveMockupSourceParameters(active_source_sync.SourceParameters):
     sleep_time: float = pydantic.Field(default=0.1)
     repeat: bool = pydantic.Field(default=True)
     messages: list[dict] = pydantic.Field(default=[dict(message="got it")])
+    track_activity: bool = pydantic.Field(default=False)
 
 
 class ActiveMockupSourceAPI(active_source_sync.AbstractSyncActiveSourceAPI):
@@ -118,8 +119,14 @@ class ActiveMockupSourceAPI(active_source_sync.AbstractSyncActiveSourceAPI):
         self.shutdown_exec = []
         self.stop_exec = []
 
+        self._last_wakeup = None
+        self._last_cycle_complete = None
+
         self._config = config
         self._termination_request = threading.Event()
+
+        self.enable_run = threading.Event()
+        self.enable_run.set()
 
     @property
     def config(self) -> ActiveMockupSourceParameters:
@@ -149,13 +156,18 @@ class ActiveMockupSourceAPI(active_source_sync.AbstractSyncActiveSourceAPI):
         if self._config.repeat:
             messages = itertools.cycle(self._config.messages)
         else:
-            messages = self._config.repeat
+            messages = self._config.messages
 
         for message in messages:
+            self._last_wakeup = datetime.datetime.now(tz=datetime.timezone.utc)
+
+            self.enable_run.wait()  # Allow to block the run method to simulate errors
             if self._termination_request.is_set():
                 break
             self.run_message_exec.append(self.draw_invocation_counter())
+
             yield message
+            self._last_cycle_complete = datetime.datetime.now(tz=datetime.timezone.utc)
 
             time.sleep(self._config.sleep_time)
 
@@ -165,6 +177,16 @@ class ActiveMockupSourceAPI(active_source_sync.AbstractSyncActiveSourceAPI):
 
     def stop(self) -> None:
         self.stop_exec.append(self.draw_invocation_counter())
+
+    def get_activity_status(self) -> active_source_sync.ActivityStatus:
+        if self.config.track_activity:
+            return active_source_sync.ActivityStatus(
+                last_wakeup=self._last_wakeup, last_cycle_complete=self._last_cycle_complete,
+                max_permitted_cycle_time=datetime.timedelta(seconds=self.config.sleep_time)
+            )
+        else:
+            return active_source_sync.ActivityStatus(last_wakeup=None, last_cycle_complete=None,
+                                                     max_permitted_cycle_time=None)
 
     @staticmethod
     def parameter_model() -> type[ActiveMockupSourceParameters]:

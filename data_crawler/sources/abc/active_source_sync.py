@@ -22,8 +22,15 @@ class ActivityStatus:
     """
 
     # The datetime of the last wakeup that triggers fetching or processing external information.
+    # Every timestamp must be tz-aware. In case a genuine active source is applied, the last wakeup defines the point in
+    # time when the source receives an information and starts parsing the incoming data. In case no wakeup was observed
+    # or the active source does not record such statistics (not recommended), None may be returned.
     last_wakeup: datetime.datetime | None
+
     # The datetime when the last processing cycle was completed.
+    # Again, every timestamp must be tz-aware. For genuine active sources, the timestamp must be recorded after the
+    # corresponding yield statement returns and the message was delivered to the calling function. In case the cycle was
+    # never completed or the active source does not record such statistics (not recommended), None may be returned.
     last_cycle_complete: datetime.datetime | None
 
     # The maximum allowed time, between two event emissions. In case no such limit can be given, None is to be returned
