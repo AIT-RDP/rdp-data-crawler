@@ -1,6 +1,7 @@
 """
 Implements the main command line interface of the E3 data crawler
 """
+import asyncio
 import dataclasses
 import itertools
 import logging
@@ -12,6 +13,7 @@ from typing import Optional, Iterable, List, Dict
 
 import click
 import prometheus_client as prom
+import pyrdp_commons as commons
 import pyrdp_commons.cli
 import redis
 
@@ -24,7 +26,8 @@ logger = logging.getLogger(__name__)
 class CommandContextInfo:
     """Implements some basic attributes that are passed on to subcommands"""
 
-    config: dict  # The global configuration
+    config_file: str  # The path to the configuration file to parse
+    env: Optional[str]  # An optional path to an environment file
 
 
 def main(argv=None, prog=None):
@@ -51,11 +54,7 @@ def main(argv=None, prog=None):
 def cli(ctx: click.Context, config_file, env):
     """Loads the basic data crawler functionality"""
 
-    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s: %(message)s", level=logging.DEBUG)
-    logger.debug("Parse main YAML configuration file '%s'", config_file)
-    config = pyrdp_commons.cli.setup_app(config_file, env, supported_config_versions={1, 2})
-
-    ctx.obj = CommandContextInfo(config=config)
+    ctx.obj = CommandContextInfo(config_file, env)
 
     if ctx.invoked_subcommand is None:
         warnings.warn("Directly calling the cli without and subcommand is deprecated and will be removed in future. "
@@ -73,21 +72,44 @@ def run(ctx):
     In parallel, the data sources are supervised and restarted, if necessary.
     """
 
-    config = ctx.obj.config
+    asyncio.run(_run_async(ctx.obj))
 
+
+async def _run_async(context_info: CommandContextInfo):
+    """Does the actual heavy lifting and runs the application in an asynchronous context"""
+
+    config = await _setup_application(context_info)
     _startup_prometheus_client(config.get("prometheus client", {}))
 
     redis_pool = _load_redis_connection_pool(config)
     sup_config = config.get("supervision", {})
-    supervisor = query_executors.QuerySupervisor(config["data sources"], sup_config, redis_pool)
-    supervisor.start()
+    supervisor = query_executors.AsyncQuerySupervisor(config["data sources"], sup_config, redis_pool)
+    await supervisor.start()
 
     logger.info(f"Startup of {len(supervisor.source_names)} source(s) complete, press Ctrl+C to exit the data crawler.")
-    _heartbeat_until_termination_request(supervisor)
+    await _heartbeat_until_termination_request(supervisor)
 
     logger.info(f"Begin to shutdown the data crawler.")
-    supervisor.stop()
+    await supervisor.stop()
     logger.info("Bye!")
+
+
+async def _setup_application(context_info: CommandContextInfo) -> commons.ConfigDict:
+    """
+    Sets up the basic application and returns the global configuration
+
+    :param context_info: The context information to read the global configuration from
+    :return: The instantiated dynamic configuration of the program
+    """
+
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s: %(message)s", level=logging.DEBUG)
+    logger.debug("Parse main YAML configuration file '%s'", context_info.config_file)
+    config = await pyrdp_commons.cli.async_setup_app(context_info.config_file, context_info.env,
+                                                     supported_config_versions={1, 2}, dst_type="extended")
+    if not isinstance(config, commons.ConfigDict):
+        raise TypeError(f"The root configuration must be a dictionary, but {type(config)} given.")
+
+    return config
 
 
 @cli.command("fetch")
@@ -103,7 +125,15 @@ def fetch(ctx, filter_expr: Iterable[str], override: Iterable[str], source_names
     likely must be escaped to avoid shell expansion. In case no source is specified, the command will gracefully exit
     without executing a fetch operation.
     """
-    config = ctx.obj.config
+
+    asyncio.run(_fetch_async(ctx.obj, filter_expr, override, source_names))
+
+
+async def _fetch_async(context_info: CommandContextInfo, filter_expr: Iterable[str], override: Iterable[str],
+                       source_names: Iterable[str]):
+    """Does the actual fetch operation in an asynchronous context"""
+
+    config = await _setup_application(context_info)
     filter_configs = _parse_filter_expression(filter_expr)
     override_config = _parse_override_clauses(override)
     redis_pool = _load_redis_connection_pool(config)
@@ -167,12 +197,26 @@ def _startup_prometheus_client(prometheus_config: Optional[dict] = None):
         logger.info(f"Started the prometheus server at http://localhost:{port}")
 
 
-def _heartbeat_until_termination_request(supervisor: query_executors.QuerySupervisor):
+class _ThreadSaveEvent(asyncio.Event):
+    """Implements a thread-save version of the event facility"""
+
+    def __init__(self):
+        super().__init__()
+        self._event_loop = asyncio.get_event_loop()
+
+    def set(self):
+        """Sets the event in a thread-save way"""
+        self._event_loop.call_soon_threadsafe(super().set)
+
+
+async def _heartbeat_until_termination_request(supervisor: query_executors.AsyncQuerySupervisor):
     """Periodically triggers the heart beat until a termination request was received"""
+
+    termination_event = _ThreadSaveEvent()
 
     def _handler(signal_number, _frame):
         logger.debug(f"Received signal {signal_number}. Initiate shutdown.")
-        raise KeyboardInterrupt("The end is near!")
+        termination_event.set()
 
     # Install the signal handlers
     signal_codes = ("SIGTERM", "SIGINT", "SIGBREAK", "SIGHUP")
@@ -182,14 +226,14 @@ def _heartbeat_until_termination_request(supervisor: query_executors.QuerySuperv
         if signal_nr is not None:
             signal.signal(signal_nr, _handler)
 
-    # Sleep until a KeyboardInterrupt it caught
-    # Using an event rather than an exception would be nicer, but exit_event.wait() blocks the signal handler.
-    try:
-        while True:
-            time.sleep(10)
-            supervisor.heartbeat()
-    except KeyboardInterrupt:
-        pass
+    # Loop until the termination signal is received and the event is set
+    pending = [termination_event.wait()]
+    while True:
+        _, pending = await asyncio.wait(pending, timeout=10)
+        if termination_event.is_set():
+            break
+
+        await supervisor.heartbeat()
 
 
 def _load_redis_connection_pool(config: dict) -> redis.ConnectionPool:

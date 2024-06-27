@@ -1,23 +1,18 @@
 """
 Test the query executor services
 """
+import asyncio
 import copy
 import datetime
 import logging
-import os
-import threading
 import time
-import warnings
 from typing import Dict, Any, Optional
 
 import pytest
+import pyrdp_commons as commons
 import redis
 
 import data_crawler.query_executors as query_executors
-import data_crawler.sources.abc.active_source_sync as active_source_sync
-import data_crawler.sources.abc.abstract_source as abstract_sources
-import data_crawler.sources.abc.message as msg
-import data_crawler.sources.abc.history as history
 import data_crawler.access.storage as storage
 
 import sources.mockup as mockup
@@ -415,6 +410,12 @@ def mockup_executors_config(mockup_service_config):
 
 
 @pytest.fixture()
+async def mockup_executors_config_container(mockup_executors_config) -> commons.ConfigDict:
+    """Returns an exemplary executors configuration as a pyrdp-commons container"""
+    return await commons.ConfigDict.create(mockup_executors_config)
+
+
+@pytest.fixture()
 def mockup_executors_externals(mockup_executors_config) -> Dict[str, mockup.PassiveMockupSourceAPI]:
     """Instantiates the mockup executors for the collection"""
     return {
@@ -422,17 +423,20 @@ def mockup_executors_externals(mockup_executors_config) -> Dict[str, mockup.Pass
     }
 
 
-def test_query_supervisor_life_cycle(mockup_executors_config, mockup_executors_externals, redis_pool):
+@pytest.mark.asyncio
+async def test_query_supervisor_life_cycle(mockup_executors_config_container, mockup_executors_externals, redis_pool):
     """Tests the standard life cycle of the supervisor"""
+    mockup_executors_config_container = await mockup_executors_config_container
 
-    supervisor = query_executors.QuerySupervisor(mockup_executors_config, {}, redis_pool, mockup_executors_externals)
-    supervisor.start()
+    supervisor = query_executors.AsyncQuerySupervisor(mockup_executors_config_container, {}, redis_pool,
+                                                      mockup_executors_externals)
+    await supervisor.start()
 
-    status = supervisor.heartbeat()
+    status = await supervisor.heartbeat()
     assert status == {"first": "ok", "second": "ok"}
 
-    time.sleep(0.6)
-    status = supervisor.heartbeat()
+    await asyncio.sleep(0.6)
+    status = await supervisor.heartbeat()
     assert status == {"first": "ok", "second": "ok"}
 
     assert mockup_executors_externals["first"].start_invocations == 1
@@ -443,7 +447,7 @@ def test_query_supervisor_life_cycle(mockup_executors_config, mockup_executors_e
     assert mockup_executors_externals["second"].fetch_invocations >= 1
     assert mockup_executors_externals["second"].stop_invocations == 0
 
-    supervisor.stop()
+    await supervisor.stop()
     assert mockup_executors_externals["first"].start_invocations == 1
     assert mockup_executors_externals["first"].fetch_invocations >= 1
     assert mockup_executors_externals["first"].stop_invocations == 1
@@ -453,65 +457,72 @@ def test_query_supervisor_life_cycle(mockup_executors_config, mockup_executors_e
     assert mockup_executors_externals["second"].stop_invocations == 1
 
 
-def test_query_supervisor_restart(mockup_executors_config, mockup_executors_externals, redis_pool):
+@pytest.mark.asyncio
+async def test_query_supervisor_restart(mockup_executors_config_container, mockup_executors_externals, redis_pool):
     """Tests the friendly restart policy of the query supervisor"""
-    sup_config = {"dead timeout": "0.1s"}
-    supervisor = query_executors.QuerySupervisor(mockup_executors_config, sup_config, redis_pool,
-                                                 mockup_executors_externals)
-    supervisor.start()
+    mockup_executors_config_container = await mockup_executors_config_container
 
-    status = supervisor.heartbeat()
+    sup_config = {"dead timeout": "0.1s"}
+    supervisor = query_executors.AsyncQuerySupervisor(mockup_executors_config_container, sup_config, redis_pool,
+                                                      mockup_executors_externals)
+    await supervisor.start()
+
+    status = await supervisor.heartbeat()
     assert status == {"first": "ok", "second": "ok"}
 
     mockup_executors_externals["second"].enable_fetch.clear()  # Block the execution
-    time.sleep(1.1)
+    await asyncio.sleep(1.1)
 
-    status = supervisor.heartbeat()
+    status = await supervisor.heartbeat()
     assert status == {"first": "ok", "second": "stop-by-timeout"}
-    status = supervisor.heartbeat()
+    status = await supervisor.heartbeat()
     assert status == {"first": "ok", "second": "blocking"}
 
     mockup_executors_externals["second"].enable_fetch.set()
-    time.sleep(0.1)  # Give the second source some time to terminate
+    await asyncio.sleep(0.1)  # Give the second source some time to terminate
 
-    status = supervisor.heartbeat()
+    status = await supervisor.heartbeat()
     assert status == {"first": "ok", "second": "restarted"}
 
-    time.sleep(0.6)
+    await asyncio.sleep(0.6)
 
-    status = supervisor.heartbeat()
+    status = await supervisor.heartbeat()
     assert status == {"first": "ok", "second": "ok"}
 
-    supervisor.stop()
+    await supervisor.stop()
 
 
-def test_query_supervisor_logging(caplog: pytest.LogCaptureFixture, mockup_executors_config, mockup_executors_externals,
-                                  redis_pool):
+@pytest.mark.asyncio
+async def test_query_supervisor_logging(caplog: pytest.LogCaptureFixture, mockup_executors_config_container,
+                                        mockup_executors_externals,
+                                        redis_pool):
     """Tests the log messages when restarting some executors"""
+    mockup_executors_config_container = await mockup_executors_config_container
+
     caplog.set_level(logging.DEBUG, logger="data_crawler")
     sup_config = {"dead timeout": "0.1s"}
-    supervisor = query_executors.QuerySupervisor(mockup_executors_config, sup_config, redis_pool,
-                                                 mockup_executors_externals)
-    supervisor.start()
-    supervisor.heartbeat()
+    supervisor = query_executors.AsyncQuerySupervisor(mockup_executors_config_container, sup_config, redis_pool,
+                                                      mockup_executors_externals)
+    await supervisor.start()
+    await supervisor.heartbeat()
 
     mockup_executors_externals["second"].enable_fetch.clear()  # Block the execution
-    time.sleep(1.1)
+    await asyncio.sleep(1.1)
 
-    supervisor.heartbeat()  # second: "stop-by-timeout"
+    await supervisor.heartbeat()  # second: "stop-by-timeout"
     assert "The source second does not complete its cycle in time" in caplog.text
 
-    supervisor.heartbeat()  # second: "blocking"
+    await supervisor.heartbeat()  # second: "blocking"
     assert "Source second reached a timeout and is marked for restart" in caplog.text
 
     mockup_executors_externals["second"].enable_fetch.set()
-    time.sleep(0.1)  # Give the second source some time to terminate
+    await asyncio.sleep(0.1)  # Give the second source some time to terminate
 
-    supervisor.heartbeat()  # second: "restarted"
+    await supervisor.heartbeat()  # second: "restarted"
     assert "Restart the executor" in caplog.text
 
-    supervisor.heartbeat()
-    supervisor.stop()
+    await supervisor.heartbeat()
+    await supervisor.stop()
 
 
 def test_one_shot_executor_api_instantiation(mockup_service_config, redis_pool):
