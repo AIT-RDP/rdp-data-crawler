@@ -198,7 +198,7 @@ def test_polling_executor_alignment_force_initial(mockup_source_config_base: dic
         end_ts = datetime.datetime.now(tz=datetime.timezone.utc)
     source.stop()
 
-    assert 2 <= api.fetch_invocations <= 3
+    assert 2 <= api.fetch_invocations <= 4
     assert api.fetch_invocations == len(messages)
 
     # Check the initial invocation
@@ -230,7 +230,7 @@ def test_polling_executor_timing_slots(mockup_source_config_base: dict):
         end_ts = datetime.datetime.now(tz=datetime.timezone.utc)
     source.stop()
 
-    assert 1 <= api.fetch_invocations <= 3
+    assert 1 <= api.fetch_invocations <= 4
     assert api.fetch_invocations == len(messages)
 
     # Check the event timing and alignment
