@@ -1,13 +1,15 @@
 """
 Implements some mockup sources used for testing
 """
+import asyncio
 import itertools
 import threading
 import datetime
 import time
-from typing import Optional, Any, Dict, Generator
+from typing import Optional, Any, Dict, Generator, Union, Iterable, AsyncIterator
 
 import pydantic
+import pyrdp_commons as commons
 
 import data_crawler.sources.abc.abstract_source as abstract_sources
 import data_crawler.sources.abc.active_source_sync as active_source_sync
@@ -191,3 +193,41 @@ class ActiveMockupSourceAPI(active_source_sync.AbstractSyncActiveSourceAPI):
     @staticmethod
     def parameter_model() -> type[ActiveMockupSourceParameters]:
         return ActiveMockupSourceParameters
+
+
+class StaticConfigSequenceTemplate(commons.AbstractTemplate):
+    """
+    Implements a configuration template to induce configuration changes
+
+    To indicate a new realization, a dedicated event will be fired
+    """
+
+    def __init__(self, realizations: Union[Iterable[dict], Iterable[list]]):
+        """
+        Sequentially maps to the individual realizations
+
+        :param realizations: The realization to materialize one after another. If the realizations are lists, the
+        template may be used in a list context. Likewise, if the individual elements are dicts, they may be used in a
+        dict context.
+        """
+
+        self._realizations = list(realizations)
+        self._current_content: Union[list, dict] = self._realizations.pop(0)
+        self.event_trigger = asyncio.Semaphore(0) # Release to trigger new events
+
+    async def expand_to_mapping(self, key_template_node) -> dict:
+        assert isinstance(self._current_content, dict)
+        return self._current_content
+
+    async def expand_to_sequences(self) -> list:
+        assert isinstance(self._current_content, list)
+        return self._current_content
+
+    async def subscribe(self) -> AsyncIterator[commons.ChangeEvent]:
+        """Delivers the change events"""
+        while len(self._realizations) > 0:
+            await self.event_trigger.acquire()  # Wait to trigger new events
+
+            self._current_content = self._realizations.pop(0)
+            event = commons.ChangeEvent(commons.ChangeEventType.UPDATE, None, None, self)
+            yield event
