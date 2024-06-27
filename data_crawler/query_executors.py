@@ -211,12 +211,8 @@ class ThreadQueryExecutor(_QueryExecutorBase):
         """
         Returns the Source API object
 
-        The getter is mostly intended for testing purpose any may not be needed otherwise. It will raise an error in
-        case the thread is already started.
+        The getter is mostly intended for testing purpose any may not be needed otherwise.
         """
-
-        if self._thread.is_alive():
-            raise AttributeError("The source_api is accessed while the local executor is already started")
         return super(ThreadQueryExecutor, self).source_api
 
     def start(self):

@@ -226,3 +226,12 @@ class AsyncQuerySupervisor:
     def source_names(self) -> List[str]:
         """The list of managed sources. (Mostly for testing)"""
         return list(self._executors.keys())
+
+    @property
+    def executors(self) -> Dict[str, ThreadQueryExecutor]:
+        """
+        Returns the mapping of executor names and the corresponding executor for testing purpose.
+
+        Do not fiddle around with the execuotrs manually as it could create some havoc.
+        """
+        return self._executors
