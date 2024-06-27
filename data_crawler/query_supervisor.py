@@ -55,6 +55,7 @@ class AsyncQuerySupervisor:
         self._redis_pool = redis_pool
         self._ext_sources = ext_sources
         self._source_config = source_config
+        self._executors_lock = asyncio.Lock()
         self._executors = self._create_executors(source_config, redis_pool, ext_sources)
         self._config_observer: Optional[asyncio.Task] = None
 
@@ -84,10 +85,10 @@ class AsyncQuerySupervisor:
         """Starts up all executors as well as the background task that watches the configuration"""
 
         assert self._config_observer is None, "the start() function must not me called beforehand"
-
-        for ex in self._executors.values():
-            ex.start()
-        logger.debug(f"Started all {len(self._executors)} threads managed by the supervisor.")
+        async with self._executors_lock:
+            for ex in self._executors.values():
+                ex.start()
+            logger.debug(f"Started all {len(self._executors)} threads managed by the supervisor.")
 
         self._config_observer = asyncio.Task(self._watch_for_config_changes(), name="Configuration Change Observer")
         logger.debug(f"Start to listen for externally induced configuration changes")
@@ -105,11 +106,12 @@ class AsyncQuerySupervisor:
         logger.debug(f"Stopped listening for configuration changes")
 
         # Shutdown and join the executors
-        for ex in self._executors.values():
-            ex.shutdown()
+        async with self._executors_lock:
+            for ex in self._executors.values():
+                ex.shutdown()
 
-        for ex in self._executors.values():
-            ex.join()
+            for ex in self._executors.values():
+                ex.join()
         logger.debug(f"Stopped all {len(self._executors)} threads managed by the supervisor.")
 
     async def _watch_for_config_changes(self):
@@ -133,7 +135,8 @@ class AsyncQuerySupervisor:
             updated_channels = set(filter(lambda chn: new_config[chn] != current_config[chn], updated_channels))
 
             # do the restarts
-            await self._restart_executor_batch(new_channels, removed_channels, updated_channels)
+            async with self._executors_lock:
+                await self._restart_executor_batch(new_channels, removed_channels, updated_channels)
 
         try:
             self._source_config.set_on_change(_handle_changes)
@@ -173,6 +176,17 @@ class AsyncQuerySupervisor:
         testing, a non-blocking design was chosen that returns the status of each executor for further assessment.
 
         :return: A dictionary of status messages per source
+        """
+
+        async with self._executors_lock:
+            return await self._heartbeat_unlocked()
+
+    async def _heartbeat_unlocked(self) -> Dict[str, str]:
+        """
+        Performs the actual heartbeat operation but does nto acquire any locks.
+
+        Any caller must either ensure that the object content will not be changed by any outside task or must lock the
+        operation appropriately.
         """
 
         ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
