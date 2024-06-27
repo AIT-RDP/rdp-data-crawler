@@ -18,6 +18,7 @@ import pyrdp_commons.cli
 import redis
 
 import data_crawler.query_executors as query_executors
+import data_crawler.query_supervisor
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ async def _run_async(context_info: CommandContextInfo):
 
     redis_pool = _load_redis_connection_pool(config)
     sup_config = config.get("supervision", {})
-    supervisor = query_executors.AsyncQuerySupervisor(config["data sources"], sup_config, redis_pool)
+    supervisor = data_crawler.query_supervisor.AsyncQuerySupervisor(config["data sources"], sup_config, redis_pool)
     await supervisor.start()
 
     logger.info(f"Startup of {len(supervisor.source_names)} source(s) complete, press Ctrl+C to exit the data crawler.")
@@ -209,7 +210,7 @@ class _ThreadSaveEvent(asyncio.Event):
         self._event_loop.call_soon_threadsafe(super().set)
 
 
-async def _heartbeat_until_termination_request(supervisor: query_executors.AsyncQuerySupervisor):
+async def _heartbeat_until_termination_request(supervisor: data_crawler.query_supervisor.AsyncQuerySupervisor):
     """Periodically triggers the heart beat until a termination request was received"""
 
     termination_event = _ThreadSaveEvent()
