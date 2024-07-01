@@ -10,7 +10,7 @@ import pytest
 import data_crawler.sources.knmi as knmi
 
 @pytest.fixture()
-def simplified_base_response() -> dict:
+def simplified_base_response() -> bytes:
     """Returns a simplified yr.no base response"""
 
     file = os.path.join(__file__, "../../../data/test/2024-06-17-test_knmi.nc")
@@ -38,10 +38,10 @@ def weather_measurements_base_parameters() -> dict:
     return source_parameters
 
 
-def test_location_forecast_parsing(simplified_base_response: dict, weather_measurements_base_parameters: dict):
+def test_location_forecast_parsing(simplified_base_response: bytes, weather_measurements_base_parameters: dict):
     """Tests the parsing and transformation mechanism with a static response"""
 
-    api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_base_parameters)
+    api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_base_parameters, executor_name="<test>")
     response_data = api.fetch_data_bundle(raw_data=simplified_base_response)
 
     assert response_data is not None
