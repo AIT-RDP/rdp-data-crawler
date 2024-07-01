@@ -46,7 +46,7 @@ class WeatherStationsKNMI(abstract_source.AbstractMultiMessageSourceAPI):
         self.stations_to_save = source_parameters['stations_to_save']
 
     def __get_data(self, url, params=None):
-        self.dataset_name.debug(f"Query KNMI API endpoint: {url} with {dict(params)}")
+        self._logger.debug(f"Query KNMI API endpoint: {url} with {params}")
         return requests.get(url, headers=self.headers, params=params).json()
 
     def list_files(self, dataset_name: str, dataset_version: str, params: dict):
