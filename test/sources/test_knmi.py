@@ -3,11 +3,13 @@ Tests the KNMI weather station parser
 """
 import datetime
 import json
+import math
 import os, pickle
 
 import pytest
 
 import data_crawler.sources.knmi as knmi
+
 
 @pytest.fixture()
 def simplified_base_response() -> bytes:
@@ -19,26 +21,27 @@ def simplified_base_response() -> bytes:
     with open(file, "rb") as f:
         return f.read()
 
+
 @pytest.fixture()
 def weather_measurements_base_parameters() -> dict:
     """Returns a set of base parameters for a locationForecast"""
-    source_parameters = {"Authorization"    : os.environ.get("DATA_CRAWLER_KNMI_API_KEY", "---"),
-                         "stations_to_save" : {"BERKHOUT AWS"                   : "06249", 
-                                               "IJMUIDEN"                       : "06225", 
-                                               "DE KOOY VK"                     : "06235", 
-                                               "VLIELAND"                       : "06242", 
-                                               "VOORSCHOTEN AWS"                : "06215", 
-                                               "Hollandse Kust Zuid Alfa (HKZA)": "06216",
-                                               "K14-FA-1C"                      : "06204",
-                                               "WIJDENES WP"                    : "06248",
-                                               "HOUTRIBDIJK WP"                 : "06258",
-                                               "STAVOREN AWS"                   : "06267"},
-                    }
+    source_parameters = {"Authorization": os.environ.get("DATA_CRAWLER_KNMI_API_KEY", "---"),
+                         "stations_to_save": {"BERKHOUT AWS": "06249",
+                                              "IJMUIDEN": "06225",
+                                              "DE KOOY VK": "06235",
+                                              "VLIELAND": "06242",
+                                              "VOORSCHOTEN AWS": "06215",
+                                              "Hollandse Kust Zuid Alfa (HKZA)": "06216",
+                                              "K14-FA-1C": "06204",
+                                              "WIJDENES WP": "06248",
+                                              "HOUTRIBDIJK WP": "06258",
+                                              "STAVOREN AWS": "06267"},
+                         }
 
     return source_parameters
 
 
-def test_location_forecast_parsing(simplified_base_response: bytes, weather_measurements_base_parameters: dict):
+def test_weather_station_parsing(simplified_base_response: bytes, weather_measurements_base_parameters: dict):
     """Tests the parsing and transformation mechanism with a static response"""
 
     api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_base_parameters, executor_name="<test>")
@@ -54,3 +57,32 @@ def test_location_forecast_parsing(simplified_base_response: bytes, weather_meas
     assert type(first_message["longitude"]) == float
     assert type(first_message["latitude"]) == float
     assert type(first_message["wind_direction_10m"]) == list
+
+
+def test_weather_station_online(weather_measurements_base_parameters: dict):
+    """Tests fetching the online response for the KNMI weather station data"""
+
+    api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_base_parameters, executor_name="<test>")
+    response_data = api.fetch_data_bundle()
+    response_data = list(response_data)
+
+    station_ids = set(weather_measurements_base_parameters["stations_to_save"].values())
+
+    t_now = datetime.datetime.now(tz=datetime.timezone.utc)
+    for msg in response_data:
+        # Check observation time
+        assert isinstance(msg["observation_time"], list)
+        assert len(msg["observation_time"]) >= 1
+        obs_time = datetime.datetime.fromisoformat(msg["observation_time"][0])
+        assert t_now - datetime.timedelta(hours=3) <= obs_time <= t_now + datetime.timedelta(minutes=2)
+
+        # Check the device IDs
+        assert isinstance(msg["device_id"], str)
+        assert msg["device_id"] in station_ids
+
+        # check some parameters that must always be present on the selected stations
+        must_have_params = ["air_temperature_2m", "air_pressure_at_sea_level"]
+        for param in must_have_params:
+            assert param in msg
+            assert isinstance(msg[param], list)
+            assert len(msg[param]) >= 1
