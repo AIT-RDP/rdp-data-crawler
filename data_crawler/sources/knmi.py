@@ -1,8 +1,19 @@
 """
-Implements the interface to the yr.no forecasting service
+Implements the interface to the Danish KNMI weather services
+
+The module requires the numerics extras since it has to parse large grid and measurement data files
 """
+
 import pandas as pd
-import xarray as xr
+
+try:
+    # Optional dependencies that come with the 'numerics' extras
+    import xarray as xr
+except ModuleNotFoundError:
+    import warnings
+    warnings.warn("xarray is not found. Most likely the optional 'numerics' dependencies are missing.")
+    raise
+
 from typing import Dict, Any, Generator, Optional
 
 import requests, os
