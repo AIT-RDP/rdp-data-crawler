@@ -39,11 +39,11 @@ class WeatherStationsKNMI(abstract_source.AbstractMultiMessageSourceAPI):
         self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{executor_name}")
 
         self.base_url = "https://api.dataplatform.knmi.nl/open-data/v1"
-        self.headers = {"Authorization": source_parameters["Authorization"]}
+        self.headers = {"Authorization": source_parameters["api_key"]}
         self.params = {"maxKeys": 1, "orderBy": "created", "sorting": "desc"}
         self.dataset_name = "Actuele10mindataKNMIstations"
         self.dataset_version = "2"
-        self.stations_to_save = source_parameters['stations_to_save']
+        self.stations_to_save = source_parameters['stations']
 
     def __get_data(self, url, params=None):
         self._logger.debug(f"Query KNMI API endpoint: {url} with {params}")
@@ -90,7 +90,7 @@ class WeatherStationsKNMI(abstract_source.AbstractMultiMessageSourceAPI):
         tmp_df = xr_object.to_dataframe()  # now a pandas dataframe
 
         tmp_df = tmp_df.loc[
-            tmp_df.index.get_level_values(0).isin(self.stations_to_save.values())]  # select rows (weather stations)
+            tmp_df.index.get_level_values(0).isin(self.stations_to_save)]  # select rows (weather stations)
         tmp_df = tmp_df.reset_index(level=['time'])  # , 'station'])
         tmp_df = tmp_df.reset_index(level=['station'])
         tmp_df = pd.DataFrame(tmp_df)
