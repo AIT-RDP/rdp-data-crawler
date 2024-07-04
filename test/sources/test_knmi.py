@@ -25,17 +25,18 @@ def simplified_base_response() -> bytes:
 @pytest.fixture()
 def weather_measurements_base_parameters() -> dict:
     """Returns a set of base parameters for a locationForecast"""
-    source_parameters = {"Authorization": os.environ.get("DATA_CRAWLER_KNMI_API_KEY", "---"),
-                         "stations_to_save": {"BERKHOUT AWS": "06249",
-                                              "IJMUIDEN": "06225",
-                                              "DE KOOY VK": "06235",
-                                              "VLIELAND": "06242",
-                                              "VOORSCHOTEN AWS": "06215",
-                                              "Hollandse Kust Zuid Alfa (HKZA)": "06216",
-                                              "K14-FA-1C": "06204",
-                                              "WIJDENES WP": "06248",
-                                              "HOUTRIBDIJK WP": "06258",
-                                              "STAVOREN AWS": "06267"},
+    source_parameters = {"api_key": os.environ.get("DATA_CRAWLER_KNMI_API_KEY", "---"),
+                         "stations": ["06249",  # "BERKHOUT AWS"
+                                              "06225",  # "IJMUIDEN"
+                                              "06235",  # "DE KOOY VK"
+                                              "06242",  # "VLIELAND"
+                                              "06215",  # "VOORSCHOTEN AWS"
+                                              "06216",  # "Hollandse Kust Zuid Alfa (HKZA)"
+                                              "06204",  # "K14-FA-1C"
+                                              "06248",  # "WIJDENES WP"
+                                              "06258",  # "HOUTRIBDIJK WP"
+                                              "06267"  # "STAVOREN AWS"
+                                              ],
                          }
 
     return source_parameters
@@ -49,7 +50,7 @@ def test_weather_station_parsing(simplified_base_response: bytes, weather_measur
 
     assert response_data is not None
     list_of_messages = [i for i in response_data]
-    assert len(list(list_of_messages)) == len(weather_measurements_base_parameters['stations_to_save'])
+    assert len(list(list_of_messages)) == len(weather_measurements_base_parameters['stations'])
     first_message: dict = list_of_messages[0]
     assert type(first_message) == dict
     assert first_message["observation_time"] == ['2024-06-17T14:20:00+00:00']
@@ -66,7 +67,7 @@ def test_weather_station_online(weather_measurements_base_parameters: dict):
     response_data = api.fetch_data_bundle()
     response_data = list(response_data)
 
-    station_ids = set(weather_measurements_base_parameters["stations_to_save"].values())
+    station_ids = set(weather_measurements_base_parameters["stations"])
 
     t_now = datetime.datetime.now(tz=datetime.timezone.utc)
     for msg in response_data:
