@@ -4,13 +4,12 @@ Implements the interface to the Danish KNMI weather services
 The module requires the numerics extras since it has to parse large grid and measurement data files
 """
 
-from typing import Dict, Any, Generator, Optional
+from typing import Dict, Generator, Optional
 import io
 import logging
 
 import numpy as np
 import pandas as pd
-import requests
 
 try:
     # Optional dependencies that come with the 'numerics' extras
@@ -22,9 +21,10 @@ except ModuleNotFoundError:
     raise
 
 import data_crawler.sources.abc.abstract_source as abstract_source
+import data_crawler.sources.abc.http_cache as http_cache
 
 
-class WeatherStationsKNMI(abstract_source.AbstractMultiMessageSourceAPI):
+class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMultiMessageSourceAPI):
     """Queries the KNMI for the weather station measurements in the Netherlands"""
 
     def __init__(self, source_parameters, executor_name, **kwargs):
@@ -48,7 +48,7 @@ class WeatherStationsKNMI(abstract_source.AbstractMultiMessageSourceAPI):
 
     def __get_data(self, url, params=None):
         self._logger.debug(f"Query KNMI API endpoint: {url} with {params}")
-        return requests.get(url, headers=self.headers, params=params).json()
+        return self.session.get(url, headers=self.headers, params=params).json()
 
     def list_files(self, dataset_name: str, dataset_version: str, params: dict):
         return self.__get_data(
@@ -82,7 +82,7 @@ class WeatherStationsKNMI(abstract_source.AbstractMultiMessageSourceAPI):
 
             # get the file and load it into an object
             response = self.get_file_url(self.dataset_name, self.dataset_version, latest_file)
-            raw_file_content = requests.get(response["temporaryDownloadUrl"], stream=True)
+            raw_file_content = self.session.get(response["temporaryDownloadUrl"], stream=True)
 
             # raw_data = io.BytesIO(raw_file_content.content)
             raw_data = raw_file_content.content
@@ -126,7 +126,7 @@ class WeatherStationsKNMI(abstract_source.AbstractMultiMessageSourceAPI):
         dataframe["D1H"] *= 100. / 60.  # minutes per one-hour moving average
         dataframe[["dr", "pr"]] *= 100. / (10 * 60.)  # seconds per 10-minutes period
         dataframe[["Q1H", "Q24H"]] *= 1e4 / 3600.  # J/(cm^2) to Wh/m²
-        dataframe["ss"] *= 100. / 10. # % from min per 10 minutes interval
+        dataframe["ss"] *= 100. / 10.  # % from min per 10 minutes interval
 
         # convert time from UTC to timezone aware
         dataframe['time'] = pd.to_datetime(dataframe['time'].dt.tz_localize('UTC'))
