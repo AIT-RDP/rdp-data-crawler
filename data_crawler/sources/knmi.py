@@ -8,6 +8,7 @@ from typing import Dict, Any, Generator, Optional
 import io
 import logging
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -111,17 +112,27 @@ class WeatherStationsKNMI(abstract_source.AbstractMultiMessageSourceAPI):
         Renames all the variables that are already implemented in the dataset. Keeps all the others with the original name.
 
         """
+
+        # Some columns seem to be encoded as binary strings. No idea why.
+        dataframe[["za", "nhc"]] = dataframe[["za", "nhc"]].map(lambda x: np.nan if x == b'' else x)
+
         ft_to_m = 0.3048
         octa_to_percentage = 1. / 8.
         m_to_km = 1. / 1000.
 
         dataframe[["h", "h1", "h2", "h3", "hc", "hc1", "hc2", "hc3"]] *= ft_to_m
-        dataframe[["n", "n1", "n2", "n3"]] *= octa_to_percentage
+        dataframe[["n", "n1", "n2", "n3", "nc", "nc1", "nc2", "nc3", "nhc"]] *= octa_to_percentage
         dataframe["vv"] *= m_to_km
+        dataframe["D1H"] *= 100. / 60.  # minutes per one-hour moving average
+        dataframe[["dr", "pr"]] *= 100. / (10 * 60.)  # seconds per 10-minutes period
+        dataframe[["Q1H", "Q24H"]] *= 1e4 / 3600.  # J/(cm^2) to Wh/m²
+        dataframe["ss"] *= 100. / 10. # % from min per 10 minutes interval
 
         # convert time from UTC to timezone aware
         dataframe['time'] = pd.to_datetime(dataframe['time'].dt.tz_localize('UTC'))
 
+        # Mapping to the AIT RDP scheme. A more detailed documentation can be found at
+        # https://english.knmidata.nl/open-data/actuele10mindataknmistations
         variable_names = {
             "time": "observation_time",  # "ISO TS"),
             "lat": "latitude",  # "deg"),
@@ -129,39 +140,44 @@ class WeatherStationsKNMI(abstract_source.AbstractMultiMessageSourceAPI):
             "height": "altitude",  # "m"),
             "stationname": "location",  # "string"),
             "station": "device_id",  # "string"),
-            "D1H": "rainfall_duration_in_last_h",  # "min"),
+            "D1H": "rainfall_time_fraction_1h",  # "%"),
+            "dr": "precipitation_time_fraction",  # "%"),
             "dd": "wind_direction_10m",  # "°"),
-            "dn": "wind_direction_sensor_min_with_md",  # "°"),
-            "dr": "precipitation_duration_rain_gauge_10min_sum",  # "sec"),
-            "dsd": "wind_direction_10m_stddev",  # "°"),
-            "dx": "wind_direction_sensor_max_with_md",  # "°"),
+            "dn": "wind_direction_10m_min",  # "°"),
+            "dx": "wind_direction_10m_max",  # "°"),
+            "dsd": "wind_direction_10m_std",  # "°"),
             "ff": "wind_speed_10m",  # "m/s"),
-            "ffs": "wind_speed_sensor_avg_with_md",  # "m/s"),
-            "fsd": "wind_speed_stddev",  # "m/s"),
-            "fx": "wind_speed_gust_10m",  # "m/s"),
-            "fxs": "wind_speed_gust_sensor_max",  # "m/s"),
-            "gff": "wind_speed_gust_10m_max_with_md",  # "m/s"),
-            "gffs": "wind_speed_gust_sensor_max_with_md",  # "m/s"),
+            "ffs": "wind_speed_10m_sensor",  # "m/s"),
+            "fsd": "wind_speed_10m_std",  # "m/s"),
+            "gff": "wind_speed_gust_10m",  # "m/s"),
+            "gffs": "wind_speed_gust_10m_sensor",  # "m/s"),
+            "fx": "wind_speed_gust_10m_full_average",  # "m/s"), values without discontinuation filter
+            "fxs": "wind_speed_gust_10m_sensor_full_average",  # "m/s"), values without discontinuation filter
             "h": "cloud_base",  # "m"), # multiply ft_to_m
-            "h1": "cloud_base_first_layer",  # "m"), # multiply ft_to_m
-            "h2": "cloud_base_second_layer",  # "m"), # multiply ft_to_m
-            "h3": "cloud_base_third_layer",  # "m"), # multiply ft_to_m
-            "hc": "cloud_base_ceilometer_algorithm",  # "m"), # multiply ft_to_m
-            "hc1": "cloud_base_ceilometer_first_layer",  # "m"), # multiply ft_to_m
-            "hc2": "cloud_base_ceilometer_second_layer",  # "m"), # multiply ft_to_m
-            "hc3": "cloud_base_ceilometer_third_layer",  # "m"), # multiply ft_to_m
+            "h1": "cloud_base_low",  # "m"), # multiply ft_to_m
+            "h2": "cloud_base_medium",  # "m"), # multiply ft_to_m
+            "h3": "cloud_base_high",  # "m"), # multiply ft_to_m
+            "hc": "cloud_base_ceilometer",  # "m"), # multiply ft_to_m
+            "hc1": "cloud_base_low_ceilometer",  # "m"), # multiply ft_to_m
+            "hc2": "cloud_base_medium_ceilometer",  # "m"), # multiply ft_to_m
+            "hc3": "cloud_base_high_ceilometer",  # "m"), # multiply ft_to_m
             "n": "cloud_area_fraction",  # "%"),# multiply octa_to_percentage
             "n1": "cloud_area_fraction_low",  # "%"),# multiply octa_to_percentage
             "n2": "cloud_area_fraction_medium",  # "%"),# multiply octa_to_percentage
             "n3": "cloud_area_fraction_high",  # "%"),# multiply octa_to_percentage
+            "nc": "cloud_area_fraction_ceilometer",  # "%"),# multiply octa_to_percentage
+            "nc1": "cloud_area_fraction_low_ceilometer",  # "%"),# multiply octa_to_percentage
+            "nc2": "cloud_area_fraction_medium_ceilometer",  # "%"),# multiply octa_to_percentage
+            "nc3": "cloud_area_fraction_high_ceilometer",  # "%"),# multiply octa_to_percentage
+            "nhc": "cloud_area_fraction_low_medium_ceilometer",  # "%"),# multiply octa_to_percentage
             "p0": "air_pressure",  # "hPa"),
             "pp": "air_pressure_at_sea_level",  # "hPa"),
-            "ps": "air_pressure_at_sensor1min",  # "hPa"),
-            "pg": "precipitation_rate",  # "mm/h"),
-            "rg": "precipitation_rate_rain_gauge",  # "mm/h"),
-            "pr": "precipitation_duration_pws_10min_sum",  # "sec"),
-            "Q1H": "global_horizontal_irradiation_1h_sum",  # "J/(cm^2)"),
-            "Q24H": "global_horizontal_irradiation_24h_sum",  # "J/(cm^2)"),
+            "ps": "air_pressure_at_sensor_level",  # "hPa"),
+            "pg": "precipitation_rate_pws",  # "mm/h"),
+            "rg": "precipitation_rate",  # "mm/h"),
+            "pr": "precipitation_time_fraction_pws",  # "%" from "sec/10min"),
+            "Q1H": "global_horizontal_irradiation_1h_sum",  # Wh/m² from "J/(cm^2)"),
+            "Q24H": "global_horizontal_irradiation_24h_sum",  # Wh/m² from "J/(cm^2)"),
             "qg": "global_horizontal_irradiation",  # "W/(m^2)"),
             "qgn": "global_horizontal_irradiation_min",  # "W/(m^2)"),
             "qgx": "global_horizontal_irradiation_max",  # "W/(m^2)"),
@@ -169,54 +185,54 @@ class WeatherStationsKNMI(abstract_source.AbstractMultiMessageSourceAPI):
             "R6H": "rainfall_total_6h",  # "mm"),
             "R12H": "rainfall_total_12h",  # "mm"),
             "R24H": "rainfall_total_24h",  # "mm"),
-            "rh10": "relative_humidity_10min_avg",  # "%"),
-            "Sav1H": "wind_speed_10m_avg_last_1h",  # "m/s"),
-            "Sax1H": "wind_speed_10m_max_last_1h",  # "m/s"),
-            "Sax3H": "wind_speed_10m_max_last_3h",  # "m/s"),
-            "Sax6H": "wind_speed_10m_max_last_6h",  # "m/s"),
+            "rh": "relative_humidity_2m",  # %
+            "rh10": "relative_humidity_2m_10min_avg",  # "%"),
+            "Sav1H": "wind_speed_10m_1h_avg",  # "m/s"),
+            "Sax1H": "wind_speed_10m_1h_max",  # "m/s"),
+            "Sax3H": "wind_speed_10m_3h_max",  # "m/s"),
+            "Sax6H": "wind_speed_10m_6h_max",  # "m/s"),
             "sq": "squall_indicator",  # "code wmo table 4680"),
-            "ss": "sunshine_duration_last_10min",  # "min"),
-            "Sx1H": "wind_speed_gust_max_last_1h",  # "m/s"),
-            "Sx3H": "wind_speed_gust_max_last_3h",  # "m/s"),
-            "Sx6H": "wind_speed_gust_max_last_6h",  # "m/s"),
+            "ss": "sunshine_fraction",  # % from "min per 10 min interval,
+            "Sx1H": "wind_speed_gust_10m_1h_max",  # "m/s"),
+            "Sx3H": "wind_speed_gust_10m_3h_max",  # "m/s"),
+            "Sx6H": "wind_speed_gust_10m_6h_max",  # "m/s"),
             "t10": "air_temperature",  # "°C" ), ## some station don't have either t10 or ta
             "ta": "air_temperature_2m",  # "°C" ), ## actually 1.5 meters, but whatever
             "tb": "wet_bulb_temperature_2m",  # "°C"),
             "tb1": "soil_temperature_5cm",  # "°C"),
+            "Tb1n6": "soil_temperature_5cm_6h_min",  # "°C"),
+            "Tb1x6": "soil_temperature_5cm_6h_max",  # "°C"),
             "tb2": "soil_temperature_10cm",  # "°C"),
+            "Tb2n6": "soil_temperature_10cm_6h_min",  # "°C"),
+            "Tb2x6": "soil_temperature_10cm_6h_max",  # "°C"),
             "tb3": "soil_temperature_20cm",  # "°C"),
             "tb4": "soil_temperature_50cm",  # "°C"),
             "tb5": "soil_temperature_100cm",  # "°C"),
-            "td": "dew_point_temperature_1p5m_1min",  # "°C"),
-            "td10": "dew_point_temperature",  # "°C"),
+            "td": "dew_point_temperature_2m",  # "°C"),
+            "td10": "dew_point_temperature_2m_10min_avg",  # "°C"),
             "tg": "grass_temperature_10cm_10min_avg",  # "°C"),
             "tgn": "grass_temperature_10cm_10min_min",  # "°C"),
-            "Tgn6": "grass_temperature_min_last_6h",  # "°C"),
-            "Tgn12": "grass_temperature_min_last_12h",  # "°C"),
-            "Tgn14": "grass_temperature_min_last_14h",  # "°C"),
-            "tn": "air_temperature_2m_min",  # "°C"),
-            "tx": "air_temperature_2m_max",  # "°C"),
-            "Tn12": "air_temperature_min_last_12h",  # "°C"),
-            "Tn14": "air_temperature_min_last_14h",  # "°C"),
-            "Tn6": "air_temperature_min_last_6h",  # "°C"),
-            "Tx6": "air_temperature_max_last_6h",  # "°C"),
-            "Tx12": "air_temperature_max_last_12h",  # "°C"),
-            "Tx24": "air_temperature_max_last_24h",  # "°C"),
-            "vv": "horizontal_visibility_10min_avg",  # "km"), ## multiply to km
+            "Tgn6": "grass_temperature_6h_min",  # "°C"),
+            "Tgn12": "grass_temperature_12h_min",  # "°C"),
+            "Tgn14": "grass_temperature_14h_min",  # "°C"),
+            "tn": "air_temperature_2m_10min_min",  # "°C"),
+            "tx": "air_temperature_2m_10min_max",  # "°C"),
+            "Tn12": "air_temperature_2m_12h_min",  # "°C"),
+            "Tn14": "air_temperature_2m_14h_min",  # "°C"),
+            "Tn6": "air_temperature_2m_6h_min",  # "°C"),
+            "Tx6": "air_temperature_2m_6h_max",  # "°C"),
+            "Tx12": "air_temperature_2m_12h_max",  # "°C"),
+            "Tx24": "air_temperature_2m_24h_max",  # "°C"),
+            "vv": "visibility",  # "km"), ## multiply to km
             "W10": "past_weather_indicator",  # "code wmo table 4680"),
-            "W10-10": "past_weather_indicator_for_previous_10min",  # "code wmo table 4680"),
+            "W10-10": "past_weather_indicator_10min",  # "code wmo table 4680"),
             "ww": "wawa_weather_code",  # "code wmo table 4680"),
-            "ww-10": "wawa_weather_code_for_previous_10min",  # "code wmo table 4680"),
-            "za": "background_luminance_avg",  # "cd/(m^2)"),
-            "zm": "meteorological_optical_range_avg",  # "m")
+            "ww-10": "wawa_weather_code_10min",  # "code wmo table 4680"),
+            "za": "background_luminance",  # "cd/(m^2)"),
+            "zm": "meteorological_optical_range",  # "m")
         }
         # "tsd"         :      ("siam_ambient_temperature_10min_avg_std_dev"           ,   "°C"),
         # "rh"          :      ("relative_humidity_1p5m_1min_avg"                      ,   "%"),
-        # "nc"          :      ("total_cloud_cover_ceilometer"                         ,   "octa"),# multiply accordingly
-        # "nc1"         :      ("cloud_amount_ceilometer_first_layer"                  ,   "octa"),# multiply accordingly
-        # "nc2"         :      ("cloud_amount_ceilometer_second_layer"                 ,   "octa"),# multiply accordingly
-        # "nc3"         :      ("cloud_amount_ceilometer_third_layer"                  ,   "octa"),# multiply accordingly
-        # "nhc"         :      ("low_and_middle_cloud_amount_ceilometer"               ,   "octa"),# multiply accordingly
         # "pwc"         :      ("corrected_precipitation_type_10min_max"               ,   "code knmi handboek waarnemingen"),
         # "qnh"         :      ("qnh_1min_avg"                                         ,   "hpa"),
 

@@ -14,10 +14,16 @@ air_temperature_min_2m;°C;Float;no;Minimum air temperature at 2m above ground a
 air_temperature_max_2m;°C;Float;no;Maximum air temperature at 2m above ground at the corresponding interval
 air_temperature_5cm;°C;Float;no;Air temperature at 5cm above ground
 apparent_temperature;°C;Float;no;Apparent/Feels-Like temperature
+wet_bulb_temperature_2m;°C;Float;no;Wet bulb temperature measured 2m above ground
 air_pressure;hPa;Float;no;Air pressure at ground level
 air_pressure_at_sea_level;hPa;Float;no;Air pressure at a (hypothetical) sea level
+air_pressure_at_sensor_level;hPa;Float;no;Air pressure at the sensor level
 dew_point_temperature_2m;°C;Float;no;Dew point at 2m above ground
 relative_humidity_2m;%;Float;no;Relative humidity at 2m above ground
+cloud_base;m;Float;no;Lowest altitude of the visible portion of a cloud
+cloud_base_high;m;Float;no;Lowest altitude of the visible portion of a cloud. Third layer.
+cloud_base_medium;m;Float;no;Lowest altitude of the visible portion of a cloud. Second layer.
+cloud_base_low;m;Float;no;Lowest altitude of the visible portion of a cloud. First layer.
 cloud_area_fraction;%;Float;no;Total cloud cover for all heights
 cloud_area_fraction_high;%;Float;no;Cloud cover higher than 5000m above the ground
 cloud_area_fraction_medium;%;Float;no;Cloud cover between 2000 and 5000m above the ground
@@ -27,17 +33,28 @@ global_horizontal_irradiation;W/m^2;Float;no;Global horizontal irradiation
 diffuse_irradiation;W/m^2;Float;no;Diffuse Irradiation
 sunshine_fraction;%;Float;no;Fraction of sunshine time within the last time interval
 uv_index;1;Float;no;Ultraviolet index 0 (low), 11+ (extreme)
+background_luminance;cd/m^2;Float;no;Background luminance
+meteorological_optical_range;m;Float;no;Meteorological optical range that allows to detect a dark object on light ground
 visibility;km;Float;no;Visibility
 wind_direction_10m;°;Float;no;Direction the wind is coming from (0° is north, 90° east, etc.) at 10m above ground
+wind_direction_10m_min;°;Float;no;Minimum direction the wind is coming from (0° is north, 90° east, etc.) at 10m above ground over the last measurement period
+wind_direction_10m_max;°;Float;no;Maximum direction the wind is coming from (0° is north, 90° east, etc.) at 10m above ground over the last measurement period
+wind_direction_10m_std;°;Float;no;Standard deviation of the measured wind direction within the last measurement period
 wind_direction_gust_10m;°;Float;no;Direction the wind gusts are coming from (0° is north, 90° east, etc.) at 10m above ground
 wind_speed_10m;m/s;Float;no;Wind speed at 10m above the ground
+wind_speed_10m_std;m/s;Float;no;Standard deviation of the wind speed above 10m on the ground
 wind_speed_gust_10m;m/s;Float;no;Wind speed of gusts at 10m above the ground
 precipitation_total_6h;mm;Float;no;Total precipitation amount for a 6h period. Covers solid and liquid precipitation. For solid one, the liquid equivalent at ~0°C is used.
 precipitation_total_1h;mm;Float;no;Total precipitation amount for a 1h period. Covers solid and liquid precipitation. For solid one, the liquid equivalent at ~0°C is used.
 precipitation_total_10min;mm;Float;no;Total precipitation amount for a 10 minutes period. Covers solid and liquid precipitation. For solid one, the liquid equivalent at ~0°C is used.
 precipitation_rate;mm/h;Float;no;Liquid equivalent precipitation rate
+precipitation_time_fraction;%;Float;no;Fraction of time precipitation was detected within the last timer period
 rainfall_total_1h;mm;Float;no;The total rainfall amount without solid components for a 1h period
+rainfall_total_6h;mm;Float;no;The total rainfall amount without solid components for a 6h period
+rainfall_total_12h;mm;Float;no;The total rainfall amount without solid components for a 12h period
+rainfall_total_24h;mm;Float;no;The total rainfall amount without solid components for a 24h period
 rainfall_rate;mm/h;Float;no;Rainfall rate without solid components. (If both is mixed, consider precipitation_rate)
+rainfall_time_fraction_1h;%;Float;no;Fraction of time, rainfall was detected within the last 1h
 snowfall_total_1h;mm;Float;no;Total snowfall amount for a 1h period
 snowfall_rate;mm/h;Float;no;Snowfall rate
 snow_depth;mm;Float;no;Vertical depth of any snow cover
@@ -48,6 +65,7 @@ precipitation_probability;%;Float;no;Probability of observing precipitation
 soil_temperature_10_cm;°C;Float;no;Soil temperature 10cm below ground
 soil_temperature_20_cm;°C;Float;no;Soil temperature 20cm below ground
 soil_temperature_50_cm;°C;Float;no;Soil temperature 50cm below ground
+grass_temperature_10cm;°C;Float;no;Grass temperature meausred 10cm above ground
 air_quality_index_epa;1;Float;no;Air quality index [US - EPA standard 0 - +500]
 convective_available_potential_energy;m^2 * s^-2;Float;no;Convectively available potential energy (e.g. used to estimate/forecast the intensity of thunderstorms)
 convective_inhibition;J/kg;Float;no;Convective inhibition
@@ -84,3 +102,4 @@ day_ahead_prices;€/MWh;Float;no;Prices of the day-ahead market
 day_ahead_resolution;min;Integer;no;Resolution of the day-ahead forecasts (15, 30, 60)
 <data_point>_p10;-;-;no;10% percentile of data point <data_point>
 <data_point>_p90;-;-;no;90% percentile of data point <data_point>
+<data_point>_1h_avg;-;-;no;Aggregation scheme of <data point>. The time gives the window and the function (avg/min/max) gives the aggregation
