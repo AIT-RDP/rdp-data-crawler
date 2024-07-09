@@ -119,7 +119,7 @@ class AbstractSyncActiveSourceAPI(abc.ABC):
         Returns the current activity status of the source
 
         The function may be called by any thread. Hence, make sure to avoid any race conditions. Although it is not
-        mandatory to implement the status interface, it is highly adviced to be able to gracefully restart the source
+        mandatory to implement the status interface, it is highly advised to be able to gracefully restart the source
         in case it fails. In case it is not overloaded, a default status without any information is returned.
 
         :return: The current status information on the source activity
