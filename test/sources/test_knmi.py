@@ -5,6 +5,7 @@ import datetime
 import json
 import math
 import os, pickle
+from typing import Iterable
 
 import pytest
 
@@ -12,31 +13,32 @@ import data_crawler.sources.knmi as knmi
 
 
 @pytest.fixture()
-def simplified_base_response() -> bytes:
-    """Returns a simplified yr.no base response"""
+def simplified_base_response() -> Iterable[bytes]:
+    """Returns a simplified KNMI measurement station response with a signle element"""
 
     file = os.path.join(__file__, "../../../data/test/2024-06-17-test_knmi.nc")
     file = os.path.abspath(file)
 
     with open(file, "rb") as f:
-        return f.read()
+        return [f.read()]
 
 
 @pytest.fixture()
 def weather_measurements_base_parameters() -> dict:
     """Returns a set of base parameters for a locationForecast"""
     source_parameters = {"api_key": os.environ.get("DATA_CRAWLER_KNMI_API_KEY", "---"),
-                         "stations": ["06249",  # "BERKHOUT AWS"
-                                              "06225",  # "IJMUIDEN"
-                                              "06235",  # "DE KOOY VK"
-                                              "06242",  # "VLIELAND"
-                                              "06215",  # "VOORSCHOTEN AWS"
-                                              "06216",  # "Hollandse Kust Zuid Alfa (HKZA)"
-                                              "06204",  # "K14-FA-1C"
-                                              "06248",  # "WIJDENES WP"
-                                              "06258",  # "HOUTRIBDIJK WP"
-                                              "06267"  # "STAVOREN AWS"
-                                              ],
+                         "stations": ["06204",  # "K14-FA-1C"
+                                      "06215",  # "VOORSCHOTEN AWS"
+                                      "06216",  # "Hollandse Kust Zuid Alfa (HKZA)"
+                                      "06225",  # "IJMUIDEN"
+                                      "06235",  # "DE KOOY VK"
+                                      "06242",  # "VLIELAND"
+                                      "06248",  # "WIJDENES WP"
+                                      "06249",  # "BERKHOUT AWS"
+                                      "06258",  # "HOUTRIBDIJK WP"
+                                      "06267"  # "STAVOREN AWS"
+                                      ],
+                         "initial_history": "30min"
                          }
 
     return source_parameters
@@ -87,3 +89,39 @@ def test_weather_station_online(weather_measurements_base_parameters: dict):
             assert param in msg
             assert isinstance(msg[param], list)
             assert len(msg[param]) >= 1
+
+
+def test_weather_station_online_consecutive_fetch(weather_measurements_base_parameters: dict):
+    """Tests two consecutive fetch operation and whether the time stamps are properly managed without duplicates"""
+
+    api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_base_parameters, executor_name="<test>")
+
+    t_now = datetime.datetime.now(tz=datetime.timezone.utc)
+    first_response = list(api.fetch_data_bundle())
+    second_response = list(api.fetch_data_bundle())
+
+    assert len(first_response) == len(second_response) or len(second_response) == 0
+    assert len(first_response) >= 1
+
+    for first_msg in first_response:
+        first_obs_times = [datetime.datetime.fromisoformat(t) for t in first_msg["observation_time"]]
+        assert all(
+            t_now - datetime.timedelta(hours=1) <= t <= t_now + datetime.timedelta(minutes=2)
+            for t in first_obs_times
+        )
+
+    # second message set may be empty, but if it is not, the time stamps must be distinct.
+    for first_msg, second_msg in zip(first_response, second_response):
+        first_obs_times = [datetime.datetime.fromisoformat(t) for t in first_msg["observation_time"]]
+        second_obs_times = [datetime.datetime.fromisoformat(t) for t in second_msg["observation_time"]]
+        assert all(
+            t_now - datetime.timedelta(hours=1) <= t <= t_now + datetime.timedelta(minutes=2)
+            for t in second_obs_times
+        )
+
+        # The following asserts assume that there are rarely value updates. Please remove the condition, in case the
+        # assumption does not hold in practice
+        assert 0 <= len(second_obs_times) <= 1
+        duplicated_values = set(first_obs_times).intersection(second_obs_times)
+        assert duplicated_values == set()
+

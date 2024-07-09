@@ -1,10 +1,14 @@
 """
 Implements the interface to the Danish KNMI weather services
 
-The module requires the numerics extras since it has to parse large grid and measurement data files
+The module requires the numerics extras since it has to parse large grid and measurement data files. Documentation can
+be found at the following locations:
+ * Data point description: https://english.knmidata.nl/open-data/actuele10mindataknmistations
+ * API Docs: https://tyk-cdn.dataplatform.knmi.nl/open-data/index.html
 """
-
-from typing import Dict, Generator, Optional
+import datetime
+import itertools
+from typing import Dict, Generator, Optional, Iterable
 import io
 import logging
 
@@ -41,70 +45,107 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
 
         self.base_url = "https://api.dataplatform.knmi.nl/open-data/v1"
         self.headers = {"Authorization": source_parameters["api_key"]}
-        self.params = {"maxKeys": 1, "orderBy": "created", "sorting": "desc"}
         self.dataset_name = "Actuele10mindataKNMIstations"
         self.dataset_version = "2"
         self.stations_to_save = source_parameters['stations']
+
+        initial_history = pd.to_timedelta(source_parameters.get("initial_history", "12h"))
+        self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - initial_history
+
+        self._batch_size = int(source_parameters.get("batch_size", 1000))  # Mostly for testing purpose
 
     def __get_data(self, url, params=None):
         self._logger.debug(f"Query KNMI API endpoint: {url} with {params}")
         return self.session.get(url, headers=self.headers, params=params).json()
 
-    def list_files(self, dataset_name: str, dataset_version: str, params: dict):
-        return self.__get_data(
-            f"{self.base_url}/datasets/{dataset_name}/versions/{dataset_version}/files",
-            params=params,
-        )
+    def _list_updated_files(self, dataset_name: str, dataset_version: str, start_date: datetime.datetime,
+                            end_date: datetime.datetime) -> list[str]:
+        """Lists the files that were updated within the given time frame and returns the corresponding file names"""
+
+        base_params = {
+            "maxKeys": self._batch_size, "orderBy": "lastModified", "sorting": "asc",
+            "begin": start_date.isoformat(), "end": end_date.isoformat()
+        }
+        url = f"{self.base_url}/datasets/{dataset_name}/versions/{dataset_version}/files"
+
+        batches = [self.__get_data(url, params=base_params)]
+        while ("nextPageToken" in batches[-1] and
+               batches[-1]["nextPageToken"] is not None and
+               batches[-1]["nextPageToken"] != ""):
+            batches.append(self.__get_data(url, params={**base_params, "nextPageToken": batches[-1]["nextPageToken"]}))
+
+        file_records = itertools.chain(*[batch["files"] for batch in batches])
+
+        # Filter all timestamps that are smaller than the start_data because the API includes both ends.
+        def _is_new(rec) -> bool:
+            ts = datetime.datetime.fromisoformat(rec["lastModified"]).astimezone(datetime.timezone.utc)
+            return ts > start_date
+
+        file_records = filter(_is_new, file_records)
+        return [rec["filename"] for rec in file_records]
+
+    def _generate_raw_data_blobs(self, dataset_name: str, dataset_version: str, start_date: datetime.datetime,
+                                 end_date: datetime.datetime) -> Generator[bytes, None, None]:
+        """Generator function that yields one content file after another"""
+
+        # get the name of the latest files first
+        updates = self._list_updated_files(self.dataset_name, self.dataset_version, start_date, end_date)
+        for filename in updates:
+            # get the file and load it into an object
+            file_url_response = self.get_file_url(self.dataset_name, self.dataset_version, filename)
+            raw_file_content = self.session.get(file_url_response["temporaryDownloadUrl"], stream=True)
+            yield raw_file_content.content
 
     def get_file_url(self, dataset_name: str, dataset_version: str, file_name: str):
         return self.__get_data(
             f"{self.base_url}/datasets/{dataset_name}/versions/{dataset_version}/files/{file_name}/url"
         )
 
-    @property
-    def static_request_parameters(self) -> Dict[str, str]:
-        """Returns a copy of the static request parameters for testing purpose"""
-        return self._static_request_parameters.copy()
-
-    def fetch_data_bundle(self, raw_data: Optional[bytes] = None) -> Generator:
+    def fetch_data_bundle(self, raw_data: Optional[Iterable[bytes]] = None) -> Generator:
         """
         Fetches the weather station data and translates it into a common Redis-ready nomenclature
 
-        :param raw_data: The raw measurement file for testing purpose. It is not advised to use the parameter
+        :param raw_data: The raw measurement files for testing purpose. It is not advised to use the parameter
             productively.
         :return: The dictionary of forecasts following the common nomenclature. See the AbstractSourceAPI class for more
             information on the expected output format.
         """
+        ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
         if raw_data is None:
-            # get the name of the latest file first
-            response = self.list_files(self.dataset_name, self.dataset_version, self.params)
-            latest_file = response["files"][0].get("filename")
+            raw_data = self._generate_raw_data_blobs(self.dataset_name, self.dataset_version, self._last_query_ts,
+                                                     ts_now)
 
-            # get the file and load it into an object
-            response = self.get_file_url(self.dataset_name, self.dataset_version, latest_file)
-            raw_file_content = self.session.get(response["temporaryDownloadUrl"], stream=True)
+        measurement_collection = []
+        for hdf_data in raw_data:
+            measurements_array = xr.open_dataset(io.BytesIO(hdf_data))  # now an xarray object
+            measurements = measurements_array.to_dataframe()  # now a pandas dataframe
+            # The measurements frame already comes with a MultiIndex with level station/time. The columns correspond to
+            # the individual data fields. Hence, the frames holding a single instance of time can be directly
+            # concatenated
+            measurements = self._filter_stations(measurements)
+            measurement_collection.append(measurements)
 
-            # raw_data = io.BytesIO(raw_file_content.content)
-            raw_data = raw_file_content.content
+        if len(measurement_collection) > 0:
 
-        xr_object = xr.open_dataset(io.BytesIO(raw_data))  # now an xarray object
-        tmp_df = xr_object.to_dataframe()  # now a pandas dataframe
+            # Join all time steps into a common frame for more efficient processing
+            measurements_combined = pd.concat(measurement_collection, axis="index")
+            # put the variables into a proper format
+            measurements_combined = self._beautify_variables(measurements_combined)
+            # Split the bunch of data into individual messages and add auxiliary information
+            messages = self._convert_to_messages(measurements_combined)
 
-        tmp_df = tmp_df.loc[
-            tmp_df.index.get_level_values(0).isin(self.stations_to_save)]  # select rows (weather stations)
-        tmp_df = tmp_df.reset_index(level=['time'])  # , 'station'])
-        tmp_df = tmp_df.reset_index(level=['station'])
-        tmp_df = pd.DataFrame(tmp_df)
+            # return The formatted message data
+            yield from messages
 
-        # put the variables into a proper format
-        tmp_df = self._beautify_variables(tmp_df)
+        self._last_query_ts = ts_now  # Don't use the measurement time as updates may arrive later.
 
-        list_of_dicts = tmp_df.to_dict('records')
+    def _filter_stations(self, measurement_batch: pd.DataFrame) -> pd.DataFrame:
+        """Slices the configured stations based on the station id in the first level of the MultiIndex-Index"""
 
-        return_object = self._convert_dicts(list_of_dicts)
+        batch_filter = measurement_batch.index.get_level_values(0).isin(self.stations_to_save)
+        filtered_batch = measurement_batch.loc[batch_filter]
 
-        # return return_object
-        yield from return_object
+        return filtered_batch
 
     @staticmethod
     def _beautify_variables(dataframe: pd.DataFrame) -> pd.DataFrame:
@@ -112,6 +153,12 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         Renames all the variables that are already implemented in the dataset. Keeps all the others with the original name.
 
         """
+
+        # Add the index information as columns
+        dataframe["station"] = dataframe.index.get_level_values(0)
+        dataframe["time"] = dataframe.index.get_level_values(1)
+
+        dataframe["location"] = dataframe["stationname"].map(lambda x: 'NL-' + x.replace(' ', '-'))
 
         # Some columns seem to be encoded as binary strings. No idea why.
         dataframe[["za", "nhc"]] = dataframe[["za", "nhc"]].map(lambda x: np.nan if x == b'' else x)
@@ -128,8 +175,9 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         dataframe[["Q1H", "Q24H"]] *= 1e4 / 3600.  # J/(cm^2) to Wh/m²
         dataframe["ss"] *= 100. / 10.  # % from min per 10 minutes interval
 
-        # convert time from UTC to timezone aware
-        dataframe['time'] = pd.to_datetime(dataframe['time'].dt.tz_localize('UTC'))
+        # convert time from UTC to timezone aware timestamps
+        dataframe["time"] = dataframe["time"].dt.tz_localize('UTC')
+        dataframe["time"] = dataframe["time"].map(lambda x: x.isoformat())
 
         # Mapping to the AIT RDP scheme. A more detailed documentation can be found at
         # https://english.knmidata.nl/open-data/actuele10mindataknmistations
@@ -138,7 +186,8 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
             "lat": "latitude",  # "deg"),
             "lon": "longitude",  # "deg"),
             "height": "altitude",  # "m"),
-            "stationname": "location",  # "string"),
+            "stationname": "station_name",  # "string"),
+            "location": "location",  # "string"),
             "station": "device_id",  # "string"),
             "D1H": "rainfall_time_fraction_1h",  # "%"),
             "dr": "precipitation_time_fraction",  # "%"),
@@ -243,19 +292,33 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
 
         return dataframe
 
-    @staticmethod
-    def _convert_dicts(input: list):
-        output = []
-        meta_values = ["latitude", "longitude", "altitude", "location", "device_id"]
-        for d in input:
-            tmp_dict = {}
-            for k, v in d.items():
-                if k in meta_values:
-                    tmp_dict[k] = v if not k == 'location' else 'NL-' + v.replace(' ', '-')
-                elif k == 'observation_time':
-                    tmp_dict[k] = [v.isoformat()]
-                else:
-                    tmp_dict[k] = [v]
-            output.append(tmp_dict)
+    def _convert_to_messages(self, measurements_combined: pd.DataFrame) -> Generator[dict, None, None]:
+        """
+        Converts the station/time-indexed frame into a station-based message format.
 
-        return output
+        It is assumed that the columns are already transformed to the destination nomenclature.
+        """
+
+        stations = list(set(measurements_combined.index.get_level_values(0)))
+        stations.sort()  # Mostly to ease testing
+        for station in stations:
+            station_data = measurements_combined.xs(station, level=0, axis="index")
+            message = self._convert_to_message(station_data)
+            yield message
+
+    @staticmethod
+    def _convert_to_message(message_data: pd.DataFrame):
+        """Converts the single message from the data frame to a dict structure"""
+        meta_values = ["latitude", "longitude", "altitude", "location", "device_id"]
+        message_in = message_data.to_dict(orient="list")
+        message_out = {}
+        for msg_key, msg_val in message_in.items():
+            if msg_key in meta_values:
+                assert len(msg_val) >= 1, "At least one message element must be given"
+                assert all(v == msg_val[0] for v in msg_val), "All meta-fields must be equal"
+
+                message_out[msg_key] = msg_val[0]  # Unpack the meta-field
+            else:
+                message_out[msg_key] = msg_val
+
+        return message_out
