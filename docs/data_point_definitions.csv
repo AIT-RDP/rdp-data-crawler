@@ -34,7 +34,7 @@ diffuse_irradiation;W/m^2;Float;no;Diffuse Irradiation
 sunshine_fraction;%;Float;no;Fraction of sunshine time within the last time interval
 uv_index;1;Float;no;Ultraviolet index 0 (low), 11+ (extreme)
 background_luminance;cd/m^2;Float;no;Background luminance
-meteorological_optical_range;m;Float;no;Meteorological optical range that allows to detect a dark object on light ground
+meteorological_optical_range;km;Float;no;Meteorological optical range that allows to detect a dark object on light ground
 visibility;km;Float;no;Visibility
 wind_direction_10m;°;Float;no;Direction the wind is coming from (0° is north, 90° east, etc.) at 10m above ground
 wind_direction_10m_min;°;Float;no;Minimum direction the wind is coming from (0° is north, 90° east, etc.) at 10m above ground over the last measurement period

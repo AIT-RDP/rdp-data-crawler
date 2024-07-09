@@ -150,8 +150,7 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
 
         return filtered_batch
 
-    @staticmethod
-    def _beautify_variables(dataframe: pd.DataFrame) -> pd.DataFrame:
+    def _beautify_variables(self, dataframe: pd.DataFrame) -> pd.DataFrame:
         """
         Renames all the variables that are already implemented in the dataset. Keeps all the others with the original name.
 
@@ -172,7 +171,7 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
 
         dataframe[["h", "h1", "h2", "h3", "hc", "hc1", "hc2", "hc3"]] *= ft_to_m
         dataframe[["n", "n1", "n2", "n3", "nc", "nc1", "nc2", "nc3", "nhc"]] *= octa_to_percentage
-        dataframe["vv"] *= m_to_km
+        dataframe[["vv", "zm"]] *= m_to_km
         dataframe["D1H"] *= 100. / 60.  # minutes per one-hour moving average
         dataframe[["dr", "pr"]] *= 100. / (10 * 60.)  # seconds per 10-minutes period
         dataframe[["Q1H", "Q24H"]] *= 1e4 / 3600.  # J/(cm^2) to Wh/m²
@@ -192,41 +191,41 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
             "stationname": "station_name",  # "string"),
             "location": "location",  # "string"),
             "station": "device_id",  # "string"),
-            "D1H": "rainfall_time_fraction_1h",  # "%"),
-            "dr": "precipitation_time_fraction",  # "%"),
-            "dd": "wind_direction_10m",  # "°"),
+            "dd": "wind_direction_10m",  # "°"), values with marked discontinuation detection (md)
             "dn": "wind_direction_10m_min",  # "°"),
             "dx": "wind_direction_10m_max",  # "°"),
             "dsd": "wind_direction_10m_std",  # "°"),
-            "ff": "wind_speed_10m",  # "m/s"),
+            "ff": "wind_speed_10m_md",  # "m/s"),
             "ffs": "wind_speed_10m_sensor",  # "m/s"),
             "fsd": "wind_speed_10m_std",  # "m/s"),
-            "gff": "wind_speed_gust_10m",  # "m/s"),
+            "gff": "wind_speed_gust_10m_md",  # "m/s"),
             "gffs": "wind_speed_gust_10m_sensor",  # "m/s"),
             "fx": "wind_speed_gust_10m_full_average",  # "m/s"), values without discontinuation filter
             "fxs": "wind_speed_gust_10m_sensor_full_average",  # "m/s"), values without discontinuation filter
-            "h": "cloud_base",  # "m"), # multiply ft_to_m
-            "h1": "cloud_base_low",  # "m"), # multiply ft_to_m
-            "h2": "cloud_base_medium",  # "m"), # multiply ft_to_m
-            "h3": "cloud_base_high",  # "m"), # multiply ft_to_m
+            "h": "cloud_base_standard",  # "m"), # multiply ft_to_m
+            "h1": "cloud_base_low_standard",  # "m"), # multiply ft_to_m
+            "h2": "cloud_base_medium_standard",  # "m"), # multiply ft_to_m
+            "h3": "cloud_base_high_standard",  # "m"), # multiply ft_to_m
             "hc": "cloud_base_ceilometer",  # "m"), # multiply ft_to_m
             "hc1": "cloud_base_low_ceilometer",  # "m"), # multiply ft_to_m
             "hc2": "cloud_base_medium_ceilometer",  # "m"), # multiply ft_to_m
             "hc3": "cloud_base_high_ceilometer",  # "m"), # multiply ft_to_m
-            "n": "cloud_area_fraction",  # "%"),# multiply octa_to_percentage
-            "n1": "cloud_area_fraction_low",  # "%"),# multiply octa_to_percentage
-            "n2": "cloud_area_fraction_medium",  # "%"),# multiply octa_to_percentage
-            "n3": "cloud_area_fraction_high",  # "%"),# multiply octa_to_percentage
+            "n": "cloud_area_fraction_standard",  # "%"),# multiply octa_to_percentage
+            "n1": "cloud_area_fraction_low_standard",  # "%"),# multiply octa_to_percentage
+            "n2": "cloud_area_fraction_medium_standard",  # "%"),# multiply octa_to_percentage
+            "n3": "cloud_area_fraction_high_standard",  # "%"),# multiply octa_to_percentage
             "nc": "cloud_area_fraction_ceilometer",  # "%"),# multiply octa_to_percentage
             "nc1": "cloud_area_fraction_low_ceilometer",  # "%"),# multiply octa_to_percentage
             "nc2": "cloud_area_fraction_medium_ceilometer",  # "%"),# multiply octa_to_percentage
             "nc3": "cloud_area_fraction_high_ceilometer",  # "%"),# multiply octa_to_percentage
             "nhc": "cloud_area_fraction_low_medium_ceilometer",  # "%"),# multiply octa_to_percentage
-            "p0": "air_pressure",  # "hPa"),
+            "p0": "air_pressure_at_station_level",  # "hPa"),
             "pp": "air_pressure_at_sea_level",  # "hPa"),
             "ps": "air_pressure_at_sensor_level",  # "hPa"),
             "pg": "precipitation_rate_pws",  # "mm/h"),
-            "rg": "precipitation_rate",  # "mm/h"),
+            "rg": "precipitation_rate_gauge",  # "mm/h"),
+            "D1H": "rainfall_time_fraction_1h",  # "%"),
+            "dr": "precipitation_time_fraction_gauge",  # "%" from "sec/10min"),
             "pr": "precipitation_time_fraction_pws",  # "%" from "sec/10min"),
             "Q1H": "global_horizontal_irradiation_1h_sum",  # Wh/m² from "J/(cm^2)"),
             "Q24H": "global_horizontal_irradiation_24h_sum",  # Wh/m² from "J/(cm^2)"),
@@ -237,7 +236,7 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
             "R6H": "rainfall_total_6h",  # "mm"),
             "R12H": "rainfall_total_12h",  # "mm"),
             "R24H": "rainfall_total_24h",  # "mm"),
-            "rh": "relative_humidity_2m",  # %
+            "rh": "relative_humidity_2m_1min_avg",  # %
             "rh10": "relative_humidity_2m_10min_avg",  # "%"),
             "Sav1H": "wind_speed_10m_1h_avg",  # "m/s"),
             "Sax1H": "wind_speed_10m_1h_max",  # "m/s"),
@@ -248,8 +247,8 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
             "Sx1H": "wind_speed_gust_10m_1h_max",  # "m/s"),
             "Sx3H": "wind_speed_gust_10m_3h_max",  # "m/s"),
             "Sx6H": "wind_speed_gust_10m_6h_max",  # "m/s"),
-            "t10": "air_temperature",  # "°C" ), ## some station don't have either t10 or ta
-            "ta": "air_temperature_2m",  # "°C" ), ## actually 1.5 meters, but whatever
+            "t10": "air_temperature_10min_avg",  # "°C" ), ## some station don't have either t10 or ta
+            "ta": "air_temperature_2m_10min_avg",  # "°C" ), ## actually 1.5 meters, but whatever
             "tb": "wet_bulb_temperature_2m",  # "°C"),
             "tb1": "soil_temperature_5cm",  # "°C"),
             "Tb1n6": "soil_temperature_5cm_6h_min",  # "°C"),
@@ -260,7 +259,7 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
             "tb3": "soil_temperature_20cm",  # "°C"),
             "tb4": "soil_temperature_50cm",  # "°C"),
             "tb5": "soil_temperature_100cm",  # "°C"),
-            "td": "dew_point_temperature_2m",  # "°C"),
+            "td": "dew_point_temperature_2m_1min_avg",  # "°C"),
             "td10": "dew_point_temperature_2m_10min_avg",  # "°C"),
             "tg": "grass_temperature_10cm_10min_avg",  # "°C"),
             "tgn": "grass_temperature_10cm_10min_min",  # "°C"),
@@ -275,25 +274,61 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
             "Tx6": "air_temperature_2m_6h_max",  # "°C"),
             "Tx12": "air_temperature_2m_12h_max",  # "°C"),
             "Tx24": "air_temperature_2m_24h_max",  # "°C"),
-            "vv": "visibility",  # "km"), ## multiply to km
+            "vv": "horizontal_visibility",  # "km"), ## multiply to km
             "W10": "past_weather_indicator",  # "code wmo table 4680"),
             "W10-10": "past_weather_indicator_10min",  # "code wmo table 4680"),
             "ww": "wawa_weather_code",  # "code wmo table 4680"),
             "ww-10": "wawa_weather_code_10min",  # "code wmo table 4680"),
             "za": "background_luminance",  # "cd/(m^2)"),
-            "zm": "meteorological_optical_range",  # "m")
+            "zm": "meteorological_optical_range",  # "km", # multiply to km
         }
         # "tsd"         :      ("siam_ambient_temperature_10min_avg_std_dev"           ,   "°C"),
-        # "rh"          :      ("relative_humidity_1p5m_1min_avg"                      ,   "%"),
         # "pwc"         :      ("corrected_precipitation_type_10min_max"               ,   "code knmi handboek waarnemingen"),
         # "qnh"         :      ("qnh_1min_avg"                                         ,   "hpa"),
 
         # make a subselection of the dataframe
         dataframe = dataframe[variable_names.keys()]
-
         dataframe = dataframe.rename(columns=variable_names)
 
+        # Join series to virtual sensors that are more likely present
+        joined_sensors = {
+            "precipitation_rate": ["precipitation_rate_pws", "precipitation_rate_gauge"],
+            "precipitation_time_fraction": ["precipitation_time_fraction_pws", "precipitation_time_fraction_gauge"],
+            "air_pressure": ["air_pressure_at_station_level", "air_pressure_at_sensor_level"],
+            "wind_speed_gust_10m": ["wind_speed_gust_10m_md", "wind_speed_gust_10m_sensor",
+                                    "wind_speed_gust_10m_full_average"],
+            "wind_speed_10m": ["wind_speed_10m_md", "wind_speed_10m_sensor"],
+            "cloud_base": ["cloud_base_standard", "cloud_base_ceilometer"],
+            "cloud_base_low": ["cloud_base_low_standard", "cloud_base_low_ceilometer"],
+            "cloud_base_medium": ["cloud_base_medium_standard", "cloud_base_medium_ceilometer"],
+            "cloud_base_high": ["cloud_base_high_standard", "cloud_base_high_ceilometer"],
+            "cloud_area_fraction": ["cloud_area_fraction_standard", "cloud_area_fraction_ceilometer"],
+            "cloud_area_fraction_low": ["cloud_area_fraction_low_standard", "cloud_area_fraction_low_ceilometer"],
+            "cloud_area_fraction_medium": ["cloud_area_fraction_medium_standard",
+                                           "cloud_area_fraction_medium_ceilometer"],
+            "cloud_area_fraction_high": ["cloud_area_fraction_high_standard", "cloud_area_fraction_high_ceilometer"],
+            "relative_humidity_2m": ["relative_humidity_2m_1min_avg", "relative_humidity_2m_10min_avg"],
+            "air_temperature_2m": ["air_temperature_2m_10min_avg", "air_temperature_10min_avg"],
+            "dew_point_temperature_2m": ["dew_point_temperature_2m_1min_avg", "dew_point_temperature_2m_10min_avg"],
+            "visibility": ["horizontal_visibility", "meteorological_optical_range"],
+        }
+        for dst, src in joined_sensors.items():
+            dataframe[dst] = self._to_joined_sensor(dataframe, *src)
+
         return dataframe
+
+    @staticmethod
+    def _to_joined_sensor(data, *args: Iterable[pd.Series]) -> pd.Series:
+        """Parses the series in args and takes the first value that is not NaN"""
+        args = list(args)
+        assert len(args) > 0
+
+        candidates = [data[a] for a in args]
+
+        ret: pd.Series = candidates[0]
+        for ovr in candidates[1:]:
+            ret = ret.where(~ret.isna(), ovr)
+        return ret
 
     def _convert_to_messages(self, measurements_combined: pd.DataFrame) -> Generator[dict, None, None]:
         """
