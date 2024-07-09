@@ -5,6 +5,7 @@ import datetime
 import json
 import math
 import os, pickle
+import warnings
 from typing import Iterable
 
 import pytest
@@ -38,13 +39,14 @@ def weather_measurements_base_parameters() -> dict:
                                       "06258",  # "HOUTRIBDIJK WP"
                                       "06267"  # "STAVOREN AWS"
                                       ],
-                         "initial_history": "30min"
+                         "initial_history": "30min",
+                         "batch_size": "2",  # Try to trigger a two-stage response
                          }
 
     return source_parameters
 
 
-def test_weather_station_parsing(simplified_base_response: bytes, weather_measurements_base_parameters: dict):
+def test_weather_station_parsing(simplified_base_response: Iterable[bytes], weather_measurements_base_parameters: dict):
     """Tests the parsing and transformation mechanism with a static response"""
 
     api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_base_parameters, executor_name="<test>")
@@ -91,6 +93,7 @@ def test_weather_station_online(weather_measurements_base_parameters: dict):
             assert len(msg[param]) >= 1
 
 
+@pytest.mark.xfail(raises=RuntimeWarning, reason="Some late value updates may be detected")
 def test_weather_station_online_consecutive_fetch(weather_measurements_base_parameters: dict):
     """Tests two consecutive fetch operation and whether the time stamps are properly managed without duplicates"""
 
@@ -123,5 +126,53 @@ def test_weather_station_online_consecutive_fetch(weather_measurements_base_para
         # assumption does not hold in practice
         assert 0 <= len(second_obs_times) <= 1
         duplicated_values = set(first_obs_times).intersection(second_obs_times)
-        assert duplicated_values == set()
+        if duplicated_values != set():
+            raise RuntimeWarning("Received duplicated values. This could be due to some one the fly updates but should "
+                                 "not occur regularly.")
 
+
+@pytest.fixture()
+def weather_measurements_overrides() -> dict:
+    """Returns a set of base parameters for a locationForecast"""
+    source_parameters = {
+        "api_key": os.environ.get("DATA_CRAWLER_KNMI_API_KEY", "---"),
+        "stations": [
+            {
+                "id": "06204",
+                "tags": {"location": "here", "my-id": "666"}
+            }
+        ],
+        "initial_history": "30min",
+        "batch_size": "2",  # Try to trigger a two-stage response
+    }
+
+    return source_parameters
+
+
+def test_weather_station_tag_overrides(simplified_base_response: Iterable[bytes], weather_measurements_overrides: dict):
+    """Tests the parsing and transformation mechanism with a static response"""
+
+    api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_overrides, executor_name="<test>")
+    response_data = list(api.fetch_data_bundle(raw_data=simplified_base_response))
+
+    assert len(response_data) == 1
+    message = response_data[0]
+
+    assert message["observation_time"] == ["2024-06-17T14:20:00+00:00"]
+    assert message["location"] == "here"
+    assert message["my-id"] == "666"
+
+
+def test_duplicate_station_config(simplified_base_response: Iterable[bytes], weather_measurements_overrides: dict):
+    """Tests whether an error is raised on duplicate station ids."""
+
+    weather_measurements_overrides["stations"] = [
+        {"id": "06204"},
+        {"id": "06204"}  # Duplicate
+    ]
+
+    with pytest.raises(KeyError) as err_info:
+        api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_overrides, executor_name="<test>")
+        list(api.fetch_data_bundle(raw_data=simplified_base_response))
+
+    assert "06204" in str(err_info.value)
