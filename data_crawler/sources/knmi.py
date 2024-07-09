@@ -47,7 +47,10 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         self.headers = {"Authorization": source_parameters["api_key"]}
         self.dataset_name = "Actuele10mindataKNMIstations"
         self.dataset_version = "2"
-        self.stations_to_save = source_parameters['stations']
+        self._station_config = [
+            {"id": st} if isinstance(st, str) else st
+            for st in source_parameters['stations']
+        ]
 
         initial_history = pd.to_timedelta(source_parameters.get("initial_history", "12h"))
         self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - initial_history
@@ -126,7 +129,6 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
             measurement_collection.append(measurements)
 
         if len(measurement_collection) > 0:
-
             # Join all time steps into a common frame for more efficient processing
             measurements_combined = pd.concat(measurement_collection, axis="index")
             # put the variables into a proper format
@@ -141,8 +143,8 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
 
     def _filter_stations(self, measurement_batch: pd.DataFrame) -> pd.DataFrame:
         """Slices the configured stations based on the station id in the first level of the MultiIndex-Index"""
-
-        batch_filter = measurement_batch.index.get_level_values(0).isin(self.stations_to_save)
+        registered_stations = set(cnf["id"] for cnf in self._station_config)
+        batch_filter = measurement_batch.index.get_level_values(0).isin(registered_stations)
         filtered_batch = measurement_batch.loc[batch_filter]
 
         return filtered_batch
@@ -304,6 +306,11 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         for station in stations:
             station_data = measurements_combined.xs(station, level=0, axis="index")
             message = self._convert_to_message(station_data)
+
+            # Override fields fixed by tags
+            tags = self._get_station_config(station).get("tags", {})
+            message = {**message, **tags}
+
             yield message
 
     @staticmethod
@@ -322,3 +329,12 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
                 message_out[msg_key] = msg_val
 
         return message_out
+
+    def _get_station_config(self, station_id: str) -> dict:
+        """Returns the station specific configuration for the particular station"""
+
+        cnf_candidates = list(filter(lambda x: x["id"] == station_id, self._station_config))
+        if len(cnf_candidates) != 1:
+            raise KeyError(f"Expect exactly one station entry for ID {station_id}, but {len(cnf_candidates)} found.")
+
+        return cnf_candidates[0]
