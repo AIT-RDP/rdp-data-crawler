@@ -56,6 +56,7 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - initial_history
 
         self._batch_size = int(source_parameters.get("batch_size", 1000))  # Mostly for testing purpose
+        self._drop_missing_observations = source_parameters.get("drop_missing_observations", False)
 
     def __get_data(self, url, params=None):
         self._logger.debug(f"Query KNMI API endpoint: {url} with {params}")
@@ -313,9 +314,12 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
 
             yield message
 
-    @staticmethod
-    def _convert_to_message(message_data: pd.DataFrame):
+    def _convert_to_message(self, message_data: pd.DataFrame):
         """Converts the single message from the data frame to a dict structure"""
+
+        if self._drop_missing_observations:
+            message_data = message_data.dropna(axis="columns", how="all")
+
         meta_values = ["latitude", "longitude", "altitude", "location", "device_id"]
         message_in = message_data.to_dict(orient="list")
         message_out = {}

@@ -2,10 +2,8 @@
 Tests the KNMI weather station parser
 """
 import datetime
-import json
 import math
-import os, pickle
-import warnings
+import os
 from typing import Iterable
 
 import pytest
@@ -62,6 +60,9 @@ def test_weather_station_parsing(simplified_base_response: Iterable[bytes], weat
     assert type(first_message["longitude"]) == float
     assert type(first_message["latitude"]) == float
     assert type(first_message["wind_direction_10m"]) == list
+
+    assert len(first_message["soil_temperature_5cm"]) == 1
+    assert all(math.isnan(v) for v in first_message["soil_temperature_5cm"])
 
 
 def test_weather_station_online(weather_measurements_base_parameters: dict):
@@ -144,6 +145,7 @@ def weather_measurements_overrides() -> dict:
         ],
         "initial_history": "30min",
         "batch_size": "2",  # Try to trigger a two-stage response
+        "drop_missing_observations": True,  # Remove observations that are not present
     }
 
     return source_parameters
@@ -161,6 +163,23 @@ def test_weather_station_tag_overrides(simplified_base_response: Iterable[bytes]
     assert message["observation_time"] == ["2024-06-17T14:20:00+00:00"]
     assert message["location"] == "here"
     assert message["my-id"] == "666"
+
+
+def test_weather_station_drop_missing(simplified_base_response: Iterable[bytes], weather_measurements_overrides: dict):
+    """Tests whether missing observations are successfully dropped"""
+
+    api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_overrides, executor_name="<test>")
+    response_data = list(api.fetch_data_bundle(raw_data=simplified_base_response))
+
+    assert len(response_data) == 1
+    message = response_data[0]
+
+    # Check whether all purely-nan based series have been dropped
+    for val in message.values():
+        if isinstance(val, list):
+            assert all(not isinstance(v, float) for v in val) or not all(math.isnan(v) for v in val)
+        else:
+            assert val is not None
 
 
 def test_duplicate_station_config(simplified_base_response: Iterable[bytes], weather_measurements_overrides: dict):
