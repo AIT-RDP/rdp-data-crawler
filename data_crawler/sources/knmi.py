@@ -166,7 +166,7 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         dataframe[["za", "nhc"]] = dataframe[["za", "nhc"]].map(lambda x: np.nan if x == b'' else x)
 
         ft_to_m = 0.3048
-        octa_to_percentage = 1. / 8.
+        octa_to_percentage = 100. / 8.
         m_to_km = 1. / 1000.
 
         dataframe[["h", "h1", "h2", "h3", "hc", "hc1", "hc2", "hc3"]] *= ft_to_m
