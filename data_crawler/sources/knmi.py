@@ -129,6 +129,9 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
             measurements = self._filter_stations(measurements)
             measurement_collection.append(measurements)
 
+        self._logger.debug(f"Fetched {len(measurement_collection)} raw data sets from the KNMI API. Start "
+                           f"extracting {len(self._station_config)} stations.")
+
         if len(measurement_collection) > 0:
             # Join all time steps into a common frame for more efficient processing
             measurements_combined = pd.concat(measurement_collection, axis="index")
@@ -139,7 +142,9 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
 
             # return The formatted message data
             yield from messages
-
+            self._logger.debug(f"Extracted the information from all {len(self._station_config)} measurement stations.")
+        else:
+            self._logger.debug("No new measurements detected. Skip the cycle.")
         self._last_query_ts = ts_now  # Don't use the measurement time as updates may arrive later.
 
     def _filter_stations(self, measurement_batch: pd.DataFrame) -> pd.DataFrame:
