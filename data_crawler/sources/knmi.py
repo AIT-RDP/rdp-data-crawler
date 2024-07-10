@@ -8,7 +8,7 @@ be found at the following locations:
 """
 import datetime
 import itertools
-from typing import Dict, Generator, Optional, Iterable
+from typing import Dict, Generator, Optional, Iterable, Union
 import io
 import logging
 
@@ -47,10 +47,7 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         self.headers = {"Authorization": source_parameters["api_key"]}
         self.dataset_name = "Actuele10mindataKNMIstations"
         self.dataset_version = "2"
-        self._station_config = [
-            {"id": st} if isinstance(st, str) else st
-            for st in source_parameters['stations']
-        ]
+        self._station_config = self._extract_station_config(source_parameters['stations'])
 
         initial_history = pd.to_timedelta(source_parameters.get("initial_history", "12h"))
         self._last_query_ts = datetime.datetime.now(tz=datetime.timezone.utc) - initial_history
@@ -59,6 +56,27 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         self._drop_missing_observations = source_parameters.get("drop_missing_observations", False)
 
         self._logger.debug(f"Initialized the station extraction for {self._station_config}")
+
+    @staticmethod
+    def _extract_station_config(station_config: Union[list, dict]) -> dict:
+        """Normalizes and validates the station config."""
+        # Normalize the structure
+        ret_config = [
+            {"id": st} if not isinstance(st, dict) else st
+            for st in station_config
+        ]
+
+        # Parse the ids to integers
+        for st_index, st_config in enumerate(ret_config):
+            if "id" not in st_config:
+                raise KeyError(f"The {st_config + 1}-rd station config does not have an 'id' property: {st_config}")
+            st_config["id"] = int(st_config["id"])
+
+        # Check duplicate IDs
+        if len(set(x["id"] for x in ret_config)) < len(ret_config):
+            raise KeyError(f"Duplicate station IDs found, please check the configuration: {ret_config}")
+
+        return ret_config
 
     def __get_data(self, url, params=None):
         self._logger.debug(f"Query KNMI API endpoint: {url} with {params}")
@@ -152,8 +170,10 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
 
     def _filter_stations(self, measurement_batch: pd.DataFrame) -> pd.DataFrame:
         """Slices the configured stations based on the station id in the first level of the MultiIndex-Index"""
-        registered_stations = set(cnf["id"] for cnf in self._station_config)
-        batch_filter = measurement_batch.index.get_level_values(0).isin(registered_stations)
+        # Use the integer equivalent for comparison as it does not directly depend on the representation
+        registered_stations = set(int(cnf["id"]) for cnf in self._station_config)
+        station_ids = measurement_batch.index.get_level_values(0).astype(int)
+        batch_filter = station_ids.isin(registered_stations)
         filtered_batch = measurement_batch.loc[batch_filter]
 
         return filtered_batch
@@ -165,7 +185,7 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         """
 
         # Add the index information as columns
-        dataframe["station"] = dataframe.index.get_level_values(0)
+        dataframe["station"] = dataframe.index.get_level_values(0).astype(int)
         dataframe["time"] = dataframe.index.get_level_values(1)
 
         dataframe["location"] = dataframe["stationname"].map(lambda x: 'NL-' + x.replace(' ', '-'))
@@ -363,7 +383,7 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         if self._drop_missing_observations:
             message_data = message_data.dropna(axis="columns", how="all")
 
-        meta_values = ["latitude", "longitude", "altitude", "location", "device_id"]
+        meta_values = ["latitude", "longitude", "altitude", "location", "device_id", "station_name"]
         message_in = message_data.to_dict(orient="list")
         message_out = {}
         for msg_key, msg_val in message_in.items():
@@ -380,7 +400,8 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
     def _get_station_config(self, station_id: str) -> dict:
         """Returns the station specific configuration for the particular station"""
 
-        cnf_candidates = list(filter(lambda x: x["id"] == station_id, self._station_config))
+        # Use the integer-equivalent for comparison
+        cnf_candidates = list(filter(lambda x: x["id"] == int(station_id), self._station_config))
         if len(cnf_candidates) != 1:
             raise KeyError(f"Expect exactly one station entry for ID {station_id}, but {len(cnf_candidates)} found.")
 

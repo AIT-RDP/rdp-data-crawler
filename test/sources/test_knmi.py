@@ -28,8 +28,8 @@ def weather_measurements_base_parameters() -> dict:
     """Returns a set of base parameters for a locationForecast"""
     source_parameters = {"api_key": os.environ.get("DATA_CRAWLER_KNMI_API_KEY", "---"),
                          "stations": ["06204",  # "K14-FA-1C"
-                                      "06215",  # "VOORSCHOTEN AWS"
-                                      "06216",  # "Hollandse Kust Zuid Alfa (HKZA)"
+                                      6215,     # "VOORSCHOTEN AWS"
+                                      "6216",   # "Hollandse Kust Zuid Alfa (HKZA)"
                                       "06225",  # "IJMUIDEN"
                                       "06235",  # "DE KOOY VK"
                                       "06242",  # "VLIELAND"
@@ -77,7 +77,7 @@ def test_weather_station_value_transformation_0(simplified_base_response: Iterab
 
     message = response_data[0]  # Take the first message ordered by ID
 
-    assert message["device_id"] == "06204"
+    assert message["device_id"] == 6204
     assert message["observation_time"] == ["2024-06-17T14:20:00+00:00"]
 
     assert message["latitude"] == pytest.approx(53.2694, abs=1e-4)
@@ -199,7 +199,7 @@ def test_weather_station_virtual_sensors_0(simplified_base_response: Iterable[by
 
     message = response_data[0]  # Take the first message ordered by ID
 
-    assert message["device_id"] == "06204"
+    assert message["device_id"] == 6204
     assert message["observation_time"] == ["2024-06-17T14:20:00+00:00"]
 
     assert message["precipitation_rate"] == pytest.approx([0.], abs=1e-2)
@@ -232,7 +232,7 @@ def test_weather_station_value_transformation_1(simplified_base_response: Iterab
 
     message = response_data[1]  # Take the first message ordered by ID
 
-    assert message["device_id"] == "06215"
+    assert message["device_id"] == 6215
     assert message["observation_time"] == ["2024-06-17T14:20:00+00:00"]
 
     assert message["latitude"] == pytest.approx(52.1397, abs=1e-4)
@@ -350,7 +350,7 @@ def test_weather_station_online(weather_measurements_base_parameters: dict):
     response_data = api.fetch_data_bundle()
     response_data = list(response_data)
 
-    station_ids = set(weather_measurements_base_parameters["stations"])
+    station_ids = set(int(x) for x in weather_measurements_base_parameters["stations"])
 
     t_now = datetime.datetime.now(tz=datetime.timezone.utc)
     for msg in response_data:
@@ -361,7 +361,7 @@ def test_weather_station_online(weather_measurements_base_parameters: dict):
         assert t_now - datetime.timedelta(hours=3) <= obs_time <= t_now + datetime.timedelta(minutes=2)
 
         # Check the device IDs
-        assert isinstance(msg["device_id"], str)
+        assert isinstance(msg["device_id"], int)
         assert msg["device_id"] in station_ids
 
         # check some parameters that must always be present on the selected stations
@@ -465,11 +465,11 @@ def test_duplicate_station_config(simplified_base_response: Iterable[bytes], wea
 
     weather_measurements_overrides["stations"] = [
         {"id": "06204"},
-        {"id": "06204"}  # Duplicate
+        {"id": "6204"}  # Duplicate
     ]
 
     with pytest.raises(KeyError) as err_info:
         api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_overrides, executor_name="<test>")
         list(api.fetch_data_bundle(raw_data=simplified_base_response))
 
-    assert "06204" in str(err_info.value)
+    assert "6204" in str(err_info.value)
