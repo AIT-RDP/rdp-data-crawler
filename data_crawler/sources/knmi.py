@@ -69,7 +69,7 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         # Parse the ids to integers
         for st_index, st_config in enumerate(ret_config):
             if "id" not in st_config:
-                raise KeyError(f"The {st_config + 1}-rd station config does not have an 'id' property: {st_config}")
+                raise KeyError(f"The {st_index + 1}-rd station config does not have an 'id' property: {st_config}")
             st_config["id"] = int(st_config["id"])
 
         # Check duplicate IDs
