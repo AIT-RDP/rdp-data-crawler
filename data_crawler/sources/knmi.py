@@ -58,6 +58,8 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         self._batch_size = int(source_parameters.get("batch_size", 1000))  # Mostly for testing purpose
         self._drop_missing_observations = source_parameters.get("drop_missing_observations", False)
 
+        self._logger.debug(f"Initialized the station extraction for {self._station_config}")
+
     def __get_data(self, url, params=None):
         self._logger.debug(f"Query KNMI API endpoint: {url} with {params}")
         return self.session.get(url, headers=self.headers, params=params).json()
@@ -138,11 +140,12 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
             # put the variables into a proper format
             measurements_combined = self._beautify_variables(measurements_combined)
             # Split the bunch of data into individual messages and add auxiliary information
-            messages = self._convert_to_messages(measurements_combined)
+            messages = list(self._convert_to_messages(measurements_combined))
 
             # return The formatted message data
             yield from messages
-            self._logger.debug(f"Extracted the information from all {len(self._station_config)} measurement stations.")
+            self._logger.debug(f"Extracted the information from all {len(self._station_config)} measurement stations "
+                               f"into {len(messages)} messages.")
         else:
             self._logger.debug("No new measurements detected. Skip the cycle.")
         self._last_query_ts = ts_now  # Don't use the measurement time as updates may arrive later.
