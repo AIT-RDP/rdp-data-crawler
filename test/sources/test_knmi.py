@@ -28,8 +28,8 @@ def weather_measurements_base_parameters() -> dict:
     """Returns a set of base parameters for a locationForecast"""
     source_parameters = {"api_key": os.environ.get("DATA_CRAWLER_KNMI_API_KEY", "---"),
                          "stations": ["06204",  # "K14-FA-1C"
-                                      6215,     # "VOORSCHOTEN AWS"
-                                      "6216",   # "Hollandse Kust Zuid Alfa (HKZA)"
+                                      6215,  # "VOORSCHOTEN AWS"
+                                      "6216",  # "Hollandse Kust Zuid Alfa (HKZA)"
                                       "06225",  # "IJMUIDEN"
                                       "06235",  # "DE KOOY VK"
                                       "06242",  # "VLIELAND"
@@ -473,3 +473,18 @@ def test_duplicate_station_config(simplified_base_response: Iterable[bytes], wea
         list(api.fetch_data_bundle(raw_data=simplified_base_response))
 
     assert "6204" in str(err_info.value)
+
+
+def test_missing_id_in_config(simplified_base_response: Iterable[bytes], weather_measurements_overrides: dict):
+    """Tests whether an error is raised on missing station ids."""
+
+    weather_measurements_overrides["stations"] = [
+        {"tags": {}},  # No ID.
+        {"id": "6204"}
+    ]
+
+    with pytest.raises(KeyError) as err_info:
+        api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_overrides, executor_name="<test>")
+        list(api.fetch_data_bundle(raw_data=simplified_base_response))
+
+    assert "id" in str(err_info.value)
