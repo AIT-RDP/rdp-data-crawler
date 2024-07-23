@@ -228,7 +228,7 @@ async def _heartbeat_until_termination_request(supervisor: data_crawler.query_su
             signal.signal(signal_nr, _handler)
 
     # Loop until the termination signal is received and the event is set
-    pending = [termination_event.wait()]
+    pending = [asyncio.create_task(termination_event.wait())]
     while True:
         _, pending = await asyncio.wait(pending, timeout=10)
         if termination_event.is_set():
