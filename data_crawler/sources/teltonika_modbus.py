@@ -400,7 +400,8 @@ class TeltonikaModbus(active_source_sync.AbstractSyncActiveSourceAPI):
         # replace the header with ("content-type": "application/json")
         @app.middleware("http")
         async def change_header(request: fastapi.Request, call_next):
-            if request.scope["path"] == "/data":
+            # endpoints might be served under sub-path -> path.endswith("/data")
+            if request.scope["path"].endswith("/data"):
                 headers = dict(request.scope["headers"])
 
                 # replace the header
