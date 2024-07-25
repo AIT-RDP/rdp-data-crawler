@@ -84,6 +84,9 @@ U_DC_S2;V;Float;no;DC Voltage of String nr. 2
 U_L1N;V;Float;no;AC Voltage L1 to N
 U_L2N;V;Float;no;AC Voltage L2 to N
 U_L3N;V;Float;no;AC Voltage L3 to N
+U_L1L2;V;Float;no;AC Voltage L1 to L2
+U_L2L3;V;Float;no;AC Voltage L2 to L3
+U_L3L1;V;Float;no;AC Voltage L3 to L1
 P_AC_tot;W;Float;no;Total AC power
 P_DC_tot;W;Float;no;Total DC power
 P_DC_S1;W;Float;no;DC Power, string 1 is delivering

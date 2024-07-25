@@ -1,5 +1,6 @@
 stages:
   - build
+  - test
   - release
   - cleanup
 
@@ -13,7 +14,8 @@ variables:
 # =============================================================================
 
 test_python_3_10:
-  stage: build  # Docker-image creation and tests can run in parallel
+  stage: test
+  needs: []  # no dependencies to precious pipelines stages
   services:
     - name: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/redis
       alias: redis

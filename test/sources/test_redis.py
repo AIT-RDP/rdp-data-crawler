@@ -11,7 +11,7 @@ import data_crawler.sources.redis as redis_source
 
 
 def test_redis_stream_config_classes():
-    """Tests the RedisStream sink configuration classes"""
+    """Tests the RedisStream source configuration classes"""
 
     assert issubclass(redis_source.RedisStream.parameter_model(), redis_source.RedisStreamParameters)
 
