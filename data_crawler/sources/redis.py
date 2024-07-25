@@ -17,7 +17,7 @@ from data_crawler.sources.abc import message as msg
 
 
 class StreamParameters(pydantic.BaseModel):
-    name: str
+    name: str = pydantic.Field(description="Name of the stream")
     metadata: dict[str, Any] = pydantic.Field(
         description="Metadata that will be provide additionally on each received message",
         default={},
@@ -80,7 +80,7 @@ class RedisStream(active_source_sync.AbstractSyncActiveSourceAPI):
             raise RuntimeError("Expect an externally supplied redis_pool")  # Avoid signature warnings
         redis_pool: redis.ConnectionPool = kwargs["redis_pool"]
 
-        return RedisStream(source_parameters, redis_pool)
+        return cls(source_parameters, redis_pool)
 
     def start(self) -> None:
         """
