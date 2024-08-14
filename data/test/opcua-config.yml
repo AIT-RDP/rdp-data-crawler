@@ -1,0 +1,35 @@
+version: 1
+data sources:
+  speicherprüfstand.forte.receive:
+    type: "data_crawler.sources.opc_ua.OPCUA"
+    source parameter:
+      register_spec: !table/csv
+        path: "./OPC-UA_registers.csv"
+      endpoint: "opc.tcp://localhost:4840"
+      # user: "admin"
+      # password: "admin"
+    polling:
+      frequency: 10s
+    sink_type: "data_crawler.sinks.redis.RedisStream"
+    sink_parameters:
+      stream: "speicherprüfstand.forte.receive"
+  speicherprüfstand.forte.send:
+    type: "data_crawler.sources.redis.RedisStream"
+    source parameter:
+      streams:
+        - name: "speicherprüfstand.forte.send"
+          metadata:
+            tag_den_ich_nicht_brauche: "ich bin ein tag"
+      group_name: "ich konsumiere"
+      consumer_name: "ich konsumiere"
+    sink_type: "data_crawler.sinks.opc_ua.OPCUA"
+    sink_parameters:
+      register_spec: !table/csv
+        path: "./OPC-UA_registers.csv"
+      endpoint: "opc.tcp://localhost:4840"
+      # user: "admin"
+      # password: "admin"
+redis:
+  host: localhost
+  port: 6379
+  db: 0

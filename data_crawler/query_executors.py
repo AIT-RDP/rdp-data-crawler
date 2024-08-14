@@ -55,7 +55,7 @@ class _QueryExecutorBase(abc.ABC):
         persistent_store = storage.PersistentAPIStorage(redis_pool, name)
 
         if source_api is None:
-            source_api = self._resolve_source_api(self._config, name, persistent_store)
+            source_api = self._resolve_source_api(self._config, name, redis_pool, persistent_store)
         if isinstance(source_api, abstract_source.AbstractMultiMessageSourceAPI):
             source_api = _sync_wrapper.SyncPollingExecutor(source_api, executor_config, name)
         self._source_api = source_api  # Expect protected scope.
@@ -84,7 +84,7 @@ class _QueryExecutorBase(abc.ABC):
 
     @staticmethod
     def _resolve_source_api(
-            executor_config: dict, executor_name: str,
+            executor_config: dict, executor_name: str, redis_pool: redis.ConnectionPool,
             persistent_store: storage.PersistentAPIStorage
     ) -> abstract_source.AbstractMultiMessageSourceAPI | active_sync_source.AbstractSyncActiveSourceAPI:
         """
@@ -101,12 +101,12 @@ class _QueryExecutorBase(abc.ABC):
         if issubclass(api_class, abstract_source.AbstractMultiMessageSourceAPI):
             # Instantiate the legacy object that expects synchronous polling
             api_object = api_class(source_parameters=executor_config["source parameter"], executor_name=executor_name,
-                                   persistent_store=persistent_store)
+                                   persistent_store=persistent_store, redis_pool=redis_pool)
         elif issubclass(api_class, active_sync_source.AbstractSyncActiveSourceAPI):
             # Instantiate the new active interface
             api_parameters = api_class.parameter_model().model_validate(executor_config["source parameter"])
             api_object = api_class.create(api_parameters, executor_name=executor_name,
-                                          persistent_store=persistent_store)
+                                          persistent_store=persistent_store, redis_pool=redis_pool)
         else:
             # No appropriate class found
             raise ModuleNotFoundError(f"The specified source API class '{type_name}' ({api_class}) is not an "

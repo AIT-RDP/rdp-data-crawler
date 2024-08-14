@@ -1,0 +1,19 @@
+address;name;data_type;mode;description
+"ns=1;i=1";Status;Int;r;Sobald ein Schalter aktiviert wird, wird der Status auf 1 gesetzt. 0 wenn kein Schalter aktiviert ist. (Entspricht der Signalleuchte 1 = rot, 2 = gelb, 3 = grün).
+"ns=1;i=2";Automatenquittierung_24V_DC;Boolean;w;Quittiert einen Automatenfall KP_NSL250_KG+F3-12F1. Weiterleitung an KP_NSL250_KG+F3-13F1 welcher auch quittiert wird.
+"ns=1;i=16501";Automatenfall_24V_DC;Boolean;r;Automatenfall von KP_NSL250_KG+F3-12F1 oder KP_NSL250_KG+F3-13F1 24V Quelle
+"ns=1;i=16502";Schluesselschalter_USV;Boolean;r;
+"ns=1;i=16503";USV_Hauptschuetz_ein;Boolean;r;
+"ns=1;i=16504";NOT_AUS_Speicherlabor;Boolean;r;
+"ns=1;i=16505";NOT_AUS_Taster_Schranktuer;Boolean;r;
+"ns=1;i=16506";NOT_AUS_Taster_AP_NSL50_Reserve;Boolean;r;
+"ns=1;i=16507";Tuer_AP_NSL50_zu;Boolean;r;
+"ns=1;i=16510";NOT_AUS_Taster_AP_NSL250;Boolean;r;
+"ns=1;i=16511";Tuer_AP_NSL250_zu;Boolean;r;
+"ns=1;i=16604";Alle_Tueren_zu;Boolean;r;
+"ns=1;i=16605";NOT_AUS_Bruecke_Wand_Containertuer;Boolean;r;
+"ns=1;i=16606";NOT_AUS_Bruecke_Wand_Containertuer_bereit;Boolean;r;
+"ns=1;i=16607";NOT_AUS_Bruecke_AP_NSL50;Boolean;r
+"ns=1;i=16608";NOT_AUS_Bruecke_AP_NSL50_bereit;Boolean;r;
+"ns=1;i=16611";Sicherung_Hausversorgung;Boolean;r;
+"ns=1;i=16612";Sicherung_Normalnetz;Boolean;r;
