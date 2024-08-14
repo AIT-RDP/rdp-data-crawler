@@ -114,9 +114,9 @@ def test_modbus_tcp_basic(minimal_modbus_config):
     src_api = modbus.ModbusTCP(source_parameters=minimal_modbus_config, executor_name="<test-modbus>")
     src_api.start()
 
-    time_start = datetime.datetime.utcnow()
+    time_start = datetime.datetime.now(tz=datetime.timezone.utc)
     data = src_api.fetch_data()
-    time_end = datetime.datetime.utcnow()
+    time_end = datetime.datetime.now(tz=datetime.timezone.utc)
 
     src_api.stop()
 
@@ -154,9 +154,9 @@ def test_modbus_tcp_unconventional_types(modbus_config_types, config_fkt):
     src_api = modbus.ModbusTCP(source_parameters=config_fkt(modbus_config_types), executor_name="<test-modbus>")
     src_api.start()
 
-    time_start = datetime.datetime.utcnow()
+    time_start = datetime.datetime.now(tz=datetime.timezone.utc)
     data = src_api.fetch_data()
-    time_end = datetime.datetime.utcnow()
+    time_end = datetime.datetime.now(tz=datetime.timezone.utc)
 
     src_api.stop()
 
