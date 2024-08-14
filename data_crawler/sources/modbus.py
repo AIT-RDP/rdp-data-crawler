@@ -5,10 +5,9 @@ import datetime
 from typing import Dict, Any
 
 import modbus_crawler.modbus_device_tcp
-import pandas as pd
-import pymodbus.constants
 
 import data_crawler.sources.abc.abstract_source as abstract_source
+from data_crawler.shared.modbus import ModbusParameters
 
 
 class ModbusTCP(abstract_source.AbstractSourceAPI):
@@ -25,29 +24,15 @@ class ModbusTCP(abstract_source.AbstractSourceAPI):
 
         super(ModbusTCP, self).__init__(source_parameters=source_parameters, executor_name=executor_name, **kwargs)
 
-        register_spec = source_parameters["register spec"]
-        if not isinstance(register_spec, pd.DataFrame):
-            raise ValueError(f"The modbus register spec '{register_spec}' at {executor_name} is not a valid table "
-                             "(DataFrame). Please consider the appropriate YAML tags to input one.")
+        source_parameters_model = ModbusParameters.model_validate(source_parameters)
 
         self._device = modbus_crawler.modbus_device_tcp.ModbusTcpDevice(
-            ip_address=source_parameters["address"],
-            modbus_port=source_parameters.get("port", 502),
-            byteorder=self._get_endian_config(source_parameters.get("byte order", "BIG")),
-            wordorder=self._get_endian_config(source_parameters.get("word order", "BIG")),
-            auto_connect=False, registers_spec_df=register_spec
+            ip_address=source_parameters_model.address,
+            modbus_port=source_parameters_model.port,
+            byteorder=source_parameters_model.byte_order,
+            wordorder=source_parameters_model.word_order,
+            auto_connect=False, registers_spec_df=source_parameters_model.register_spec
         )
-
-    @staticmethod
-    def _get_endian_config(config_value: str) -> str:
-        """Resolves the Endian value"""
-
-        # Upper the value to match the enum and allow old configs to work
-        config_value = config_value.upper()
-
-        if not hasattr(pymodbus.constants.Endian, config_value):
-            raise ValueError(f"Unknown endian value '{config_value}'")
-        return getattr(pymodbus.constants.Endian, config_value)
 
     def start(self):
         """Connects to the Modbus server"""
@@ -57,7 +42,7 @@ class ModbusTCP(abstract_source.AbstractSourceAPI):
         """
         Queries the Modbus TCP device and returns the corresponding message
         """
-        out_info: Dict[str, Any] = {"observation_time": datetime.datetime.utcnow().isoformat()}
+        out_info: Dict[str, Any] = {"observation_time": datetime.datetime.now(tz=datetime.timezone.utc).isoformat()}
         out_info.update(self._device.read_registers_as_dict())
         return out_info
 
