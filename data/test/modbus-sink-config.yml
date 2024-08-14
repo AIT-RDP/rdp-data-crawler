@@ -1,0 +1,21 @@
+version: 1
+data sources:
+  send.to.modbus:
+    type: "data_crawler.sources.redis.RedisStream"
+    source parameter:
+      streams:
+        - name: "modbus.send"
+          metadata:
+            tag_den_ich_nicht_brauche: "ich bin ein tag"
+      group_name: "ich konsumiere"
+      consumer_name: "ich konsumiere"
+    sink_type: "data_crawler.sinks.modbus.ModbusTCP"
+    sink_parameters:
+      address: "localhost"
+      register_spec: !table/csv
+        path: "./PAC2200_modbus_registers.csv"
+
+redis:
+  host: localhost
+  port: 6379
+  db: 0
