@@ -113,4 +113,3 @@ options:
 
 Since there is no extensive documentation on the configuration formats, please refer to the project configurations, 
 e.g. at the [E3 Docker Repository](https://gitlab-intern.ait.ac.at/ees/rdp/e3-at-school/e3-docker/-/blob/main/e3-data-crawler/config.yml)  
-
