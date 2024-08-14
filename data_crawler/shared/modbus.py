@@ -20,7 +20,7 @@ class ModbusParameters(abstract_sink.SinkParameters):
     )
 
     register_spec: pd.DataFrame = pydantic.Field(
-        description="The register spec of the OPCUA server",
+        description="The register spec of the Modbus server",
         validation_alias=AliasChoices('register_spec', 'register spec')
     )
 
