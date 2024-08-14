@@ -33,14 +33,17 @@ class ModbusTCP(abstract_source.AbstractSourceAPI):
         self._device = modbus_crawler.modbus_device_tcp.ModbusTcpDevice(
             ip_address=source_parameters["address"],
             modbus_port=source_parameters.get("port", 502),
-            byteorder=self._get_endian_config(source_parameters.get("byte order", "Big")),
-            wordorder=self._get_endian_config(source_parameters.get("word order", "Big")),
+            byteorder=self._get_endian_config(source_parameters.get("byte order", "BIG")),
+            wordorder=self._get_endian_config(source_parameters.get("word order", "BIG")),
             auto_connect=False, registers_spec_df=register_spec
         )
 
     @staticmethod
     def _get_endian_config(config_value: str) -> str:
         """Resolves the Endian value"""
+
+        # Upper the value to match the enum and allow old configs to work
+        config_value = config_value.upper()
 
         if not hasattr(pymodbus.constants.Endian, config_value):
             raise ValueError(f"Unknown endian value '{config_value}'")
