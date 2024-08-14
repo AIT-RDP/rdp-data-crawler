@@ -1,11 +1,8 @@
 """
 Assesses the Modbus Source API
 """
-import asyncio
 import datetime
 import multiprocessing
-import threading
-import time
 from typing import Tuple
 
 import pandas as pd
