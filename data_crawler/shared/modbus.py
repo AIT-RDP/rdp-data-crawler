@@ -1,4 +1,3 @@
-import pandas
 import pandas as pd
 import pydantic
 import pymodbus.constants
@@ -46,4 +45,4 @@ class ModbusParameters(abstract_sink.SinkParameters):
         if isinstance(raw, pd.DataFrame):
             return raw
         # Uses a record in the yaml which can be created with df.to_dict(orient='records')
-        return pandas.DataFrame.from_records(raw)
+        return pd.DataFrame.from_records(raw)
