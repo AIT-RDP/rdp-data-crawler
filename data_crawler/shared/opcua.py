@@ -1,6 +1,5 @@
 from typing import Optional
 
-import pandas
 import pandas as pd
 import pydantic
 from pydantic import ConfigDict, AliasChoices, SecretStr, field_validator
@@ -41,7 +40,7 @@ class OPCUAParameters(abstract_sink.SinkParameters):
         if isinstance(raw, pd.DataFrame):
             return raw
         # Uses a record in the yaml which can be created with df.to_dict(orient='records')
-        return pandas.DataFrame.from_records(raw)
+        return pd.DataFrame.from_records(raw)
 
         # This is an example list[dict] in yaml
 
