@@ -35,7 +35,7 @@ pandera = {version = "^0.20.3", optional = true}
 modbus = ["modbus-crawler", "pymodbus", "pandera"]
 numerics = ["xarray", "h5netcdf"]
 rest-server = ["fastapi", "uvicorn"]
-opcua = ["asyncua"]
+opcua = ["asyncua", "pandera"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"

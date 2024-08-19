@@ -6,7 +6,7 @@ from asyncua import ua
 from asyncua.sync import Client
 
 import data_crawler.sources.abc.abstract_source as abstract_source
-from data_crawler.shared.opcua import OPCUAParameters
+from data_crawler.shared.opcua import OPCUAParameters, Datapoint
 
 
 class OPCUA(abstract_source.AbstractSourceAPI):
@@ -56,11 +56,11 @@ class OPCUA(abstract_source.AbstractSourceAPI):
             self.create_client(self._source_parameters)
             self._client.connect()
 
-        nodes = [self._client.get_node(node_id) for node_id in self._source_parameters.register_spec["address"]]
+        nodes = [self._client.get_node(node_id) for node_id in self._source_parameters.register_spec[Datapoint.address]]
         values = self._client.read_values(nodes)
 
         # Convert the values to a dictionary with the node_id as key
-        values = {node_id: value for node_id, value in zip(self._source_parameters.register_spec["name"], values)}
+        values = {node_id: value for node_id, value in zip(self._source_parameters.register_spec[Datapoint.name], values)}
 
         out_info: Dict[str, Any] = {"observation_time": datetime.datetime.now(tz=datetime.timezone.utc).isoformat()}
         out_info.update(values)

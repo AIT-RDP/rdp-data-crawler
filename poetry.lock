@@ -2335,10 +2335,10 @@ viz = ["matplotlib", "nc-time-axis", "seaborn"]
 [extras]
 modbus = ["modbus-crawler", "pandera", "pymodbus"]
 numerics = ["h5netcdf", "xarray"]
-opcua = ["asyncua"]
+opcua = ["asyncua", "pandera"]
 rest-server = ["fastapi", "uvicorn"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "696d8d25e8134e327a66a4bc39f77a3005e9b42cb91853a489ce851a33903ce9"
+content-hash = "1259a55dacbb1e350fe4d8aee13eb1eb03162ee562fc5139ec23630af0eab292"
