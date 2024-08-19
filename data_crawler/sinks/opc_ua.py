@@ -7,7 +7,7 @@ from typing import Any
 from asyncua import ua
 from asyncua.sync import Client
 import data_crawler.sinks.abc.abstract_sink as abstract_sink
-from data_crawler.shared.opcua import OPCUAParameters
+from data_crawler.shared.opcua import OPCUAParameters, Datapoint
 
 
 class OPCUAMetadata(abstract_sink.SinkMetadata):
@@ -36,7 +36,7 @@ class OPCUA(abstract_sink.AbstractSinkAPI):
         self._client.disconnect()
 
     @classmethod
-    def create(cls, sink_parameters: OPCUAParameters, **kwargs) -> abstract_sink.AbstractSinkAPI:
+    def create(cls, sink_parameters: OPCUAParameters, **kwargs) -> "OPCUA":
         """
         Factory function that creates a new sink
 
@@ -67,9 +67,9 @@ class OPCUA(abstract_sink.AbstractSinkAPI):
         # Get the node id of each key in data dict
         nodes = {
             self._client.get_node(
-                self._register_spec.loc[self._register_spec["name"] == key, "address"].iloc[0]
+                self._register_spec.loc[self._register_spec[Datapoint.name] == key, Datapoint.address].iloc[0]
             ): data[key]
-            for key in data if (self._register_spec["name"] == key).any()}
+            for key in data if (self._register_spec[Datapoint.name] == key).any()}
 
         self._client.write_values(nodes.keys(), nodes.values())
 

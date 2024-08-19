@@ -3,8 +3,46 @@ from typing import Optional
 import pandas as pd
 import pydantic
 from pydantic import ConfigDict, AliasChoices, SecretStr, field_validator
+import pandera as pa
+from pandera import typing as pt
 
 from data_crawler.sinks.abc import abstract_sink
+
+# TODO: Remove this once pandera is fixed
+# Reference warning: FutureWarning:
+# Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version.
+# Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set
+# `pd.set_option('future.no_silent_downcasting', True)` check_obj[col_name] = check_obj[col_name].fillna(
+pd.set_option('future.no_silent_downcasting', True)
+
+class Datapoint(pa.DataFrameModel):
+    """
+    Datapoint dataframe model
+    """
+    address: pt.Series[str] = pa.Field(
+        description="The address of the opc ua datapoint as a string e.g. 'ns=1;i=1650'.",
+        coerce=True,
+        unique=True,
+    )
+    name: pt.Series[str] = pa.Field(
+        description="The name of the datapoint.",
+        coerce=True,
+        unique=True,
+    )
+
+    @classmethod
+    def preprocess(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Preprocess the DataFrame before validation. Called before validation in Device manually.
+        :param df: Original DataFrame
+        :return: Modified DataFrame
+        """
+        # Mapping of aliases to the actual column names
+        alias_map = {
+            "register_start": "address",  # Allow modbus csv to also work
+            # Add more aliases if needed
+        }
+        return df.rename(columns=alias_map)
 
 
 class OPCUAParameters(abstract_sink.SinkParameters):
@@ -15,7 +53,7 @@ class OPCUAParameters(abstract_sink.SinkParameters):
         description="The endpoint of the OPCUA server",
     )
 
-    register_spec: pd.DataFrame = pydantic.Field(
+    register_spec: pt.DataFrame[Datapoint] = pydantic.Field(
         description="The register spec of the OPCUA server",
         validation_alias=AliasChoices('register_spec', 'register spec')
     )
@@ -38,9 +76,15 @@ class OPCUAParameters(abstract_sink.SinkParameters):
         """Transforms the raw data into a pandas DataFrame if necessary"""
 
         if isinstance(raw, pd.DataFrame):
-            return raw
-        # Uses a record in the yaml which can be created with df.to_dict(orient='records')
-        return pd.DataFrame.from_records(raw)
+            df = raw
+        else:
+            # Uses a record in the yaml which can be created with df.to_dict(orient='records')
+            df = pd.DataFrame.from_records(raw)
+
+        # Preprocess the DataFrame before validation
+        df = Datapoint.preprocess(df)
+
+        return df
 
         # This is an example list[dict] in yaml
 
