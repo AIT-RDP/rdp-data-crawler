@@ -1034,8 +1034,8 @@ pandas = ["pandas (>1.4)"]
 [package.source]
 type = "git"
 url = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler"
-reference = "5055af3e2578a52f16a93611f0767e2988f66cdc"
-resolved_reference = "5055af3e2578a52f16a93611f0767e2988f66cdc"
+reference = "d570f6553ddc15e9ab30ccc5028dd4ff6febbc53"
+resolved_reference = "d570f6553ddc15e9ab30ccc5028dd4ff6febbc53"
 
 [[package]]
 name = "msgpack"
@@ -2171,4 +2171,4 @@ rest-server = ["fastapi", "uvicorn"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "be170cbd25346f7664afdb5029dbb145f931235efd8f90bdc421e243d5c748b9"
+content-hash = "bb89e16381cd200e1a13f65b317f4cd4482557c5d3484373d06d76ccc81ab6a5"
