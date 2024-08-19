@@ -34,7 +34,7 @@ class ModbusTCP(abstract_sink.AbstractSinkAPI):
         self._device.disconnect()
 
     @classmethod
-    def create(cls, sink_parameters: ModbusParameters, **kwargs) -> abstract_sink.AbstractSinkAPI:
+    def create(cls, sink_parameters: ModbusParameters, **kwargs) -> "ModbusTCP":
         """
         Factory function that creates a new sink
 
