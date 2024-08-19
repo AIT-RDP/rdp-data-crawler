@@ -10,6 +10,8 @@ from modbus_crawler.input_data_validation import data_types, register_types, dat
 
 from data_crawler.sinks.abc import abstract_sink
 
+# TODO: Remove this once pandera is fixed
+pd.set_option('future.no_silent_downcasting', True)
 
 class Datapoint(pa.DataFrameModel):
     """
