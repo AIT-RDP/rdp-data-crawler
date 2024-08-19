@@ -11,6 +11,10 @@ from modbus_crawler.input_data_validation import data_types, register_types, dat
 from data_crawler.sinks.abc import abstract_sink
 
 # TODO: Remove this once pandera is fixed
+# Reference warning: FutureWarning:
+# Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version.
+# Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set
+# `pd.set_option('future.no_silent_downcasting', True)` check_obj[col_name] = check_obj[col_name].fillna(
 pd.set_option('future.no_silent_downcasting', True)
 
 class Datapoint(pa.DataFrameModel):
