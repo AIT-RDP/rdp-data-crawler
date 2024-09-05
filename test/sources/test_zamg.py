@@ -129,6 +129,8 @@ def test_measurement_station_online(endpoint, station_id, measurement_station_pa
 
 @pytest.mark.xfail(string=False, raises=(requests.exceptions.HTTPError, requests.exceptions.ConnectionError),
                    reason="ZAMG servers are notoriously unreliable")
+@pytest.mark.xfail(string="No history samples returned.", raises=RuntimeError,
+                   reason="ZAMG servers are notoriously unreliable")
 @pytest.mark.parametrize("endpoint,station_id", [
     ("climate", "20209"),
     ("tawes", "8989076")
@@ -155,6 +157,11 @@ def test_measurement_station_history_online(endpoint, station_id, measurement_st
 
     response_data = response_data[0]
     response_length = len(response_data["observation_time"])
+
+    if response_length == 0:
+        # Most likely, ZAMG has some gaps in the data
+        raise RuntimeError("No history samples returned.")
+
     assert response_length > 23
 
     first_ts = datetime.datetime.fromisoformat(response_data["observation_time"][0])
