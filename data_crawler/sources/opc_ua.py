@@ -1,9 +1,13 @@
 import datetime
 import time
 from typing import Dict, Any
+from pathlib import Path
 
 from asyncua import ua
 from asyncua.sync import Client
+from asyncua.crypto.security_policies import SecurityPolicyBasic256Sha256
+from asyncua.crypto.validator import CertificateValidator, CertificateValidatorOptions
+from asyncua.crypto.truststore import TrustStore
 
 import data_crawler.sources.abc.abstract_source as abstract_source
 from data_crawler.shared.opcua import OPCUAParameters, Datapoint
@@ -30,6 +34,33 @@ class OPCUA(abstract_source.AbstractSourceAPI):
 
     def create_client(self, source_parameters: OPCUAParameters):
         self._client = Client(url=self._source_parameters.endpoint)
+
+        # Set application URI
+        if source_parameters.uri:
+            self._client.application_uri = source_parameters.uri
+
+        # Add encryption
+        if source_parameters.encryption:
+            # Set security mode and policy
+            self._client.set_security(
+                policy=SecurityPolicyBasic256Sha256,
+                certificate=source_parameters.encryption.client_cert_path,
+                private_key=source_parameters.encryption.client_key_path,
+                server_certificate=source_parameters.encryption.server_cert_path
+            )
+
+            # Add trusted store
+            if source_parameters.encryption.trusted_certs_path:
+                trust_store = TrustStore([Path(source_parameters.encryption.trusted_certs_path)], [])
+                trust_store.load()
+                validator = CertificateValidator(
+                    CertificateValidatorOptions.TRUSTED_VALIDATION | CertificateValidatorOptions.PEER_SERVER,
+                    trust_store)
+            else:
+                validator = CertificateValidator(
+                    CertificateValidatorOptions.EXT_VALIDATION | CertificateValidatorOptions.PEER_SERVER)
+
+            self._client.certificate_validator = validator
 
         if source_parameters.user is not None and source_parameters.password is not None:
             self._client.set_user(source_parameters.user.get_secret_value())

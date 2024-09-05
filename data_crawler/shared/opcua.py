@@ -2,7 +2,7 @@ from typing import Optional
 
 import pandas as pd
 import pydantic
-from pydantic import ConfigDict, AliasChoices, SecretStr, field_validator
+from pydantic import ConfigDict, AliasChoices, SecretStr, field_validator, BaseModel
 import pandera as pa
 from pandera import typing as pt
 
@@ -45,12 +45,38 @@ class Datapoint(pa.DataFrameModel):
         return df.rename(columns=alias_map)
 
 
+class OPCUAEncryption(BaseModel):
+    """OPCUA encryption parameters"""
+    server_cert_path: str = pydantic.Field(
+        description="Server certificate path"
+    )
+
+    client_cert_path: str = pydantic.Field(
+        description="Client certificate path"
+    )
+
+    client_key_path: str = pydantic.Field(
+        description="Client certificate key"
+    )
+
+    trusted_certs_path: str = pydantic.Field(
+        description="Trusted certificates folder path. The certificates must be in the *.der format",
+        default=None
+    )
+
+
 class OPCUAParameters(abstract_sink.SinkParameters):
     """OPCUA configuration parameters"""
 
     endpoint: str = pydantic.Field(
         pattern=r"^opc.tcp://",
         description="The endpoint of the OPCUA server",
+    )
+
+    uri: str = pydantic.Field(
+        pattern=r"^urn:",
+        description="The OPC UA Application URI is a unique identifier used within the OPC Unified Architecture",
+        default=None
     )
 
     register_spec: pt.DataFrame[Datapoint] = pydantic.Field(
@@ -66,6 +92,11 @@ class OPCUAParameters(abstract_sink.SinkParameters):
     password: Optional[SecretStr] = pydantic.Field(
         description="The password to connect to the OPCUA server",
         default=None,
+    )
+
+    encryption: Optional[OPCUAEncryption] = pydantic.Field(
+        description="Parameters in case the communication is encrypted",
+        default=None
     )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)  # Allow DataFrame to be used as a type
