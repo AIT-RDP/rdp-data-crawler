@@ -69,7 +69,7 @@ class Datapoint(pa.DataFrameModel):
     unit_id: Optional[pt.Series[int]] = pa.Field(
         description="The slave id of the modbus device",
         coerce=True,
-        default=True,
+        default=1,
     )
 
     description: Optional[pt.Series[str]] = pa.Field(
@@ -79,15 +79,21 @@ class Datapoint(pa.DataFrameModel):
         nullable=True
     )
 
+    mode: Optional[pt.Series[str]] = pa.Field(
+        description="Mode which can be 'r' for read or 'w' for write or 'rw' for read and write",
+        coerce=True,
+        default='r',
+    )
+
     @pa.parser("register_type")
-    def negate(cls, series):
+    def register_type_check(cls, series):
         series = series.str.lower()
         # Allow alias for register type
         series = series.map(register_type_lookup)
         return series
 
     @pa.parser("data_type")
-    def negate(cls, series):
+    def data_type_check(cls, series):
         series = series.str.lower()
         # Allow alias for data type
         series = series.map(data_type_lookup)

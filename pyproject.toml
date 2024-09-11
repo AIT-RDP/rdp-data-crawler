@@ -17,8 +17,7 @@ redis = "^5.0"
 hiredis = "^2.3.2"
 prometheus-client = "~0"
 pyrdp-commons = {version = "=0.0.0.post77.dev0+2754b1b", source = "gitlab-pyrdp-commons"}
-modbus-crawler = {git = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler", rev = "196a6e9dea5c71a584e1c87469a568565fed772a", optional = true}
-pymodbus = {version = "3.7.0", optional = true}
+modbus-crawler = {git = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler", rev = "1890c98c7faba946f920bd901f42c52fa5553972", optional = true}
 filelock = "^3.13.1"
 entsoe-py = "~0"
 pydantic = "^2.6"
@@ -32,7 +31,7 @@ asyncua = {version = "^1.1.5", optional = true}
 pandera = {version = "^0.20.3", optional = true}
 
 [tool.poetry.extras]
-modbus = ["modbus-crawler", "pymodbus", "pandera"]
+modbus = ["modbus-crawler", "pandera"]
 numerics = ["xarray", "h5netcdf"]
 rest-server = ["fastapi", "uvicorn"]
 opcua = ["asyncua", "pandera"]
