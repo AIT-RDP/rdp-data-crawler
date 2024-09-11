@@ -87,7 +87,9 @@ def test_measurement_station_drop_missing_observations(measurement_station_param
         assert key not in response_data
 
 
-@pytest.mark.xfail(string=False, raises=(requests.exceptions.HTTPError, requests.exceptions.ConnectionError),
+@pytest.mark.xfail(string=False, raises=(requests.exceptions.HTTPError,
+                                         requests.exceptions.ConnectionError,
+                                         requests.exceptions.ReadTimeout),
                    reason="ZAMG servers are notoriously unreliable")
 @pytest.mark.xfail(string="No samples returned.", raises=RuntimeError,
                    reason="ZAMG servers are notoriously unreliable")
