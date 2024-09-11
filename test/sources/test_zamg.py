@@ -89,6 +89,8 @@ def test_measurement_station_drop_missing_observations(measurement_station_param
 
 @pytest.mark.xfail(string=False, raises=(requests.exceptions.HTTPError, requests.exceptions.ConnectionError),
                    reason="ZAMG servers are notoriously unreliable")
+@pytest.mark.xfail(string="No samples returned.", raises=RuntimeError,
+                   reason="ZAMG servers are notoriously unreliable")
 @pytest.mark.parametrize("endpoint,station_id", [
     ("climate", "20209"),
     ("tawes", "8989076")
@@ -107,6 +109,11 @@ def test_measurement_station_online(endpoint, station_id, measurement_station_pa
     assert response_data is not None
 
     response_length = len(response_data["observation_time"])
+
+    if response_length == 0:
+        # Most likely, ZAMG has some gaps in the data
+        raise RuntimeError("No samples returned.")
+
     assert response_length > 2
 
     first_ts = datetime.datetime.fromisoformat(response_data["observation_time"][0])
