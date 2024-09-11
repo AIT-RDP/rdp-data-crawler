@@ -1034,8 +1034,8 @@ pandas = ["pandas (>1.4)"]
 [package.source]
 type = "git"
 url = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler"
-reference = "196a6e9dea5c71a584e1c87469a568565fed772a"
-resolved_reference = "196a6e9dea5c71a584e1c87469a568565fed772a"
+reference = "1890c98c7faba946f920bd901f42c52fa5553972"
+resolved_reference = "1890c98c7faba946f920bd901f42c52fa5553972"
 
 [[package]]
 name = "msgpack"
@@ -2333,7 +2333,7 @@ parallel = ["dask[complete]"]
 viz = ["matplotlib", "nc-time-axis", "seaborn"]
 
 [extras]
-modbus = ["modbus-crawler", "pandera", "pymodbus"]
+modbus = ["modbus-crawler", "pandera"]
 numerics = ["h5netcdf", "xarray"]
 opcua = ["asyncua", "pandera"]
 rest-server = ["fastapi", "uvicorn"]
@@ -2341,4 +2341,4 @@ rest-server = ["fastapi", "uvicorn"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "1259a55dacbb1e350fe4d8aee13eb1eb03162ee562fc5139ec23630af0eab292"
+content-hash = "5022a5dce845d7722716216267fe17589651ec378032bcb5ad89ded2fc0daf18"

@@ -32,7 +32,6 @@ def minimal_modbus_config(mockup_server):
         })
     }
 
-
 @pytest.fixture()
 def mockup_server() -> Tuple[str, int]:
     """Spins up a mockup server"""
@@ -180,3 +179,45 @@ def test_modbus_tcp_invalid_register_spec(modbus_config_types):
 
     with pytest.raises(expected_exception=ValueError):
         modbus.ModbusTCP(source_parameters=modbus_config_types, executor_name="<test-modbus>")
+
+
+
+@pytest.fixture()
+def minimal_rw_modbus_config(mockup_server):
+    """Returns a modbus configuration with read-write registers"""
+
+    return {
+        "address": mockup_server[0],
+        "port": mockup_server[1],
+        "register spec": pd.DataFrame.from_dict({
+            "Register_start": [100, "X", "-", 110],
+            "Register_end": ["", "", "", 111],
+            "Register_type": ["i", "i", "i", "i"],
+            "Data_type": ["UINT16", "DOUBLE", "FloaT", "UINT32"],
+            "Name": ["current_phase_1", "some_energy", "crazy number", "frequency"],
+            "mode": ["r", "rw", "r", "w"],
+            "Unit": ["A", "Wh", "1", "Hz"],
+            "Scaling": [0.01, 1.0, 1.0, 1.0]
+        })
+    }
+
+
+
+def test_modbus_read_only_r_mode(minimal_rw_modbus_config):
+    """Tests the very basic operation of the modbus crawler"""
+
+    src_api = modbus.ModbusTCP(source_parameters=minimal_rw_modbus_config, executor_name="<test-modbus>")
+    src_api.start()
+
+    time_start = datetime.datetime.now(tz=datetime.timezone.utc)
+    data = src_api.fetch_data()
+    time_end = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    src_api.stop()
+
+    assert "observation_time" in data
+    assert time_start <= datetime.datetime.fromisoformat(data["observation_time"]) <= time_end
+
+    read_keys = ["observation_time", "current_phase_1", "some_energy", "crazy number"]
+    assert list(data.keys()) == read_keys
+
