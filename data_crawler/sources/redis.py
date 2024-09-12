@@ -130,6 +130,10 @@ class RedisStream(active_source_sync.AbstractSyncActiveSourceAPI):
                 count=1,
                 # block for a certain time
                 block=self._config.block_time_ms,
+                # we do not require an acknowledgment after processing the message
+                # without this, the message would be put into pending and will still be saved in redis
+                # resulting in big stream bytes even when trimmed
+                noack=True,
             )
 
             with self._activity_status_lock:
