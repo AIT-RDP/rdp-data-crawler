@@ -110,16 +110,6 @@ def modbus_config_types(mockup_server):
     }
 
 
-def test_modbus_not_valid(modbus_config_types):
-    """Try to write to a non-existing register"""
-
-    modbus_config_model = ModbusParameters.model_validate(modbus_config_types)
-    src_api = modbus_sink.ModbusTCP(modbus_config=modbus_config_model)
-
-    with pytest.raises(expected_exception=ValueError):
-        src_api.insert_data({"gibts_nicht": 123.45}, None)
-
-
 def test_modbus_write_read(modbus_config_types):
     """Write and then read from modbus"""
 

@@ -54,8 +54,12 @@ class ModbusTCP(abstract_sink.AbstractSinkAPI):
         """
 
         for key, value in data.items():
-            # Modbus checks if the key is in the register table
-            self._device.write_register(key, value)
+            try:
+                # Modbus checks if the key is in the register table
+                self._device.write_register(key, value)
+            except ValueError:
+                # Catch exception if the key is not in the register table
+                pass
 
     @staticmethod
     def parameter_model() -> type[ModbusParameters]:
