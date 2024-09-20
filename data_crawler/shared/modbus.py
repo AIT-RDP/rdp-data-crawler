@@ -30,7 +30,7 @@ class Datapoint(pa.DataFrameModel):
     )
 
     name: pt.Series[str] = pa.Field(
-        description="The name of the datapoint used to query redis and used int the graphql schema.",
+        description="The name of the datapoint used to query redis",
         coerce=True,
         unique=True,
     )
