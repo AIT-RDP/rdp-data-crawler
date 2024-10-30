@@ -7,6 +7,7 @@ stages:
 include:
   - component: "$CI_SERVER_FQDN/ees/rdp/generic-components/rdp-cicd-components/kaniko@main"
     inputs:
+      stage-test-image: test
       build-args: --build-arg MODBUS_GIT_USER --build-arg MODBUS_GIT_PASSWORD --build-arg TOKEN_PYRDP_COMMONS
 
 variables:
