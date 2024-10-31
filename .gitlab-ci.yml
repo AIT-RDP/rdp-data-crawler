@@ -2,18 +2,12 @@ stages:
   - build
   - test
   - release
-  - cleanup
 
 include:
   - component: "$CI_SERVER_FQDN/ees/rdp/generic-components/rdp-cicd-components/kaniko@main"
     inputs:
       stage-test-image: test
       build-args: --build-arg MODBUS_GIT_USER --build-arg MODBUS_GIT_PASSWORD --build-arg TOKEN_PYRDP_COMMONS
-
-variables:
-  CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
-  CONTAINER_MAIN_RELEASE_IMAGE: $CI_REGISTRY_IMAGE:latest
-  CONTAINER_DEVELOPMENT_RELEASE_IMAGE: $CI_REGISTRY_IMAGE:latest-dev
 
 # =============================================================================
 # Perform the unit test

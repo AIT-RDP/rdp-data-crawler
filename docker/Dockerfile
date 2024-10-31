@@ -1,3 +1,4 @@
+ARG DOCKER_PROXY_PREFIX
 # Do not use the alpine images as it is missing many dependencies
 FROM ${DOCKER_PROXY_PREFIX}python:3.10 as builder
 
