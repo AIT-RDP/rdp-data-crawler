@@ -17,7 +17,7 @@ redis = "^5.0"
 hiredis = "^2.3.2"
 prometheus-client = "~0"
 pyrdp-commons = {version = "=0.0.0.post77.dev0+2754b1b", source = "gitlab-pyrdp-commons"}
-modbus-crawler = {git = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler", rev = "0cc12cbfa8d2451837c3ef503df4b31ebbd0ecf3", optional = true}
+modbus-crawler = {git = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler", rev = "7e82d1ab01485e09a080ff2f25ef3ec1546dd528", optional = true}
 filelock = "^3.13.1"
 entsoe-py = "~0"
 pydantic = "^2.6"
