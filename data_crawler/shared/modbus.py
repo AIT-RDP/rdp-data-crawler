@@ -57,7 +57,8 @@ class Datapoint(pa.DataFrameModel):
     scaling: Optional[pt.Series[float]] = pa.Field(
         description="The scaling of the datapoint",
         coerce=True,
-        default=1,
+        default=None,
+        nullable=True
     )
 
     used: Optional[pt.Series[bool]] = pa.Field(

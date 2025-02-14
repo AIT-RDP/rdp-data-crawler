@@ -17,7 +17,7 @@ redis = "^5.0"
 hiredis = "^2.3.2"
 prometheus-client = "~0"
 pyrdp-commons = {version = "=0.0.0.post77.dev0+2754b1b", source = "gitlab-pyrdp-commons"}
-modbus-crawler = {git = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler", rev = "7e82d1ab01485e09a080ff2f25ef3ec1546dd528", optional = true}
+modbus-crawler = {git = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler", rev = "f989b99687c0fe400ba6c3af5a23a1cf62dec7e9", optional = true}
 filelock = "^3.13.1"
 entsoe-py = "~0"
 pydantic = "^2.6"
@@ -46,9 +46,7 @@ tenacity = "^8.5.0"
 [[tool.poetry.source]]
 name = "gitlab-pyrdp-commons"
 url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple"
-default = false
-secondary = true
-
+priority = "explicit"
 
 [tool.coverage.paths]
 source = ["data_crawler"]
@@ -59,7 +57,6 @@ source = ["data_crawler"]
 
 [tool.coverage.report]
 show_missing = true
-
 
 [build-system]
 requires = ["poetry-core"]
