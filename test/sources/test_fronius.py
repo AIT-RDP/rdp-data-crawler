@@ -38,13 +38,13 @@ def test_inverter_rt_data_parsing_day(inverter_rt_device_response_1, rt_paramete
 
     assert message is not None
     assert message["active_power_generation"] == 0.049
-    assert message["P_AC_tot"] == 49
+    assert message["P_AC_tot"] == 49.
     assert message["I_AC_tot"] == 0.38
     assert message["I_DC_tot"] == 0.080000000000000002
     assert message["U_AC"] == 226.5
-    assert message["U_DC"] == 666
+    assert message["U_DC"] == 666.
     assert message["P_DC_tot"] == 666 * 0.080000000000000002
-    assert message["E_P_exp"] == 6460320
+    assert message["E_P_exp"] == 6460320.
     assert message["E_P_exp_day"] == 68.700000000000003
     assert message["E_P_exp_year"] == 5323129.5
 
@@ -53,6 +53,28 @@ def test_inverter_rt_data_parsing_day(inverter_rt_device_response_1, rt_paramete
     assert message["observation_time"] == "2022-11-30T11:06:23+01:00"
     assert message["observation_time_device"] == "2022-11-30T11:06:23+01:00"
     assert message["observation_time_correction"] == 0.0
+
+
+def test_inverter_rt_data_types(inverter_rt_device_response_1, rt_parameters):
+    """Assesses the data types returned by the Fronius real-time source"""
+
+    api = fronius.FroniusInverterRealtimeData(source_parameters=rt_parameters, executor_name="<test>")
+    api.start()
+    message = api.fetch_data(raw_data=inverter_rt_device_response_1)
+    api.stop()
+
+    float_fields = [
+        "active_power_generation", "P_AC_tot", "I_AC_tot", "I_DC_tot", "U_AC", "U_DC", "P_DC_tot", "E_P_exp",
+        "E_P_exp_day", "E_P_exp_year", "observation_time_correction"
+    ]
+    for field in float_fields:
+        assert type(message[field]) == float, f"Invalid type fo field {field}, expected float."
+
+    int_fields = [
+        "error_code", "status_code"
+    ]
+    for field in int_fields:
+        assert type(message[field]) == int, f"Invalid type fo field {field}, expected int."
 
 
 def test_inverter_rt_data_parsing_time(inverter_rt_device_response_1, rt_parameters):
@@ -87,10 +109,10 @@ def test_inverter_rt_data_parsing_night(inverter_rt_device_response_2, rt_parame
     assert message["P_DC_tot"] == 0.0
     assert message["E_P_exp"] == 6461029.5
     assert message["E_P_exp_day"] == 481.5
-    assert message["E_P_exp_year"] == 5323839
+    assert message["E_P_exp_year"] == 5323839.
 
-    assert message["error_code"] == 307
-    assert message["status_code"] == 3
+    assert message["error_code"] == 307.
+    assert message["status_code"] == 3.
     assert message["observation_time"] == "2022-12-01T19:22:17+01:00"
     assert message["observation_time_correction"] == 0.0
 
@@ -157,10 +179,10 @@ def test_inverter_pf_data_parsing_day(inverter_pf_device_response_1, pf_paramete
     assert messages[0]["device_id"] == "1"
     assert messages[0]["device_type"] == "Fronius Symo 12.5-3-M"
     assert messages[0]["active_power_generation"] == 0.152
-    assert messages[0]["P_AC_tot"] == 152
+    assert messages[0]["P_AC_tot"] == 152.
     assert messages[0]["E_P_exp"] == 6466259.5
     assert messages[0]["E_P_exp_day"] == 242.40000915527344
-    assert messages[0]["E_P_exp_year"] == 5329062
+    assert messages[0]["E_P_exp_year"] == 5329062.
 
     assert messages[1]["observation_time"] == "2022-12-06T11:21:03+01:00"
     assert messages[1]["observation_time_correction"] == 0.0
@@ -168,10 +190,10 @@ def test_inverter_pf_data_parsing_day(inverter_pf_device_response_1, pf_paramete
     assert messages[1]["device_id"] == "2"
     assert messages[1]["device_type"] == "Fronius Symo 12.5-3-M"
     assert messages[1]["active_power_generation"] == 0.432
-    assert messages[1]["P_AC_tot"] == 432
-    assert messages[1]["E_P_exp"] == 10147120
+    assert messages[1]["P_AC_tot"] == 432.
+    assert messages[1]["E_P_exp"] == 10147120.
     assert messages[1]["E_P_exp_day"] == 747.70001220703125
-    assert messages[1]["E_P_exp_year"] == 8908375
+    assert messages[1]["E_P_exp_year"] == 8908375.
 
     assert messages[2]["observation_time"] == "2022-12-06T11:21:03+01:00"
     assert messages[2]["observation_time_correction"] == 0.0
@@ -179,10 +201,10 @@ def test_inverter_pf_data_parsing_day(inverter_pf_device_response_1, pf_paramete
     assert messages[2]["device_id"] == "3"
     assert messages[2]["device_type"] == "Fronius Symo 12.5-3-M"
     assert messages[2]["active_power_generation"] == 0.187
-    assert messages[2]["P_AC_tot"] == 187
-    assert messages[2]["E_P_exp"] == 5223590
+    assert messages[2]["P_AC_tot"] == 187.
+    assert messages[2]["E_P_exp"] == 5223590.
     assert messages[2]["E_P_exp_day"] == 330.30001831054688
-    assert messages[2]["E_P_exp_year"] == 4207943
+    assert messages[2]["E_P_exp_year"] == 4207943.
     assert messages[0]["device_type"] == "Fronius Symo 12.5-3-M"
 
     assert messages[3]["observation_time"] == "2022-12-06T11:21:03+01:00"
@@ -191,8 +213,8 @@ def test_inverter_pf_data_parsing_day(inverter_pf_device_response_1, pf_paramete
     assert messages[3]["device_id"] == "4"
     assert messages[3]["device_type"] == "Fronius Symo 12.5-3-M"
     assert messages[3]["active_power_generation"] == 0.359
-    assert messages[3]["P_AC_tot"] == 359
-    assert messages[3]["E_P_exp"] == 9279820
+    assert messages[3]["P_AC_tot"] == 359.
+    assert messages[3]["E_P_exp"] == 9279820.
     assert messages[3]["E_P_exp_day"] == 564.4000244140625
     assert messages[3]["E_P_exp_year"] == 8117679.5
 
@@ -202,10 +224,29 @@ def test_inverter_pf_data_parsing_day(inverter_pf_device_response_1, pf_paramete
     assert messages[4]["device_id"] == "5"
     assert messages[4]["device_type"] == "Fronius Symo 12.5-3-M"
     assert messages[4]["active_power_generation"] == 0.247
-    assert messages[4]["P_AC_tot"] == 247
+    assert messages[4]["P_AC_tot"] == 247.
     assert messages[4]["E_P_exp"] == 8141699.5
-    assert messages[4]["E_P_exp_day"] == 353
+    assert messages[4]["E_P_exp_day"] == 353.
     assert messages[4]["E_P_exp_year"] == 7070373.5
+
+
+def test_inverter_pf_data_type(inverter_pf_device_response_1, pf_parameters):
+    """Tests the parsing functionality of the realtime power flow data source"""
+
+    api = fronius.FroniusInverterPowerFlowRealtimeData(source_parameters=pf_parameters, executor_name="<test>")
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_pf_device_response_1))
+    api.stop()
+
+    assert len(messages) == 5
+
+    float_fields = [
+        "observation_time_correction", "active_power_generation", "P_AC_tot", "E_P_exp", "E_P_exp_day", "E_P_exp_year"
+    ]
+
+    for message in messages:
+        for field in float_fields:
+            assert type(message[field]) == float, f"Invalid type fo field {field}, expected float."
 
 
 def test_inverter_pf_data_time_correction(inverter_pf_device_response_1, pf_parameters):
@@ -392,11 +433,34 @@ def test_inverter_archive_parsing_full(inverter_archive_response_2, archive_para
     assert messages[0]["U_DC_S2"] == [185.9, 181.9, 169.70000000000002, 170.9, 169.5, 163.9, 152.8, 135.5,
                                       121.10000000000001, 112.30000000000001, 96.30000000000001, 75.4]
 
-    assert messages[0]["device_temperature_1"] == [24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    assert messages[0]["device_temperature_1"] == [24., 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     assert messages[0]["U_L1N"] == [175.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     assert messages[0]["U_L2N"] == [175.10000000000002, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     assert messages[0]["U_L3N"] == [175.60000000000002, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+
+def test_inverter_archive_data_types(inverter_archive_response_2, archive_parameters, persistent_store):
+    """Tests the data type representation on parsing the archive files"""
+
+    del archive_parameters["data points"]  # Query all data points
+
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_2))
+    api.stop()
+
+    assert len(messages) == 5
+
+    float_fields = [
+        "observation_time_correction", "I_L1", "I_L2", "I_L3", "I_DC_S1", "I_DC_S2", "U_DC_S1", "U_DC_S2",
+        "device_temperature_1", "U_L1N", "U_L2N", "U_L3N"
+    ]
+
+    for message in messages:
+        for field in float_fields:
+            assert all(f is None or type(f) == float for f in message[field]), f"Not all entries of {field} are floats"
 
 
 def test_inverter_archive_parsing_big_message(inverter_archive_response_3, archive_parameters, persistent_store):
@@ -449,7 +513,7 @@ def test_inverter_archive_parsing_reduced_device(inverter_archive_response_4, ar
 
     assert messages[0]["I_DC_S1"] == [0.03, 0.03]
     assert messages[0]["I_DC_S2"] == [0, 0]
-    assert messages[0]["U_DC_S1"] == [624, 640.5]
+    assert messages[0]["U_DC_S1"] == [624., 640.5]
     assert messages[0]["U_DC_S2"] == [179.20000000000002, 178.8]
 
     assert messages[1]["device_id"] == "2"
