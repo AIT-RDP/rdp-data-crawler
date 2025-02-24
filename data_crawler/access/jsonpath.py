@@ -3,7 +3,7 @@ Implements helper classes that use jsonpath expressions to extract some informat
 """
 
 import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import jsonpath_ng as jsonpath
 import pandas as pd
@@ -12,7 +12,8 @@ import pandas as pd
 class PathExtractor:
     """Helper class to define an extraction rule transforming the parsed response"""
 
-    def __init__(self, target_key: str, src_path: str, is_list=True, dst_format=None, drop_missing=False):
+    def __init__(self, target_key: str, src_path: str, is_list=True, dst_format=None, drop_missing=False,
+                 target_type: Optional[type] = None):
         """
         Initializes the extractor
 
@@ -24,6 +25,8 @@ class PathExtractor:
             transformation will be applied.
         :param drop_missing: Entirely drops the key-value pair (returning an empty message) if the path expression
             does not match.
+        :param target_type: The target data type to convert the single entries to. In case None is given, no type
+            conversion is performed.
         """
 
         self._target_key = target_key
@@ -31,6 +34,7 @@ class PathExtractor:
         self._is_list = bool(is_list)
         self._drop_missing = bool(drop_missing)
         self._dst_format = dst_format
+        self._target_type = target_type
 
     def _extract_raw_results(self, raw_data: dict) -> list:
         """
@@ -54,6 +58,8 @@ class PathExtractor:
 
         if self._dst_format is not None:
             result = list(map(self._dst_format, result))
+        if self._target_type is not None:
+            result = list(map(self._target_type, result))
 
         if len(result) <= 0 and self._drop_missing:
             return {}
@@ -113,7 +119,7 @@ class OptionalPathExtractor(PathExtractor):
     """JSON Path extractor that allow to handle optional sub-paths"""
 
     def __init__(self, target_key: str, base_path: str, src_path: str, is_list=True, dst_format=None,
-                 default_value=None):
+                 default_value=None, target_type: Optional[type] = None):
         """
         Initializes the extractor
 
@@ -127,9 +133,12 @@ class OptionalPathExtractor(PathExtractor):
         :param dst_format: A callable that transforms each value to a destination format. In case it is None, no
             transformation will be applied.
         :param default_value: The default value to set in case the src_path is not present in the base_path
+        :param target_type: The target data type to convert the single entries to. In case None is given, no type
+            conversion is performed.
         """
 
-        super(OptionalPathExtractor, self).__init__(target_key, src_path, is_list=is_list, dst_format=dst_format)
+        super(OptionalPathExtractor, self).__init__(target_key, src_path, is_list=is_list, dst_format=dst_format,
+                                                    target_type=target_type)
 
         self._base_expression = jsonpath.parse(base_path)
         self._default_value = default_value
