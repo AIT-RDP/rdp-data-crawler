@@ -58,20 +58,23 @@ class FroniusInverterRealtimeData(abstract_source.AbstractSourceAPI):
             "E_P_exp_year": "YEAR_ENERGY",  # "Wh"
         }
         extractors = [
-            jx.PathExtractor(dst, f"Body.Data.{src}.Value", is_list=False, drop_missing=True)
+            jx.PathExtractor(dst, f"Body.Data.{src}.Value", is_list=False, drop_missing=True, target_type=float)
             for dst, src in parameter_mapping.items()
         ]
 
         extractors += [
-            jx.OptionalPathExtractor("P_AC_tot", "Body.Data", "PAC.Value", is_list=False, default_value=0.0),
+            jx.OptionalPathExtractor("P_AC_tot", "Body.Data", "PAC.Value", is_list=False, default_value=0.0,
+                                     target_type=float),
             # Deprecated variable to establish compatibility. Will be removed in future revisions:
             jx.OptionalPathExtractor("active_power_generation", "Body.Data", "PAC.Value", is_list=False,
-                                     default_value=0.0,
+                                     default_value=0.0, target_type=float,
                                      dst_format=lambda x: x * 1e-3),
 
             jx.DatetimePathExtractor("observation_time", "Head.Timestamp", is_list=False),
-            jx.PathExtractor("error_code", "Body.Data.DeviceStatus.ErrorCode", is_list=False, drop_missing=True),
-            jx.PathExtractor("status_code", "Body.Data.DeviceStatus.StatusCode", is_list=False, drop_missing=True),
+            jx.PathExtractor("error_code", "Body.Data.DeviceStatus.ErrorCode",
+                             is_list=False, drop_missing=True, target_type=int),
+            jx.PathExtractor("status_code", "Body.Data.DeviceStatus.StatusCode",
+                             is_list=False, drop_missing=True, target_type=int),
             jx.PathExtractor("device_id", "Head.RequestArguments.DeviceId", is_list=False, drop_missing=True),
         ]
 
@@ -175,11 +178,11 @@ class FroniusInverterPowerFlowRealtimeData(abstract_source.AbstractMultiMessageS
         decoded_message = {
             "device_id": inv_name,
             "device_type": _fronius_device_types.get(inv_data.get("DT", -1), "Unknown Device"),
-            "E_P_exp": inv_data["E_Total"],  # [Wh]
-            "E_P_exp_day": inv_data["E_Day"],  # [Wh]
-            "E_P_exp_year": inv_data["E_Year"],  # [Wh]
-            "active_power_generation": inv_data.get("P", 0.0) / 1e3,  # Deprecated, [kW]
-            "P_AC_tot": inv_data.get("P", 0.0),  # [W]
+            "E_P_exp": float(inv_data["E_Total"]),  # [Wh]
+            "E_P_exp_day": float(inv_data["E_Day"]),  # [Wh]
+            "E_P_exp_year": float(inv_data["E_Year"]),  # [Wh]
+            "active_power_generation": float(inv_data.get("P", 0.0)) / 1e3,  # Deprecated, [kW]
+            "P_AC_tot": float(inv_data.get("P", 0.0)),  # [W]
         }
 
         decoded_message.update(base_message)
@@ -388,8 +391,9 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
             self._logger.warning(f"Time series of {dp_name} has intermediate data points ({list(excess_points)}) that "
                                  f"will be dropped")
 
-        ret = [dp_data["Values"].get(ts, None) for ts in offset_axis]
-        return ret
+        target_data = [dp_data["Values"].get(ts, None) for ts in offset_axis]
+        target_data = [float(r) if r is not None else r for r in target_data]
+        return target_data
 
     @staticmethod
     def _extract_inverter_id(inv_name):
@@ -420,7 +424,7 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         ts_start = datetime.datetime(ts_start.year, ts_start.month, ts_start.day, ts_start.hour, ts_start.minute, 0,
                                      tzinfo=ts_start.tzinfo)
 
-        # The Archive API freaks out if we URL-encode characters like ':' and '+'. Hence we have to build the URL
+        # The Archive API freaks out if we URL-encode characters like ':' and '+'. Hence, we have to build the URL
         # manually. :-(
         channels = list(self._data_points) + ["TimeSpanInSec"]
         url = f"http://{self._address}/solar_api/v1/GetArchiveData.cgi?Scope=System&HumanReadable=False&" \
