@@ -161,7 +161,7 @@ def test_modbus_write_read(modbus_config_types):
     assert data["frequency"] == 1234567890.0
 
 
-def test_modbus_write_read_not_transactional(modbus_config_types):
+def test_modbus_write_not_transactional(modbus_config_types):
     """Write and then read from modbus"""
 
     modbus_config_model = ModbusParameters.model_validate(modbus_config_types)
@@ -179,7 +179,7 @@ def test_modbus_write_read_not_transactional(modbus_config_types):
     del sink_api
 
 
-def test_modbus_write_read_transactional(modbus_config_types_transactional):
+def test_modbus_write_transactional(modbus_config_types_transactional):
     """Write and then read from modbus"""
 
     modbus_config_model = ModbusParameters.model_validate(modbus_config_types_transactional)
