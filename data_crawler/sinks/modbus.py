@@ -28,9 +28,15 @@ class ModbusTCP(abstract_sink.AbstractSinkAPI):
             auto_connect=False, registers_spec_df=modbus_config.register_spec
         )
 
-        self._device.connect()
+        self._transactional_connection = modbus_config.transactional_connection
+
+        # If the connection is transactional, we do not want
+        # to connect here but in the insert_data method
+        if not modbus_config.transactional_connection:
+            self._device.connect()
 
     def __del__(self):
+        # Disconnect anyway
         self._device.disconnect()
 
     @classmethod
@@ -53,6 +59,9 @@ class ModbusTCP(abstract_sink.AbstractSinkAPI):
         :param metadata: Any metadata that alters the behaviour of the function
         """
 
+        if self._transactional_connection:
+            self._device.connect()
+
         for key, value in data.items():
             try:
                 # Modbus checks if the key is in the register table
@@ -60,6 +69,9 @@ class ModbusTCP(abstract_sink.AbstractSinkAPI):
             except ValueError:
                 # Catch exception if the key is not in the register table
                 pass
+
+        if self._transactional_connection:
+            self._device.disconnect()
 
     @staticmethod
     def parameter_model() -> type[ModbusParameters]:
