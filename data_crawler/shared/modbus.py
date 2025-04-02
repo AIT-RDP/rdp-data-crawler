@@ -154,6 +154,12 @@ class ModbusParameters(abstract_sink.SinkParameters):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)  # Allow DataFrame to be used as a type
 
+    transactional_connection: bool = pydantic.Field(
+        description="If each write/read operation should be done in a new connection. "
+                    "Useful if clients only allow one connection und multiple data crawlers are used",
+        default=False,
+    )
+
     @field_validator("register_spec", mode="before")
     @classmethod
     def transform(cls, raw: pd.DataFrame | list[dict]) -> pd.DataFrame:

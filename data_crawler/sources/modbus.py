@@ -34,18 +34,34 @@ class ModbusTCP(abstract_source.AbstractSourceAPI):
             auto_connect=False, registers_spec_df=source_parameters_model.register_spec
         )
 
+        self._transactional_connection = source_parameters_model.transactional_connection
+
     def start(self):
         """Connects to the Modbus server"""
-        self._device.connect()
+
+        # If the connection is transactional, we do not want
+        # to connect here but in the fetch_data method
+        if not self._transactional_connection:
+            self._device.connect()
 
     def fetch_data(self) -> Dict[str, Any]:
         """
         Queries the Modbus TCP device and returns the corresponding message
         """
+
+        if self._transactional_connection:
+            self._device.connect()
+
         out_info: Dict[str, Any] = {"observation_time": datetime.datetime.now(tz=datetime.timezone.utc).isoformat()}
         out_info.update(self._device.read_registers_as_dict())
+
+        if self._transactional_connection:
+            self._device.disconnect()
+
         return out_info
 
     def stop(self):
         """Disconnects from the Modbus server"""
+
+        # Disconnect anyway
         self._device.disconnect()

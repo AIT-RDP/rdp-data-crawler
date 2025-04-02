@@ -109,17 +109,38 @@ def modbus_config_types(mockup_server):
         })
     }
 
+@pytest.fixture()
+def modbus_config_types_transactional(mockup_server):
+    """Returns a (quite) minimal modus configuration stanza with unconventional column types"""
+
+    return {
+        "address": mockup_server[0],
+        "port": mockup_server[1],
+        "transactional_connection": True,
+        "register spec": pd.DataFrame.from_dict({
+            "Register_start": [100, None, None, 110],  # Will be translated to a float column
+            "Register_type": ["i", "i", "i", "i"],
+            "Data_type": ["UINT16", "DOUBLE", "FloaT", "UINT32"],
+            "Name": ["current_phase_1", "some_energy", "crazy number", "frequency"],
+            "Unit": ["A", "Wh", "1", "Hz"],
+            "Scaling": [0.01, 1.0, 1.0, 1.0]
+        })
+    }
+
 
 def test_modbus_write_read(modbus_config_types):
     """Write and then read from modbus"""
 
     # Write
     modbus_config_model = ModbusParameters.model_validate(modbus_config_types)
-    src_api = modbus_sink.ModbusTCP(modbus_config=modbus_config_model)
+    sink_api = modbus_sink.ModbusTCP(modbus_config=modbus_config_model)
 
-    src_api.insert_data({"current_phase_1": 123.45, "some_energy": 54830306.71802119, "crazy number": 0.2,
-                         "frequency": 1234567890.0},
-                        None)
+    sink_api.insert_data({"current_phase_1": 123.45, "some_energy": 54830306.71802119, "crazy number": 0.2,
+                          "frequency": 1234567890.0},
+                         None)
+
+    # There is no stop function in the sink, so we need to delete the object to close the connection
+    del sink_api
 
     # Read
     src_api = modbus_source.ModbusTCP(source_parameters=modbus_config_types, executor_name="<test-modbus>")
@@ -138,3 +159,39 @@ def test_modbus_write_read(modbus_config_types):
     assert data["some_energy"] == 54830306.71802119
     assert data["crazy number"] == pytest.approx(0.2)
     assert data["frequency"] == 1234567890.0
+
+
+def test_modbus_write_read_not_transactional(modbus_config_types):
+    """Write and then read from modbus"""
+
+    modbus_config_model = ModbusParameters.model_validate(modbus_config_types)
+    sink_api = modbus_sink.ModbusTCP(modbus_config=modbus_config_model)
+
+    assert sink_api._device._client.connected, "Connection should be opened at the object creation"
+
+    sink_api.insert_data({"current_phase_1": 123.45, "some_energy": 54830306.71802119, "crazy number": 0.2,
+                          "frequency": 1234567890.0},
+                         None)
+
+    assert sink_api._device._client.connected, "Connection should remain open after a write operation"
+
+    # There is no stop function in the sink, so we need to delete the object to close the connection
+    del sink_api
+
+
+def test_modbus_write_read_transactional(modbus_config_types_transactional):
+    """Write and then read from modbus"""
+
+    modbus_config_model = ModbusParameters.model_validate(modbus_config_types_transactional)
+    sink_api = modbus_sink.ModbusTCP(modbus_config=modbus_config_model)
+
+    assert not sink_api._device._client, "Client should not be opened at the object creation"
+
+    sink_api.insert_data({"current_phase_1": 123.45, "some_energy": 54830306.71802119, "crazy number": 0.2,
+                          "frequency": 1234567890.0},
+                         None)
+
+    assert not sink_api._device._client.connected, "Connection should be closed again after a write operation"
+
+    # There is no stop function in the sink, so we need to delete the object to close the connection
+    del sink_api

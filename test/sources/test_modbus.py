@@ -14,6 +14,7 @@ import pytest
 import data_crawler.sources.modbus as modbus
 import helpers
 
+
 @pytest.fixture()
 def minimal_modbus_config(mockup_server):
     """Returns a (quite) minimal modus configuration stanza"""
@@ -31,6 +32,27 @@ def minimal_modbus_config(mockup_server):
             "Scaling": [0.01, 1.0, 1.0, 1.0]
         })
     }
+
+
+@pytest.fixture()
+def minimal_modbus_config_transactional(mockup_server):
+    """Returns a (quite) minimal modus configuration stanza"""
+
+    return {
+        "address": mockup_server[0],
+        "port": mockup_server[1],
+        "transactional_connection": True,
+        "register spec": pd.DataFrame.from_dict({
+            "Register_start": [100, "X", "-", 110],
+            "Register_end": ["", "", "", 111],
+            "Register_type": ["i", "i", "i", "i"],
+            "Data_type": ["UINT16", "DOUBLE", "FloaT", "UINT32"],
+            "Name": ["current_phase_1", "some_energy", "crazy number", "frequency"],
+            "Unit": ["A", "Wh", "1", "Hz"],
+            "Scaling": [0.01, 1.0, 1.0, 1.0]
+        })
+    }
+
 
 @pytest.fixture()
 def mockup_server() -> Tuple[str, int]:
@@ -125,6 +147,44 @@ def test_modbus_tcp_basic(minimal_modbus_config):
     assert data["crazy number"] == pytest.approx(0.2)
 
 
+def test_modbus_tcp_basic_not_transactional(minimal_modbus_config):
+    """Tests the very basic operation of the modbus crawler"""
+
+    src_api = modbus.ModbusTCP(source_parameters=minimal_modbus_config, executor_name="<test-modbus>")
+
+    assert not src_api._device._client, "Connection should not be opened after initialization"
+
+    src_api.start()
+
+    assert src_api._device._client.connected, "Connection should be opened after start"
+
+    src_api.fetch_data()
+
+    assert src_api._device._client.connected, "Connection should remain open for subsequent reads"
+
+    src_api.stop()
+
+    assert not src_api._device._client.connected, "Connection should be closed after stop"
+
+def test_modbus_tcp_basic_transactional(minimal_modbus_config_transactional):
+    """Tests the very basic operation of the modbus crawler"""
+
+    src_api = modbus.ModbusTCP(source_parameters=minimal_modbus_config_transactional, executor_name="<test-modbus>")
+
+    assert not src_api._device._client, "Client should not be created on initialization"
+
+    src_api.start()
+
+    assert not src_api._device._client, "Client should not be created on start"
+
+    for _ in range(5):
+        src_api.fetch_data()
+
+        assert not src_api._device._client.connected, "Connection should be closed after each fetch"
+
+    src_api.stop()
+
+
 @pytest.fixture()
 def modbus_config_types(mockup_server):
     """Returns a (quite) minimal modus configuration stanza with unconventional column types"""
@@ -181,7 +241,6 @@ def test_modbus_tcp_invalid_register_spec(modbus_config_types):
         modbus.ModbusTCP(source_parameters=modbus_config_types, executor_name="<test-modbus>")
 
 
-
 @pytest.fixture()
 def minimal_rw_modbus_config(mockup_server):
     """Returns a modbus configuration with read-write registers"""
@@ -202,7 +261,6 @@ def minimal_rw_modbus_config(mockup_server):
     }
 
 
-
 def test_modbus_read_only_r_mode(minimal_rw_modbus_config):
     """Tests the very basic operation of the modbus crawler"""
 
@@ -220,4 +278,3 @@ def test_modbus_read_only_r_mode(minimal_rw_modbus_config):
 
     read_keys = ["observation_time", "current_phase_1", "some_energy", "crazy number"]
     assert list(data.keys()) == read_keys
-
