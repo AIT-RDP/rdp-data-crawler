@@ -90,14 +90,14 @@ class Datapoint(pa.DataFrameModel):
     def register_type_check(cls, series):
         series = series.str.lower()
         # Allow alias for register type
-        series = series.map(register_type_lookup)
+        series = series.map(lambda tp: register_type_lookup[tp] if tp in register_type_lookup else tp)
         return series
 
     @pa.parser("data_type")
     def data_type_check(cls, series):
         series = series.str.lower()
         # Allow alias for data type
-        series = series.map(data_type_lookup)
+        series = series.map(lambda tp: data_type_lookup[tp] if tp in data_type_lookup else tp)
         return series
 
     @classmethod

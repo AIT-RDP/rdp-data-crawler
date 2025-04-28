@@ -278,3 +278,44 @@ def test_modbus_read_only_r_mode(minimal_rw_modbus_config):
 
     read_keys = ["observation_time", "current_phase_1", "some_energy", "crazy number"]
     assert list(data.keys()) == read_keys
+
+
+@pytest.mark.parametrize("register_spec,magic_words", [
+    (
+        pd.DataFrame.from_dict({
+            "Register_start": [100],
+            "Register_type": ["h"],
+            "Data_type": ["qbit"],  # Invalid datatype
+            "Name": ["current_phase_1"],
+            "Scaling": [0.01]
+        }),
+        ["data_type", "qbit"]
+    ),
+    (
+            pd.DataFrame.from_dict({
+                "Register_start": [100],
+                "Register_type": ["random"],  # Invalid Register type
+                "Data_type": ["uint16"],
+                "Name": ["current_phase_1"],
+                "Scaling": [0.01]
+            }),
+            ["register_type", "random"]
+    )
+])
+def test_modbus_source_invalid_register_spec(register_spec: pd.DataFrame, magic_words: list[str]):
+    """Assesses the error messages on invalid register specs"""
+
+    modbus_config = {
+        "address": "localhost",
+        "port": 402,
+        "register spec": register_spec
+    }
+
+    with pytest.raises(ValueError) as err:
+        modbus.ModbusTCP(source_parameters=modbus_config, executor_name="<test-modbus>")
+
+    for magic_word in magic_words:
+        assert magic_word in str(err.value), f"Expected a hint to the actually unknown value via keyword {magic_word}"
+
+
+
