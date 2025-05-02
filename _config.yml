@@ -1,0 +1,7 @@
+# Configuration for the documentation hosted via Github pages 
+remote_theme: pages-themes/minimal@v0.2.0
+plugins:
+- jekyll-remote-theme
+title: RDP Data Crawler
+description: Periodically fetches publicly available forecast and measurement information and stores it into Redis streams
+show_downloads: true
