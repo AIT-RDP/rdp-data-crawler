@@ -122,3 +122,42 @@ In case the processing duration exceeds the configured frequency, the next opera
 the delay exceeds the following regular interval, the triggering point will be skipped in order to avoid pile-up of 
 delays and unpredictable timing.
 
+## Data Sources and Data Sinks
+
+The default distribution of the AIT RDP Data Crawler already supports a broad variety of data sources and data sinks. 
+The following overview lists the main ones. Detailed configurations can be found in the 
+[data source and data sink description](docs/data_sources_and_data_sinks.md).
+
+* Meteorological data
+  * Weatherbit
+    * `data_crawler.sources.weatherbit.CurrentWeather`: Current weather estimations (not recommended for archiving).
+    * `data_crawler.sources.weatherbit.HourlyForecasts`: Hourly, numerical weather prediction data for a particular 
+      location
+  * met.no
+    * `data_crawler.sources.yr_no.LocationForecast` Numerical weather prediction data for a particular location
+  * Geosphere Austria
+    * `data_crawler.sources.zamg.MeasurementStationData`: Live and historic measurements
+    * `data_crawler.sources.zamg.NumericalWeatherPredictionData`: Numerical weather prediction data, both point 
+      predictions and ensemble forecasts.
+  * KNMI
+    * `data_crawler.sources.knmi.WeatherStationsKNMI`: Weather station data
+
+* Generic protocols and interfaces
+  * `data_crawler.sources.modbus.ModbusTCP`: Modbus TCP source
+  * `data_crawler.sinks.modbus.ModbusTCP`; Modbus TCP sink
+  * `data_crawler.sources.opc_ua.OPCUA`: OPC UA source
+  * `data_crawler.sinks.opc_ua.OPCUA` OPC UA sink
+  * `data_crawler.sinks.redis.RedisStream`: Redis stream sink (default)
+  * `data_crawler.sources.teltonika_modbus.TeltonikaModbus`: REST interface to receive Modbus data via Teltonica devices
+
+* Energy- and market-related services:
+  * ENTSO-E
+    * `data_crawler.sources.entsoe_da.ENTSOEDATransparency`: Day-ahead market prices from ENTSO-E
+
+* Device-specific interfaces
+  * Fronius
+    * `data_crawler.sources.fronius.FroniusInverterRealtimeData`: Device-level real-time data from Fronius inverters
+    * `data_crawler.sources.fronius.FroniusInverterPowerFlowRealtimeData`: Real-time power-flow data of all devices 
+      connected to the data logger
+    * `data_crawler.sources.fronius.FroniusSystemArchiveData`: Device-level API to query historic values and detailed
+      information from Fronius inverters
