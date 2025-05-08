@@ -1,115 +1,163 @@
 # RDP Data Crawler
 
-Periodically fetches various data sources such as forecasts and measurement information and stores the data into Redis
-streams.
+The RDP Data Crawler mainly interfaces external systems and the AIT RDP. It either periodically or event-driven fetches 
+data from various sources such as forecasts or measurement information and stores the data into Redis streams. In 
+addition, the AIT Data Crawler can push data to external systems such as Modbus or OPC UA devices. 
 
-## Poetry Development Setup
+## Installation and System Integration
 
-On Windows, one may want to manage the python interpreter versions using 
-[pyenv-win](https://pyenv-win.github.io/pyenv-win/).
-```shell
-# List available interpreter versions
-pyenv install -l
+The RDP Data Crawler is designed to be integrated as Docker container into the AIT RDP. The main docker image is 
+available at Docker Hub via `ait1/rdp-data-crawler`. In addition to version tags, the following are supported:
+ * `latest`: The latest stable release branch.
+ * `latest-dev`: The latest version of the development branch. 
 
-# Install and register the python interpreter
-pyenv install 3.10.11  # Oldest supported version. You may want to choose a newer one
-pyenv local 3.10.11  # Locally activate your python version
-poetry env use $(pyenv which python)  # Create the poetry environment based on the selected interpreter
+Since the configurations are commonly rather complex, a direct configuration via environment variables is not feasible. 
+Instead, a configuration file or directory is mounted. Per default, the configuration is located at 
+`/etc/data_crawler/config.yml`. Nevertheless, the whole `/etc/data_crawler/` directory can be mounted in case 
+sub-configuration files are needed. The following example shows a basic docker-compose service definition:
+
+```yaml
+services:
+  # ...
+  data-crawler:
+    image: ait1/data-crawler:latest-dev
+    volumes:
+      - ./data-crawler/config.yml:/etc/data_crawler/config.yml:ro
+    environment:
+      REDIS_USERNAME: ${REDIS_USERNAME}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    depends_on:
+      - redis
+    restart: unless-stopped
 ```
 
-If you more into conda, you can install the base environment as follows. However, be aware that sometimes update 
-problems due to the two package managers (poetry, conda) are reported. You are warned, here are the conda snippets:
-```shell
-conda create -n rdp-data-crawler python=3.11
-conda activate rdp-data-crawler
-conda install poetry
+For other installation methods, including custom data sources and development setups, please refer to the 
+[Advanced Installation](docs/advanced_installation.md) section.
+
+## Configuration Structure
+
+The configuration is done via a YAML file that supports the AIT RDP extensions such as variables substitution and 
+templating. The configuration is organized into multiple channels that are described from the perspective of the data 
+sources. For each channel, a single source is created and the data from that source is accessed, processed and written 
+to a destination. In most cases, either the destination (default) or the source will be an internal Redis. However, 
+also different configurations are supported. Hence, a single data crawler process can handle multiple sources 
+concurrently and consequently reduces the overhead of spinning up a large amount of containers. The basic structure of 
+the configuration is as follows:
+
+```yaml
+version: 1  # Configuration file version, mostly to ensure later compatibility
+
+# List of sources that will spin up a dedicated channel for each source
+data sources:
+  source.name.0:  # Unique name of the channel. Mostly used for debugging
+    type: <source_type>  # Type of the source to instantiate
+    source parameter: {}  # Source-specific parameters are defined here
+    # The polling section describes the timing of passive data sources that are executed periodically. Active data 
+    # sources that listen on external events may emit messages at any time. Hence, the polling section can be omitted 
+    # for these sources.
+    polling:
+      frequency: 5min
+    
+    sink_type: <sink_type>  # Type of the sink
+    sink_parameters: {}  # Sink-specific parameters are defined here
+
+  source.name.1: # Another source
+    # ...
 ```
 
-In case you have a dedicated conda environment that is not shared among poetry projects, make sure to directly install 
-the packages within the conda environment. Otherwise, an additional virtualenv may be created which often creates 
-troubles and redundancies.
-```shell
-poetry config --local virtualenvs.create false
+Each section has at lest a source and some sink configuration. Both sources and sinks are dynamically loaded by the 
+respective type. Source- and sink-specific parameters can be passed on in the `source parameter` and `sink_parameters` 
+sections, respectively. In case a Redis sink is used, the configuration can be simplified by omitting the `sink_type` 
+and `sink_parameters` sections and appending a `redis` section, instead:
+
+```yaml
+version: 1
+data sources:
+  source.name.0:
+    type: <source_type>
+    source parameter: {}
+    polling:
+      frequency: 5min
+    # The Redis section replaces the sink_type and sink_parameters sections.
+    redis:
+      stream: <stream_name>  # Name of the Redis stream to write to.
+      tags:  # Optional tags to be added to the Redis stream.
+        message-key-0: message-value-0
+        message-key-1: message-value-1
 ```
 
-Independent of your environment some dependencies are needed. In case your current user does not have access to the
-[PyRDP Commons](https://gitlab-intern.ait.ac.at/ees/rdp/generic-components/pyrdp-commons) repository, use an access
-token.
-Replace `$TOKEN_PYRDP_COMMONS` with the value of the token.
-Furthermore, this token is defined as a group variable of the GitLab group `EES/RDP`.
-```shell
-poetry config http-basic.gitlab-pyrdp-commons __token__ $TOKEN_PYRDP_COMMONS
-```
+Note that the redis sink allows to append arbitrary but static message fields. This can be used to set meta-data that 
+is needed for further data processing.
 
-Having your pyton/poetry base setup ready, one can install the development dependencies as follows.
-```shell
-# Make sure the correct conda environment is activated, if you have one. For poetry no further preparation is needed.
-poetry install --with dev -E modbus  # The modbus libraries come with the modbus extras
-```
+## Polling Configuration
 
-## Run the test cases
+Sources that require regular polling can be configured via the `polling` section. In order to determine the timing and 
+avoid overloading various sources, a fine-grained control is possible. At minimum, the `frequency` parameter must be 
+set. The complete list of parameters is as follows:
 
-To run the test cases, a development instance of Redis is needed. E.g. spin up one by using podman or docker:
-```shell
-podman run -p 6379:6379 -it docker.io/redis
-```
+* `frequency`: The nominal interval between two consecutive polling operations. Values are interpreted according to the 
+  [Pandas Timedelta Specification](https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html) including 
+  ISO 8601 duration representation. Examples are `5min`, `1h`, `1d`, and `1w`.
+* `jiter`: A uniformly distributed random jitter that is added to the nominally scheduled time. This may be useful to 
+  load balance a source serving multiple requests at the same time. The value is interpreted according to the 
+  [Pandas Timedelta Specification](https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html) including 
+  ISO 8601 duration representation. The jitter is applied symmetrically, i.e., the scheduled point in time may be both 
+  reduced or extended by the jitter value, at maximum.
+* `offset`: A fixed offset to shift the scheduling interval. Per default, scheduling is aligned to the full 
+  hour/day/month/etc. The offset shifts this alignment by the given timedelta. Values are represented as described 
+  above.
+* `slot count`, `slot id`: The scheduling interval can be divided into multiple time slots, where each slot is occupied 
+  by another operation. This feature can, for instance, be used to access devices by multiple data crawlers in a 
+  round-robin fashion avoiding concurrent data access. `slot count` defines the total number of slots, while `slot id` 
+  gives the current slot of the source process. The slot IDs start with 0 and max out at `slot count - 1`. Note that the
+  slot system only affects the scheduling offset and does not perform any synchronization among sources or data 
+  crawlers. Make sure that sufficient timing reserves are available and that the system time among multiple hosts is 
+  sufficiently well synchronized.
+  Per default, one slot is configured.
+* `force initial`: If set to `true`, the source will be triggered immediately after startup. This behaviour is mainly 
+  intended to quickly populate the AIT RDP data structures on startup without the need of waiting a long time until 
+  regular scheduling intervals (e.g., of forecasts) are met. Defaults to `true`.
 
-To configure the parameters of the test suite, the following environment variables can be set:
-```shell
-REM Your e-mail to send to some public APIs that require contact details 
-set DATA_CRAWLER_CONTACT="<contact details and e-mail>"
-REM Information to access the Redis database (will create some test artefacts there):
-set DATA_CRAWLER_REDIS_DB=0
-set DATA_CRAWLER_REDIS_HOST=localhost
-set DATA_CRAWLER_REDIS_PORT=6379
-```
+In case the processing duration exceeds the configured frequency, the next operation will be immediately scheduled. If 
+the delay exceeds the following regular interval, the triggering point will be skipped in order to avoid pile-up of 
+delays and unpredictable timing.
 
-Furthermore, make sure that both the project dicrectory and the testing directory are in the PYTHONPATH. This can 
-usually be done within the GUI by including the content roots and project directory or via the CLI:  
-```shell
-set PYTHONPATH=%PYTHONPATH%;.;./test
-```
+## Data Sources and Data Sinks
 
-Have fun with testing:
-```shell
-pytest test
-```
+The default distribution of the AIT RDP Data Crawler already supports a broad variety of data sources and data sinks. 
+The following overview lists the main ones. Detailed configurations can be found in the 
+[data source and data sink description](docs/data_sources_and_data_sinks.md).
 
-## Using the Data crawler with Project-Specific Sources
+* Meteorological data
+  * Weatherbit
+    * `data_crawler.sources.weatherbit.CurrentWeather`: Current weather estimations (not recommended for archiving).
+    * `data_crawler.sources.weatherbit.HourlyForecasts`: Hourly, numerical weather prediction data for a particular 
+      location
+  * met.no
+    * `data_crawler.sources.yr_no.LocationForecast` Numerical weather prediction data for a particular location
+  * Geosphere Austria
+    * `data_crawler.sources.zamg.MeasurementStationData`: Live and historic measurements
+    * `data_crawler.sources.zamg.NumericalWeatherPredictionData`: Numerical weather prediction data, both point 
+      predictions and ensemble forecasts.
+  * KNMI
+    * `data_crawler.sources.knmi.WeatherStationsKNMI`: Weather station data
 
-The data crawler is designed to include project-specific API bindings that are not part of the main repository. For such
-cases, there are Python packages that encapsulate the main logic. To include the software in own poetry-managed 
-projects, the dependencies need to be included as follows:
+* Generic protocols and interfaces
+  * `data_crawler.sources.modbus.ModbusTCP`: Modbus TCP source
+  * `data_crawler.sinks.modbus.ModbusTCP`; Modbus TCP sink
+  * `data_crawler.sources.opc_ua.OPCUA`: OPC UA source
+  * `data_crawler.sinks.opc_ua.OPCUA` OPC UA sink
+  * `data_crawler.sinks.redis.RedisStream`: Redis stream sink (default)
+  * `data_crawler.sources.teltonika_modbus.TeltonikaModbus`: REST interface to receive Modbus data via Teltonica devices
 
-```shell
-# Add the data source of pyrdp-commons, a core dependency of the data crawler
-poetry source add -s gitlab-pyrdp-commons https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple
-poetry config http-basic.gitlab-pyrdp-commons __token__ ${TOKEN_PYRDP_COMMONS}
+* Energy- and market-related services:
+  * ENTSO-E
+    * `data_crawler.sources.entsoe_da.ENTSOEDATransparency`: Day-ahead market prices from ENTSO-E
 
-# Add the data source of the rdp-data-crawler itself 
-poetry source add gitlab-rdp-data-crawler https://gitlab-intern.ait.ac.at/api/v4/projects/3040/packages/pypi/simple
-poetry config http-basic.gitlab-rdp-data-crawler __token__ ${TOKEN_RDP_DATA_CRAWLER}
-
-# Install the data crawler. If you need modbus support make sure that the modbus-crawler repository located at 
-# https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler is accessible and add the modbus extra with -E modbus
-poetry add --source gitlab-rdp-data-crawler rdp-data-crawler
-```
-
-## Executing the Data Crawler 
-
-For development purpose and to develop own setups, the application can be directly executed by referencing the 
-`data_crawler` module. For all other setups, the corresponding docker container is recommended.
-```
-(e3-data-crawler) C:\Users\Me\Projekte\E3-SCHOOL\e3-data-crawler>python data_crawler --help
-usage: data_crawler [-h] [--config_file CONF] [--env ENV_FILE]
-
-Periodically fetches the data sources
-
-options:
-  -h, --help          show this help message and exit
-  --config_file CONF  The main YAML configuration describing the data sources
-  --env ENV_FILE      An environment file that specifies the variables to load
-```
-
-Since there is no extensive documentation on the configuration formats, please refer to the project configurations, 
-e.g. at the [E3 Docker Repository](https://gitlab-intern.ait.ac.at/ees/rdp/e3-at-school/e3-docker/-/blob/main/e3-data-crawler/config.yml)  
+* Device-specific interfaces
+  * Fronius
+    * `data_crawler.sources.fronius.FroniusInverterRealtimeData`: Device-level real-time data from Fronius inverters
+    * `data_crawler.sources.fronius.FroniusInverterPowerFlowRealtimeData`: Real-time power-flow data of all devices 
+      connected to the data logger
+    * `data_crawler.sources.fronius.FroniusSystemArchiveData`: Device-level API to query historic values and detailed
+      information from Fronius inverters
