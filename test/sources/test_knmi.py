@@ -343,6 +343,8 @@ def test_weather_station_value_transformation_1(simplified_base_response: Iterab
     assert message["wawa_weather_code_10min"] == pytest.approx([2.], abs=1e-1)  # ww-10
 
 
+# TODO: Fix API connection #95
+@pytest.mark.xfail(raises=RuntimeWarning, reason="Some flaws with the API to be fixed in another issue (#95)")
 def test_weather_station_online(weather_measurements_base_parameters: dict):
     """Tests fetching the online response for the KNMI weather station data"""
 
