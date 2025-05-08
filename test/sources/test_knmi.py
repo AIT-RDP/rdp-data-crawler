@@ -23,10 +23,13 @@ def simplified_base_response() -> Iterable[bytes]:
         return [f.read()]
 
 
+_KNMI_MOCKUP_API_KEY = "---"
+
+
 @pytest.fixture()
 def weather_measurements_base_parameters() -> dict:
     """Returns a set of base parameters for a locationForecast"""
-    source_parameters = {"api_key": os.environ.get("DATA_CRAWLER_KNMI_API_KEY", "---"),
+    source_parameters = {"api_key": os.environ.get("DATA_CRAWLER_KNMI_API_KEY", _KNMI_MOCKUP_API_KEY),
                          "stations": ["06204",  # "K14-FA-1C"
                                       6215,  # "VOORSCHOTEN AWS"
                                       "6216",  # "Hollandse Kust Zuid Alfa (HKZA)"
@@ -343,10 +346,14 @@ def test_weather_station_value_transformation_1(simplified_base_response: Iterab
     assert message["wawa_weather_code_10min"] == pytest.approx([2.], abs=1e-1)  # ww-10
 
 
-# TODO: Fix API connection #95
-@pytest.mark.xfail(raises=RuntimeWarning, reason="Some flaws with the API to be fixed in another issue (#95)")
 def test_weather_station_online(weather_measurements_base_parameters: dict):
     """Tests fetching the online response for the KNMI weather station data"""
+
+    if weather_measurements_base_parameters["api_key"] == _KNMI_MOCKUP_API_KEY:
+        raise KeyError(
+            "The KNMI api_key is set to a mockup value but for the test, an actual one is needed. Consider setting the "
+            "environment variable DATA_CRAWLER_KNMI_API_KEY"
+        )
 
     api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_base_parameters, executor_name="<test>")
     response_data = api.fetch_data_bundle()
@@ -377,6 +384,12 @@ def test_weather_station_online(weather_measurements_base_parameters: dict):
 @pytest.mark.xfail(raises=RuntimeWarning, reason="Some late value updates may be detected")
 def test_weather_station_online_consecutive_fetch(weather_measurements_base_parameters: dict):
     """Tests two consecutive fetch operation and whether the time stamps are properly managed without duplicates"""
+
+    if weather_measurements_base_parameters["api_key"] == _KNMI_MOCKUP_API_KEY:
+        raise KeyError(
+            "The KNMI api_key is set to a mockup value but for the test, an actual one is needed. Consider setting the "
+            "environment variable DATA_CRAWLER_KNMI_API_KEY"
+        )
 
     api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_base_parameters, executor_name="<test>")
 
