@@ -78,9 +78,11 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
 
         return ret_config
 
-    def __get_data(self, url, params=None):
+    def _fetch_raw_data(self, url, params=None):
         self._logger.debug(f"Query KNMI API endpoint: {url} with {params}")
-        return self.session.get(url, headers=self.headers, params=params).json()
+        resp = self.session.get(url, headers=self.headers, params=params)
+        resp.raise_for_status()
+        return resp.json()
 
     def _list_updated_files(self, dataset_name: str, dataset_version: str, start_date: datetime.datetime,
                             end_date: datetime.datetime) -> list[str]:
@@ -92,11 +94,11 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
         }
         url = f"{self.base_url}/datasets/{dataset_name}/versions/{dataset_version}/files"
 
-        batches = [self.__get_data(url, params=base_params)]
+        batches = [self._fetch_raw_data(url, params=base_params)]
         while ("nextPageToken" in batches[-1] and
                batches[-1]["nextPageToken"] is not None and
                batches[-1]["nextPageToken"] != ""):
-            batches.append(self.__get_data(url, params={**base_params, "nextPageToken": batches[-1]["nextPageToken"]}))
+            batches.append(self._fetch_raw_data(url, params={**base_params, "nextPageToken": batches[-1]["nextPageToken"]}))
 
         file_records = itertools.chain(*[batch["files"] for batch in batches])
 
@@ -121,7 +123,7 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
             yield raw_file_content.content
 
     def get_file_url(self, dataset_name: str, dataset_version: str, file_name: str):
-        return self.__get_data(
+        return self._fetch_raw_data(
             f"{self.base_url}/datasets/{dataset_name}/versions/{dataset_version}/files/{file_name}/url"
         )
 

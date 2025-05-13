@@ -503,3 +503,17 @@ def test_missing_id_in_config(simplified_base_response: Iterable[bytes], weather
         list(api.fetch_data_bundle(raw_data=simplified_base_response))
 
     assert "id" in str(err_info.value)
+
+
+def test_weather_station_online_invalid_api_key(weather_measurements_base_parameters: dict):
+    """Tests the error message on having an invalid API key"""
+
+    # Set the API key to a mockup value that should not be accepted
+    weather_measurements_base_parameters["api_key"] = _KNMI_MOCKUP_API_KEY
+    weather_measurements_base_parameters["expire"] = "0s"
+    api = knmi.WeatherStationsKNMI(source_parameters=weather_measurements_base_parameters, executor_name="<test>")
+
+    with pytest.raises(IOError) as err_info:
+        list(api.fetch_data_bundle())
+
+    assert "403 Client Error: Forbidden" in str(err_info.value)
