@@ -20,7 +20,7 @@ sub-configuration files are needed. The following example shows a basic docker-c
 services:
   # ...
   data-crawler:
-    image: ait1/data-crawler:latest-dev
+    image: ait1/rdp-data-crawler:latest-dev
     volumes:
       - ./data-crawler/config.yml:/etc/data_crawler/config.yml:ro
     environment:
