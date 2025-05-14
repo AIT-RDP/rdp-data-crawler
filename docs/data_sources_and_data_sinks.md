@@ -196,3 +196,23 @@ unit_id;Register_start;Register_end;Name;Data_type;Unit;Register_type;Scaling
 ;;;Q_tot;SINGLE;var;i;1
 ;;;PF_tot;SINGLE;-;i;1
 ```
+
+## Energy- and Market-Related Services
+#### ENTSO-E Transparency Platform - Day-Ahead Market Prices
+**Interface Type**: Source
+
+**Type Name**: `data_crawler.sources.entsoe_da.ENTSOEDATransparency`
+
+**Description**: The ENTSO-E day-ahead market prices source fetches the day-ahead market prices from the ENTSO-E. It 
+requires [registration to the ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) and acquisition of an 
+API token via the portal.
+
+**Parameters**:
+* `api_key`: The API key to access the ENTSO-E API.
+* `day_ahead_prices`: The day-ahead market price configurations to be fetched. Each entry contains a dict with the 
+  following attributes:
+    * `country_code`: The country code of the market area to be queried. (e.g., `AT` for Austria)
+    * `timezone`: The timezone of the market prices to be queried. This information is used to determine the beginning 
+      and ending of the next day
+    * `resolution`: The resolution of the market prices to be queried. Right now, `MIN_15`, `MIN_30`, and `MIN_60` are 
+      supported.
