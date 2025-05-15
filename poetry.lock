@@ -1094,9 +1094,9 @@ test = ["pytest", "pytest-asyncio", "twisted"]
 
 [package.source]
 type = "git"
-url = "https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler"
-reference = "f989b99687c0fe400ba6c3af5a23a1cf62dec7e9"
-resolved_reference = "f989b99687c0fe400ba6c3af5a23a1cf62dec7e9"
+url = "https://github.com/AIT-RDP/rdp-modbus-crawler"
+reference = "88d6fb00ea6d10ff997d8e905e8acdad6a9b53c3"
+resolved_reference = "88d6fb00ea6d10ff997d8e905e8acdad6a9b53c3"
 
 [[package]]
 name = "msgpack"
@@ -1776,7 +1776,7 @@ name = "pyyaml"
 version = "6.0.1"
 description = "YAML parser and emitter for Python"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.6"
 groups = ["main"]
 files = [
     {file = "PyYAML-6.0.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:d858aa552c999bc8a8d57426ed01e40bef403cd8ccdd0fc5f6f04a00414cac2a"},
@@ -2499,4 +2499,4 @@ websocket = ["websocket-client"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "d39b304a1ab7a297b51f567b103969f1d73e8cef69478c406e12e0d871bd44bf"
+content-hash = "6e58913d9bb5fe8f681f7be7cc5d73390c0266b0bcc305600f297a1862d32199"
