@@ -6,7 +6,7 @@ import itertools
 import logging
 import re
 import urllib
-from typing import Dict, Any, Optional, List, Generator
+from typing import Dict, Any, Optional, List, Generator, Iterable
 
 import pandas as pd
 import requests
@@ -317,11 +317,41 @@ class FroniusSystemArchiveData(abstract_source.AbstractMultiMessageSourceAPI):
         """Extends the message data by some pre-calculated quantities"""
 
         if "I_DC_S1" in message_data and "U_DC_S1" in message_data:
-            message_data["P_DC_S1"] = [u * i for u, i in zip(message_data["U_DC_S1"], message_data["I_DC_S1"])]
+            message_data["P_DC_S1"] = FroniusSystemArchiveData._apply_per_element(
+                lambda u, i: u * i, [message_data["U_DC_S1"], message_data["I_DC_S1"]]
+            )
         if "I_DC_S2" in message_data and "U_DC_S2" in message_data:
-            message_data["P_DC_S2"] = [u * i for u, i in zip(message_data["U_DC_S2"], message_data["I_DC_S2"])]
+            message_data["P_DC_S2"] = FroniusSystemArchiveData._apply_per_element(
+                lambda u, i: u * i, [message_data["U_DC_S2"], message_data["I_DC_S2"]]
+            )
 
         return message_data
+
+    @staticmethod
+    def _apply_per_element(fkt, arg_series: Iterable[Iterable]) -> list:
+        """
+        Applies the given function to each element of the iterables and returns the result as a list
+
+        In case one of the returned argument values is None, the function wikll not be called and the element in the
+        returned result will be None as well.
+
+        :param fkt:
+            The function to apply to each element of the series. It must accept the same number of arguments as the
+            number of series in arg_series.
+        :param arg_series:
+            A list of iterables that will be passed to the function. The function must accept one argument for each
+            iterable in the list. It is assumed and highly advised that all iterables return the same number of elements.
+        :return:
+            The result of applying the function to each element of the series as a list.
+        """
+
+        ret = []
+        for args in zip(*arg_series):
+            if any(a is None for a in args):
+                ret.append(None)
+            else:
+                ret.append(fkt(*args))
+        return ret
 
     def _decode_raw_inverter_data(self, inv_name: str, inv_data: dict, time_offset: datetime.timedelta) -> dict:
         """Decodes the inverter-specific section and returns the message format"""
