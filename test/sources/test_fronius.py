@@ -334,6 +334,7 @@ inverter_archive_response_1 = helpers.get_json_fixture("data/test/fronius-solara
 inverter_archive_response_2 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-2.json")
 inverter_archive_response_3 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-3.json")
 inverter_archive_response_4 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-4.json")
+inverter_archive_response_5 = helpers.get_json_fixture("data/test/fronius-solarapi/GetArchiveData-System-5.json")
 
 
 @pytest.fixture
@@ -529,6 +530,35 @@ def test_inverter_archive_parsing_reduced_device(inverter_archive_response_4, ar
     assert messages[1]["I_DC_S2"] == [0.04, 0.05]
     assert messages[1]["U_DC_S1"] == [610.2, 592.3000000000001]
     assert messages[1]["U_DC_S2"] == [588.6, 569.5]
+
+
+def test_inverter_archive_parsing_missing_dc_string_values(inverter_archive_response_5, archive_parameters,
+                                                           persistent_store):
+    """Tests parsing the archive files with a missing DC sting measurements known to crash the API (#97)"""
+
+    del archive_parameters["data points"]  # Query all data points
+
+    api = fronius.FroniusSystemArchiveData(source_parameters=archive_parameters, executor_name="<test>",
+                                           persistent_store=persistent_store)
+    api.start()
+    messages = list(api.fetch_data_bundle(raw_data=inverter_archive_response_5))
+    api.stop()
+
+    assert len(messages) == 1
+    assert messages[0]["device_id"] == "4"
+
+    assert messages[0]["observation_time"] == [
+        '2025-06-16T21:40:00+02:00', '2025-06-16T21:45:00+02:00', '2025-06-17T03:30:00+02:00',
+        '2025-06-17T04:30:00+02:00', '2025-06-17T04:35:00+02:00'
+    ]
+
+    assert messages[0]["U_DC_S1"] == [43.0, 25.0, None, 19.0, 38.7]
+    assert messages[0]["I_DC_S1"] == [1.0, 1.1, None, 1.2, 1.3]
+    assert messages[0]["P_DC_S1"] == [43.0, 27.500000000000004, None, 22.8, 50.31]
+
+    assert messages[0]["U_DC_S2"] == [43.300000000000004, 25.700000000000003, None, 19.200000000000003, 39.0]
+    assert messages[0]["I_DC_S2"] == [2.0, 2.1, None, 2.2, 2.3]
+    assert messages[0]["P_DC_S2"] == [86.60000000000001, 53.970000000000006, None, 42.24000000000001, 89.69999999999999]
 
 
 def test_inverter_archive_time_correction_single(inverter_archive_response_1, archive_parameters, persistent_store):

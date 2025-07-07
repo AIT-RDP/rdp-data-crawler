@@ -1,0 +1,173 @@
+{
+  "Body": {
+    "Data": {
+      "inverter/4": {
+        "Data": {
+          "Current_AC_Phase_1": {
+            "Unit": "A",
+            "Values": {
+              "23220": 0,
+              "23520": 0,
+              "47820": 0,
+              "48120": 0
+            }
+          },
+          "Current_AC_Phase_2": {
+            "Unit": "A",
+            "Values": {
+              "23220": 0,
+              "23520": 0,
+              "47820": 0,
+              "48120": 0
+            }
+          },
+          "Current_AC_Phase_3": {
+            "Unit": "A",
+            "Values": {
+              "23220": 0,
+              "23520": 0,
+              "47820": 0,
+              "48120": 0
+            }
+          },
+          "Current_DC_String_1": {
+            "Unit": "A",
+            "Values": {
+              "23220": 1.0,
+              "23520": 1.1,
+              "47820": 1.2,
+              "48120": 1.3
+            }
+          },
+          "Current_DC_String_2": {
+            "Unit": "A",
+            "Values": {
+              "23220": 2.0,
+              "23520": 2.1,
+              "47820": 2.2,
+              "48120": 2.3
+            }
+          },
+          "EnergyReal_WAC_Sum_Produced": {
+            "Unit": "Wh",
+            "Values": {
+              "23220": 0,
+              "23520": 0,
+              "47820": 0,
+              "48120": 0
+            }
+          },
+          "PowerReal_PAC_Sum": {
+            "Unit": "W",
+            "Values": {
+              "23220": 0,
+              "23520": 0,
+              "44220": 0,
+              "47820": 0,
+              "48120": 0
+            }
+          },
+          "Temperature_Powerstage": {
+            "Unit": "°C",
+            "Values": {
+              "23220": 0,
+              "23520": 0,
+              "48120": 0
+            }
+          },
+          "TimeSpanInSec": {
+            "Unit": "sec",
+            "Values": {
+              "23220": 300,
+              "23520": 295,
+              "44220": 0,
+              "47820": 133,
+              "48120": 295
+            }
+          },
+          "Voltage_AC_Phase_1": {
+            "Unit": "V",
+            "Values": {
+              "23220": 0,
+              "23520": 0,
+              "48120": 0
+            }
+          },
+          "Voltage_AC_Phase_2": {
+            "Unit": "V",
+            "Values": {
+              "23220": 0,
+              "23520": 0,
+              "48120": 0
+            }
+          },
+          "Voltage_AC_Phase_3": {
+            "Unit": "V",
+            "Values": {
+              "23220": 0,
+              "23520": 0,
+              "48120": 0
+            }
+          },
+          "Voltage_DC_String_1": {
+            "Unit": "V",
+            "Values": {
+              "23220": 43,
+              "23520": 25,
+              "47820": 19,
+              "48120": 38.7
+            }
+          },
+          "Voltage_DC_String_2": {
+            "Unit": "V",
+            "Values": {
+              "23220": 43.300000000000004,
+              "23520": 25.700000000000003,
+              "47820": 19.200000000000003,
+              "48120": 39
+            }
+          }
+        },
+        "DeviceType": 121,
+        "End": "2025-06-18T15:23:59+02:00",
+        "NodeType": 100,
+        "Start": "2025-06-16T15:13:00+02:00"
+      }
+    }
+  },
+  "Head": {
+    "RequestArguments": {
+      "Channel": [
+        "Voltage_AC_Phase_2",
+        "Voltage_AC_Phase_3",
+        "Temperature_Powerstage",
+        "EnergyReal_WAC_Sum_Produced",
+        "Current_AC_Phase_3",
+        "Voltage_AC_Phase_1",
+        "EnergyReal_WAC_Sum_Consumed",
+        "Voltage_DC_String_2",
+        "Current_AC_Phase_1",
+        "Current_DC_String_2",
+        "PowerReal_PAC_Sum",
+        "Current_DC_String_1",
+        "Current_AC_Phase_2",
+        "Voltage_DC_String_1",
+        "TimeSpanInSec"
+      ],
+      "EndDate": "2025-06-19T15:23:59+02:00",
+      "HumanReadable": "False",
+      "Scope": "System",
+      "SeriesType": "Detail",
+      "StartDate": "2025-06-16T15:13:00+02:00"
+    },
+    "Status": {
+      "Code": 0,
+      "ErrorDetail": {
+        "Nodes": []
+      },
+      "Reason": "",
+      "UserMessage": ""
+    },
+    "Timestamp": "2025-06-18T15:18:43+02:00"
+  }
+}
