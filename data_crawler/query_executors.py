@@ -60,10 +60,12 @@ class _QueryExecutorBase(abc.ABC):
             source_api = _sync_wrapper.SyncPollingExecutor(source_api, executor_config, name)
         self._source_api = source_api  # Expect protected scope.
 
-        self._dry_run = self._resolve_save_boolean(executor_config.get("dry_run", False))
-
         self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)  # Protected scope
         self._data_sink = self._resolve_sink_api(executor_config, name, redis_pool)  # Protected scope
+
+        self._dry_run = self._resolve_save_boolean(executor_config.get("dry_run", False))
+        if self._dry_run:
+            self._logger.info(f"DRY RUN is ON. Channel {name} will execute queries but does not forward anything.")
 
     @staticmethod
     def _resolve_save_boolean(value: bool | int | str) -> bool:
