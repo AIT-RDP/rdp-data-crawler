@@ -60,8 +60,30 @@ class _QueryExecutorBase(abc.ABC):
             source_api = _sync_wrapper.SyncPollingExecutor(source_api, executor_config, name)
         self._source_api = source_api  # Expect protected scope.
 
+        self._dry_run = self._resolve_save_boolean(executor_config.get("dry_run", False))
+
         self._logger = logging.getLogger(__name__ + "." + self.__class__.__name__ + "." + name)  # Protected scope
         self._data_sink = self._resolve_sink_api(executor_config, name, redis_pool)  # Protected scope
+
+    @staticmethod
+    def _resolve_save_boolean(value: bool | int | str) -> bool:
+        """Resolves the boolean configuration raising an Exception if it cannot be interpreted"""
+
+        if isinstance(value, bool):
+            return value
+
+        value = str(value)
+
+        true_values = ["true", "1"]
+        false_values = ["false", "0"]
+
+        if any(ref == value.lower() for ref in true_values):
+            return True
+        elif any(ref == value.lower() for ref in false_values):
+            return False
+        else:
+            raise ValueError(f"Cannot interpret the boolean configuration '{value}'. Expect one of "
+                             f"{true_values + false_values}.")
 
     @staticmethod
     def _load_api_class(type_name: str) -> type:
@@ -174,9 +196,10 @@ class _QueryExecutorBase(abc.ABC):
 
         for message in messages:
             if isinstance(message, msg.Message):
-                self._data_sink.insert_data(message.payload, meta_class.model_validate(message.metadata, strict=True))
+                meta_data = meta_class.model_validate(message.metadata, strict=True)
+                self._dry_run or self._data_sink.insert_data(message.payload, meta_data)
             else:
-                self._data_sink.insert_data(message, meta_class())
+                self._dry_run or self._data_sink.insert_data(message, meta_class())
 
 
 class ThreadQueryExecutor(_QueryExecutorBase):
