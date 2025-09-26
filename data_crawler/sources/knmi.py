@@ -45,8 +45,8 @@ class WeatherStationsKNMI(http_cache.SyncHTTPMixin, abstract_source.AbstractMult
 
         self.base_url = "https://api.dataplatform.knmi.nl/open-data/v1"
         self.headers = {"Authorization": source_parameters["api_key"]}
-        self.dataset_name = "Actuele10mindataKNMIstations"
-        self.dataset_version = "2"
+        self.dataset_name = "10-minute-in-situ-meteorological-observations"
+        self.dataset_version = "1.0"
         self._station_config = self._extract_station_config(source_parameters['stations'])
 
         initial_history = pd.to_timedelta(source_parameters.get("initial_history", "12h"))
