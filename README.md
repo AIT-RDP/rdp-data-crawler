@@ -122,6 +122,38 @@ In case the processing duration exceeds the configured frequency, the next opera
 the delay exceeds the following regular interval, the triggering point will be skipped in order to avoid pile-up of 
 delays and unpredictable timing.
 
+## Execution Live-Cycle
+Each channel is executed independently. In case a stale or faulty channel is detected, a restart is riggered to clear 
+transient faults and support for less stable, external sources. In addition, the status as well as any restarts are 
+recorded and exposed via detailed prometheus metrics. Per default, the prometheus port 8000 and metric path '/' is 
+used. A prometheus scrape config therefore may be as follows:
+
+```yaml
+  - job_name: data-crawler
+    metrics_path: '/'
+    static_configs:
+      - targets:
+        - data-crawler:8000
+```
+
+In order to support development setups that do not directly write to the final assets, a dry-run mode is provided. 
+For each channel, the `dry_run` parameter can be set to `true` to avoid writing to the final sink. Instead, the 
+data is dropped after processing without passing it on to any sink. Note that for safety reasons, the dry-run flag, 
+if configured, must not be left emty. Hence, disabling dry run requires passing on a dediated `false` value. Per 
+default, `dry_run` is disabled. The following configuration snippet shows an externally supplied `dry_run` indicated 
+via a corresponding environment variable.
+
+```yaml
+  controller.output.battery-0:
+    # Suppress writing to the final sink if the environment variable DATA_CRAWLER_DRY_RUN_WRITES is set to true.
+    dry_run: ${DATA_CRAWLER_DRY_RUN_WRITES}
+    
+    type: "data_crawler.sources.redis.RedisStream"
+    source parameter: {} # ... the RedisStream source parameters
+    sink_type: "data_crawler.sinks.modbus.ModbusTCP"
+    sink_parameters: {} # ... the Modbus sink parameters
+```
+
 ## Data Sources and Data Sinks
 
 The default distribution of the AIT RDP Data Crawler already supports a broad variety of data sources and data sinks. 
