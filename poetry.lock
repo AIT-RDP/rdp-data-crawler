@@ -2023,8 +2023,8 @@ zstandard = "^0.23.0"
 [package.source]
 type = "git"
 url = "https://github.com/AIT-RDP/rdp-mqtt"
-reference = "2c044fdeb736bd5bbb7edc0791341ea967832d20"
-resolved_reference = "2c044fdeb736bd5bbb7edc0791341ea967832d20"
+reference = "5a991645b908d04857110fd285f8f4096fa8819d"
+resolved_reference = "5a991645b908d04857110fd285f8f4096fa8819d"
 
 [[package]]
 name = "redis"
@@ -2823,4 +2823,4 @@ websocket = ["websocket-client"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "37689a2b0c257031d61821df365db94dda4f2eda1c5be2dc9ab750e9d982d3f1"
+content-hash = "abf87b22154a130555023cc79cc8a3afce1f2d71f77b7c32b040575d35c53039"
