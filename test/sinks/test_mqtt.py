@@ -459,12 +459,14 @@ class TestMqttSinkBatching:
 
         received_messages = []
         messages_received = 0
+        batches_received = 0
 
         def on_message(client, userdata, msg):
-            nonlocal messages_received
+            nonlocal messages_received, batches_received
             try:
                 # With batching, we might receive arrays of messages or single messages
                 payload = json.loads(msg.payload.decode())
+                batches_received += 1
                 if isinstance(payload, list):
                     received_messages.extend(payload)
                     messages_received += len(payload)
@@ -496,9 +498,8 @@ class TestMqttSinkBatching:
             # Wait for batch timeout to ensure all messages are sent
             await asyncio.sleep(3)
 
-            # Should have received messages, either as batches or individually
-            # The exact behavior depends on the batching implementation
-            assert messages_received > 0
+            assert batches_received == 2
+            assert messages_received == 4
 
         finally:
             subscriber.loop_stop()
@@ -532,20 +533,23 @@ class TestMqttSinkBatching:
         test_messages = [
             {"sensor": "temperature", "value": 23.5, "id": 1},
             {"sensor": "humidity", "value": 65.0, "id": 2},
+            {"sensor": "humidity", "value": 65.0, "id": 2},
+            {"sensor": "humidity", "value": 65.0, "id": 2},
+            {"sensor": "humidity", "value": 65.0, "id": 2},
         ]
 
         received_messages = []
-        message_received_event = asyncio.Event()
+        batches_received = 0
 
         def on_message(client, userdata, msg):
-            nonlocal received_messages
+            nonlocal received_messages, batches_received
             try:
                 payload = json.loads(msg.payload.decode())
+                batches_received += 1
                 if isinstance(payload, list):
                     received_messages.extend(payload)
                 else:
                     received_messages.append(payload)
-                message_received_event.set()
             except json.JSONDecodeError:
                 pass
 
@@ -567,10 +571,11 @@ class TestMqttSinkBatching:
                     await insert_task
 
             # Wait for batch timeout (should be triggered by timeout, not batch size)
-            await asyncio.wait_for(message_received_event.wait(), timeout=3)
+            await asyncio.sleep(5)
 
             # Should have received messages due to timeout
-            assert len(received_messages) >= 1
+            assert len(received_messages) == 5
+            assert batches_received == 1
 
         finally:
             subscriber.loop_stop()

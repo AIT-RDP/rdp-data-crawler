@@ -356,7 +356,7 @@ async def test_mqtt_source_qos_levels():
 
     try:
         # Give source and publisher time to connect
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(2)
 
         # Publish with QoS 2
         publisher.publish(topic, json.dumps(test_data), qos=2)
@@ -729,7 +729,7 @@ async def test_mqtt_source_json_zstd_payload():
 
     try:
         # Give source and publisher time to connect
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(2)
 
         # Compress the JSON data with zstd
         json_data = json.dumps(test_data).encode('utf-8')
