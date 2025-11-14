@@ -197,6 +197,94 @@ unit_id;Register_start;Register_end;Name;Data_type;Unit;Register_type;Scaling
 ;;;PF_tot;SINGLE;-;i;1
 ```
 
+#### MQTT
+**Interface Type**: Source and Sink
+
+**Type Name**: `data_crawler.sources.mqtt.MqttSource` and `data_crawler.sinks.mqtt.MqttSink`
+
+**Description**: The MQTT source and sink enable communication with MQTT brokers for both subscribing to topics (source)
+and publishing to topics (sink). The implementation uses the [RDP MQTT](https://github.com/AIT-RDP/rdp-mqtt) library which supports various payload formats including
+JSON, compressed JSON (Zstandard), and Sparkplug B.
+
+**Common Parameters**:
+* `host`: The hostname or IP address of the MQTT broker. Defaults to `localhost`.
+* `port`: The port of the MQTT broker. Standard ports are 1883 (no TLS) and 8883 (with TLS). Defaults to 8883.
+* `username`: Optional username for broker authentication.
+* `password`: Optional password for broker authentication.
+* `ssl`: Boolean flag to enable/disable TLS encryption. Defaults to `true`.
+* `validate_certificate`: Whether to validate the broker's TLS certificate. Defaults to `true`.
+* `identifier`: Client identifier for the MQTT connection. Defaults to a randomly generated ID with prefix `RDP_`.
+* `qos`: Quality of Service level (0, 1, or 2). Defaults to 0.
+  * `0`: At most once delivery (fire and forget)
+  * `1`: At least once delivery (acknowledged)
+  * `2`: Exactly once delivery (assured)
+* `payload_parser`: The parser to use for message payloads. Options: `json`, `json_zstd` (compressed JSON), or
+  `sparkplug` (Sparkplug B protocol). Defaults to `json`.
+* `field_precision`: Optional number of decimal places to round numeric fields, reducing payload size. Defaults to `None`
+  (no rounding).
+
+**Source-Specific Parameters**:
+* `topic`: The MQTT topic to subscribe to. Supports wildcards:
+  * `+`: Single-level wildcard (e.g., `sensors/+/temperature`)
+  * `#`: Multi-level wildcard (e.g., `sensors/#`)
+  * Default: `#` (all topics)
+
+**Sink-Specific Parameters**:
+* `topic`: The default MQTT topic to publish to. Can be overridden per message via metadata.
+* `batch_size`: Number of metrics to batch together before sending. Set to 0 to disable batching. Defaults to 0.
+* `batch_timeout`: Maximum time in seconds to wait before sending a partial batch. Defaults to 1.0 seconds.
+
+**Sparkplug Parameters** (when using `payload_parser: sparkplug`):
+* `sparkplug_group_id`: Sparkplug group ID for outgoing messages. Defaults to a randomly generated ID.
+* `sparkplug_node_id`: Sparkplug node ID for outgoing messages. Defaults to a randomly generated ID.
+* `sparkplug_device_id`: Sparkplug device ID for outgoing messages. Defaults to a randomly generated ID.
+
+**Example**: The following configuration creates an MQTT source that subscribes to sensor data and an MQTT sink that
+publishes processed data:
+
+```yaml
+version: 1
+
+data sources:
+  # MQTT Source: Subscribe to sensor data
+  sensors.mqtt.input:
+    type: "data_crawler.sources.mqtt.MqttSource"
+    source parameter:
+      host: "mqtt.example.com"
+      port: 1883
+      topic: "sensors/temperature/#"
+      ssl: false
+      qos: 1
+      payload_parser: "json"
+    sink_type: "data_crawler.sinks.redis.RedisStream"
+    sink_parameters:
+      stream: "sensors.raw"
+
+  # MQTT Sink: Publish processed data
+  sensors.mqtt.output:
+    type: "data_crawler.sources.redis.RedisStream"
+    source parameter:
+      streams:
+        - name: "sensors.processed"
+          metadata: {}
+      group_name: "mqtt_publisher"
+      consumer_name: "publisher_1"
+    sink_type: "data_crawler.sinks.mqtt.MqttSink"
+    sink_parameters:
+      host: "mqtt.example.com"
+      port: 1883
+      topic: "sensors/processed/data"
+      ssl: false
+      qos: 1
+      batch_size: 10
+      batch_timeout: 5.0
+
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+```
+
 ## Energy- and Market-Related Services
 #### ENTSO-E Transparency Platform - Day-Ahead Market Prices
 **Interface Type**: Source
