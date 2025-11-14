@@ -1,0 +1,96 @@
+services:
+  # MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mqtt-broker
+    ports:
+      - "11883:1883"
+      - "19001:9001"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      - datacrawler-net
+
+  # Redis instance 1 (for datacrawler1)
+  redis1:
+    image: redis:7-alpine
+    container_name: redis1
+    ports:
+      - "16379:6379"
+    networks:
+      - datacrawler-net
+
+  # Redis instance 2 (for datacrawler2)
+  redis2:
+    image: redis:7-alpine
+    container_name: redis2
+    ports:
+      - "16380:6379"
+    networks:
+      - datacrawler-net
+
+  # Datacrawler instance 1
+  # Flow: Redis source -> MQTT sink (outgoing)
+  #       MQTT source -> Redis sink (incoming)
+  datacrawler1:
+    image: gitlab-intern.ait.ac.at:5010/ees/rdp/generic-components/rdp-data-crawler:mqtt
+    container_name: datacrawler1
+    volumes:
+      - ./datacrawler1-config.yml:/etc/data_crawler/config.yml:ro
+    environment:
+      - DATA_CRAWLER_CONFIG=/etc/data_crawler/config.yml
+    depends_on:
+      - redis1
+      - mosquitto
+    networks:
+      - datacrawler-net
+
+  # Datacrawler instance 2
+  # Flow: MQTT source -> Redis sink (incoming)
+  #       Redis source -> MQTT sink (outgoing/echo)
+  datacrawler2:
+    image: gitlab-intern.ait.ac.at:5010/ees/rdp/generic-components/rdp-data-crawler:mqtt
+    container_name: datacrawler2
+    volumes:
+      - ./datacrawler2-config.yml:/etc/data_crawler/config.yml:ro
+    depends_on:
+      - redis2
+      - mosquitto
+    networks:
+      - datacrawler-net
+
+  # Test script runner for instance 1
+  test-script:
+    image: python:3.13-slim
+    container_name: test-script
+    volumes:
+      - ./scripts:/scripts
+    working_dir: /scripts
+    command: bash -c "pip install redis && python roundtrip_test.py"
+    # Just keep going so we can check the data being sent
+    restart: unless-stopped
+    depends_on:
+      - datacrawler1
+      - datacrawler2
+      - redis1
+      - redis2
+    networks:
+      - datacrawler-net
+
+  # Echo script runner for instance 2
+  echo-script:
+    image: python:3.13-slim
+    container_name: echo-script
+    volumes:
+      - ./scripts:/scripts
+    working_dir: /scripts
+    command: bash -c "pip install redis && python echo_service.py"
+    depends_on:
+      - datacrawler2
+      - redis2
+    networks:
+      - datacrawler-net
+
+networks:
+  datacrawler-net:
+    driver: bridge
