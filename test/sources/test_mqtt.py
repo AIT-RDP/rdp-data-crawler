@@ -88,7 +88,7 @@ async def test_mqtt_source_fetch_data():
     
     try:
         # Give source and publisher time to connect
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(2)
         
         publisher.publish(topic, json.dumps(test_data))
         
@@ -158,7 +158,7 @@ async def test_mqtt_source_multiple_messages():
     
     try:
         # Give source and publisher time to connect
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(2)
         
         # Publish all test messages
         for msg in test_messages:
@@ -290,7 +290,7 @@ async def test_mqtt_source_ssl_connection():
 
     try:
         # Give source and publisher time to connect
-        await asyncio.sleep(0.3)  # SSL connections may take longer
+        await asyncio.sleep(2)
 
         publisher.publish(topic, json.dumps(test_data))
 
@@ -427,7 +427,7 @@ async def test_mqtt_source_wildcard_topic():
 
     try:
         # Give source and publisher time to connect
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(2)
 
         # Publish to different subtopics
         for i, msg in enumerate(test_messages):
