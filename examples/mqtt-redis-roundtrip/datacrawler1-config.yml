@@ -1,0 +1,46 @@
+# Datacrawler Instance 1 Configuration
+# Flow 1 (Outgoing): Redis source -> MQTT sink (to datacrawler2)
+# Flow 2 (Incoming): MQTT source -> Redis sink (from datacrawler2)
+
+version: 1
+
+data sources:
+  # Flow 1: Redis -> MQTT (outgoing to datacrawler2)
+  datacrawler1.outgoing:
+    type: "data_crawler.sources.redis.RedisStream"
+    source parameter:
+      streams:
+        - name: "datacrawler1.outgoing"
+          metadata: {}
+      group_name: "dc1_outgoing_consumer"
+      consumer_name: "dc1_outgoing"
+    sink_type: "data_crawler.sinks.mqtt.MqttSink"
+    sink_parameters:
+      host: "mosquitto"
+      port: 1883
+      topic: "datacrawler1/request"
+      ssl: false
+
+  # Flow 2: MQTT -> Redis (incoming from datacrawler2)
+  datacrawler1.incoming:
+    type: "data_crawler.sources.mqtt.MqttSource"
+    source parameter:
+      host: "mosquitto"
+      port: 1883
+      topic: "datacrawler2/response"
+      ssl: false
+    sink_type: "data_crawler.sinks.redis.RedisStream"
+    sink_parameters:
+      stream: "datacrawler1.incoming"
+
+redis:
+  host: redis1
+  port: 6379
+  db: 0
+
+logging:
+  loggers:
+    asyncio:
+      level: ERROR
+    rdp_mqtt.mqtt_client:
+      level: ERROR
