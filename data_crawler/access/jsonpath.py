@@ -92,9 +92,9 @@ class DatetimePathExtractor(PathExtractor):
         """transforms the string representation to a common ISO 8610 format with timezone"""
 
         dt = pd.to_datetime(x)
-        # If the datetime is timezone-naive, assume UTC
+        # If the datetime is timezone-naive, localize to UTC
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=datetime.timezone.utc)
+            dt = dt.tz_localize(datetime.timezone.utc)
         return dt.isoformat()
 
 
