@@ -48,15 +48,15 @@ def test_forecast_parsing(simplified_base_response: dict, forecast_base_paramete
     assert response_data["latitude"] == 52.52
     assert response_data["elevation"] == 38.0
 
-    # Check time axis
+    # Check time axis (with timezone information in ISO8601 format)
     assert response_data["observation_time"] == [
-        "2024-01-15T00:00:00",
-        "2024-01-15T01:00:00",
-        "2024-01-15T02:00:00",
-        "2024-01-15T03:00:00",
-        "2024-01-15T04:00:00",
-        "2024-01-15T05:00:00",
-        "2024-01-15T06:00:00"
+        "2024-01-15T00:00:00+00:00",
+        "2024-01-15T01:00:00+00:00",
+        "2024-01-15T02:00:00+00:00",
+        "2024-01-15T03:00:00+00:00",
+        "2024-01-15T04:00:00+00:00",
+        "2024-01-15T05:00:00+00:00",
+        "2024-01-15T06:00:00+00:00"
     ]
 
     # Check temperature and humidity (aligned with weatherbit/yr.no naming)
@@ -119,12 +119,11 @@ def test_forecast_online(forecast_base_parameters):
 
     assert response_data is not None
     
-    # Check that we got forecast_time
+    # Check that we got forecast_time with timezone information
     assert "forecast_time" in response_data
     forecast_time = datetime.datetime.fromisoformat(response_data["forecast_time"])
-    # Handle timezone-naive datetimes by making them UTC-aware
-    if forecast_time.tzinfo is None:
-        forecast_time = forecast_time.replace(tzinfo=datetime.timezone.utc)
+    # Verify timezone is present
+    assert forecast_time.tzinfo is not None, "forecast_time should include timezone information"
     assert forecast_time > datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=1)
     
     # Check that wind data at various heights is present
@@ -240,3 +239,57 @@ def test_api_endpoint():
     """Tests that the correct API endpoint is used"""
     
     assert open_meteo.OpenMeteoForecast.API_ENDPOINT == "https://api.open-meteo.com/v1/forecast"
+
+
+def test_forecast_minutely_15_parameters():
+    """Tests that forecast_minutely_15 parameter is correctly set for 15-minute data"""
+    
+    # Test with 15-minute data enabled and custom forecast_minutely_15
+    params_with_15min = {
+        "latitude": 52.52,
+        "longitude": 13.405,
+        "enable_minutely_15": True,
+        "minutely_15_variables": ["wind_speed_10m", "temperature_2m"],
+        "forecast_minutely_15": 192,  # 48 hours = 192 timesteps
+        "forecast_days": 10,  # Hourly data for 10 days
+        "cache": {"directory": ".cache-test-persistent"}
+    }
+    
+    api = open_meteo.OpenMeteoForecast(source_parameters=params_with_15min)
+    params = api.static_request_parameters
+    
+    # Verify both forecast parameters are present and different
+    assert "forecast_days" in params
+    assert params["forecast_days"] == 10
+    assert "forecast_minutely_15" in params
+    assert params["forecast_minutely_15"] == 192
+    assert "minutely_15" in params
+    assert params["minutely_15"] == "wind_speed_10m,temperature_2m"
+    
+    # Test with 15-minute data enabled but using default forecast_minutely_15 (96 = 24 hours)
+    params_default_15min = {
+        "latitude": 52.52,
+        "longitude": 13.405,
+        "enable_minutely_15": True,
+        "cache": {"directory": ".cache-test-persistent"}
+    }
+    
+    api_default = open_meteo.OpenMeteoForecast(source_parameters=params_default_15min)
+    params_default = api_default.static_request_parameters
+    
+    assert "forecast_minutely_15" in params_default
+    assert params_default["forecast_minutely_15"] == 96  # Default is 24 hours
+    
+    # Test without 15-minute data - forecast_minutely_15 should not be present
+    params_no_15min = {
+        "latitude": 52.52,
+        "longitude": 13.405,
+        "enable_minutely_15": False,
+        "cache": {"directory": ".cache-test-persistent"}
+    }
+    
+    api_no_15min = open_meteo.OpenMeteoForecast(source_parameters=params_no_15min)
+    params_no_15min_result = api_no_15min.static_request_parameters
+    
+    assert "forecast_minutely_15" not in params_no_15min_result
+    assert "minutely_15" not in params_no_15min_result

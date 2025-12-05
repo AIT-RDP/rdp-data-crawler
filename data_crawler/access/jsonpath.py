@@ -89,9 +89,13 @@ class DatetimePathExtractor(PathExtractor):
 
     @staticmethod
     def _to_iso(x) -> str:
-        """transforms the string representation to a common ISO 8610 format"""
+        """transforms the string representation to a common ISO 8610 format with timezone"""
 
-        return pd.to_datetime(x).isoformat()
+        dt = pd.to_datetime(x)
+        # If the datetime is timezone-naive, assume UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt.isoformat()
 
 
 class UnixTimeExtractor(PathExtractor):

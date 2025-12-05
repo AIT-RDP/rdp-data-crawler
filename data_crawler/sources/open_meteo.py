@@ -6,7 +6,7 @@ See https://open-meteo.com/en/docs for the API documentation.
 import itertools
 from typing import Dict, Any, List, Optional
 
-import requests, json
+import requests
 
 import data_crawler.sources.abc.http_cache as http_cache
 import data_crawler.access.jsonpath as jx
@@ -65,6 +65,40 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         "uv_index",
     ]
 
+    # Default 15-minute variables (subset of hourly variables that are available at 15-minute resolution)
+    # Note: Not all hourly variables are available at 15-minute intervals (e.g., wind_speed_180m, precipitation_probability)
+    DEFAULT_MINUTELY_15_VARIABLES = [
+        # Temperature and humidity
+        "temperature_2m",
+        "relative_humidity_2m",
+        "dew_point_2m",
+        "apparent_temperature",
+        # Pressure
+        "pressure_msl",
+        "surface_pressure",
+        # Clouds
+        "cloud_cover",
+        # Visibility
+        "visibility",
+        # Wind (lower altitudes available at 15-min resolution)
+        "wind_speed_10m",
+        "wind_speed_80m",
+        "wind_speed_120m",
+        "wind_direction_10m",
+        "wind_direction_80m",
+        "wind_direction_120m",
+        "wind_gusts_10m",
+        # Precipitation
+        "precipitation",
+        "rain",
+        "snowfall",
+        "weather_code",
+        # Radiation
+        "shortwave_radiation",
+        "direct_radiation",
+        "diffuse_radiation",
+    ]
+
     API_ENDPOINT = "https://api.open-meteo.com/v1/forecast"
 
     def __init__(self, source_parameters: dict, **kwargs):
@@ -77,7 +111,13 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
               - longitude: float, the longitude of the location
             Optional keys:
               - hourly_variables: list[str], the hourly variables to query (defaults to DEFAULT_HOURLY_VARIABLES)
-              - forecast_days: int, number of forecast days (1-16, default 7)
+              - enable_minutely_15: bool, whether to include 15-minute data (default False)
+              - minutely_15_variables: list[str], the 15-minute variables to query 
+                  (defaults to DEFAULT_MINUTELY_15_VARIABLES if enable_minutely_15 is True)
+              - forecast_days: int, number of forecast days for hourly data (1-16, default 7)
+              - forecast_minutely_15: int, number of 15-minute timesteps for minutely data 
+                  (default 96 = 24 hours). Only used if enable_minutely_15 is True.
+                  Note: 15-minute data is limited to ~4 days (384 timesteps) by the API.
               - past_days: int, number of past days to include (0-92, default 0)
               - timezone: str, timezone for the response (default "UTC")
               - elevation: float, custom elevation in meters
@@ -93,7 +133,10 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         
         # Optional parameters
         self._hourly_variables = source_parameters.get("hourly_variables", self.DEFAULT_HOURLY_VARIABLES)
+        self._enable_minutely_15 = source_parameters.get("enable_minutely_15", False)
+        self._minutely_15_variables = source_parameters.get("minutely_15_variables", self.DEFAULT_MINUTELY_15_VARIABLES)
         self._forecast_days = source_parameters.get("forecast_days", 7)
+        self._forecast_minutely_15 = source_parameters.get("forecast_minutely_15", 96)  # 24 hours = 96 timesteps
         self._past_days = source_parameters.get("past_days", 0)
         self._timezone = source_parameters.get("timezone", "UTC")
         self._elevation = source_parameters.get("elevation")
@@ -112,13 +155,16 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             "timezone": self._timezone,
             "models": self._models,
         }
+        
+        # Add 15-minute data if enabled
+        if self._enable_minutely_15:
+            params["minutely_15"] = ",".join(self._minutely_15_variables)
+            params["forecast_minutely_15"] = self._forecast_minutely_15
+        
         if self._elevation is not None:
             params["elevation"] = self._elevation
         if self._wind_speed_unit is not None:
             params["wind_speed_unit"] = self._wind_speed_unit
-
-        print("static_request_parameters")
-        print(json.dumps(params, indent=4))
 
         return params
 
@@ -139,11 +185,16 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             response.raise_for_status()
             raw_forecast = response.json()
 
-        redis_forecast = self._transform_to_redis_format(raw_forecast, self._hourly_variables)
+        redis_forecast = self._transform_to_redis_format(
+            raw_forecast, 
+            self._hourly_variables,
+            self._minutely_15_variables if self._enable_minutely_15 else None
+        )
         return redis_forecast
 
     @staticmethod
-    def _transform_to_redis_format(raw_forecast: dict, hourly_variables: List[str]) -> Dict[str, Any]:
+    def _transform_to_redis_format(raw_forecast: dict, hourly_variables: List[str], 
+                                   minutely_15_variables: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Transforms the Open-Meteo forecast to the common Redis representation
 
@@ -151,6 +202,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         
         :param raw_forecast: The raw JSON response from Open-Meteo API
         :param hourly_variables: List of hourly variables that were queried
+        :param minutely_15_variables: Optional list of 15-minute variables that were queried
         :return: Dictionary in the common Redis format
         """
 
@@ -204,19 +256,36 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             jx.PathExtractor("longitude", "longitude", is_list=False),
             jx.PathExtractor("latitude", "latitude", is_list=False),
             jx.PathExtractor("elevation", "elevation", is_list=False, drop_missing=True),
-            
-            # Time axis - use [*] to extract individual items from the array
-            jx.DatetimePathExtractor("observation_time", "hourly.time[*]"),
         ]
-
-        # Add extractors for each hourly variable that was queried
-        # Use [*] to extract individual items from each hourly array
-        for var in hourly_variables:
-            internal_name = variable_mapping.get(var, var)
-            src_path = f"hourly.{var}[*]"
-            extractors.append(
-                jx.PathExtractor(internal_name, src_path, is_list=True, drop_missing=True)
-            )
+        
+        # Extract hourly data if available
+        if "hourly" in raw_forecast:
+            # Time axis - use [*] to extract individual items from the array
+            extractors.append(jx.DatetimePathExtractor("observation_time", "hourly.time[*]"))
+            
+            # Add extractors for each hourly variable that was queried
+            # Use [*] to extract individual items from each hourly array
+            for var in hourly_variables:
+                internal_name = variable_mapping.get(var, var)
+                src_path = f"hourly.{var}[*]"
+                extractors.append(
+                    jx.PathExtractor(internal_name, src_path, is_list=True, drop_missing=True)
+                )
+        
+        # Extract 15-minute data if available and requested
+        if minutely_15_variables is not None and "minutely_15" in raw_forecast:
+            # Time axis for 15-minute data - use a different key to distinguish from hourly
+            extractors.append(jx.DatetimePathExtractor("observation_time_15min", "minutely_15.time[*]"))
+            
+            # Add extractors for each 15-minute variable
+            # Append "_15min" suffix to distinguish from hourly data
+            for var in minutely_15_variables:
+                internal_name = variable_mapping.get(var, var)
+                internal_name_15min = f"{internal_name}_15min"
+                src_path = f"minutely_15.{var}[*]"
+                extractors.append(
+                    jx.PathExtractor(internal_name_15min, src_path, is_list=True, drop_missing=True)
+                )
 
         # Add forecast generation time if available
         extractors.append(
@@ -226,13 +295,18 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         redis_forecast = dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
         
         # Add a forecast_time based on the first observation time if available
-        if "observation_time" in redis_forecast and len(redis_forecast["observation_time"]) > 0:
+        # Prioritize 15-minute data if available, otherwise use hourly
+        if "observation_time_15min" in redis_forecast and len(redis_forecast["observation_time_15min"]) > 0:
+            redis_forecast["forecast_time"] = redis_forecast["observation_time_15min"][0]
+        elif "observation_time" in redis_forecast and len(redis_forecast["observation_time"]) > 0:
             redis_forecast["forecast_time"] = redis_forecast["observation_time"][0]
 
         return redis_forecast
 
-## a = OpenMeteoForecast(source_parameters={"latitude": 52.593, "longitude": 4.752}) #, "wind_speed_unit": "kmh"})
-## print(a.static_request_parameters)
-## b = a.fetch_data()
-## #print(json.dumps(b, indent=4))
-## print('done')
+## testing a = OpenMeteoForecast(source_parameters={"latitude": 52.593, "longitude": 4.752, 
+## testing                                          "enable_minutely_15": True, 
+## testing                                          "minutely_15_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"], "hourly_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"]}) #, "wind_speed_unit": "kmh"})
+## testing print(a.static_request_parameters)
+## testing b = a.fetch_data()
+## testing #print(json.dumps(b, indent=4))
+## testing print('done')
