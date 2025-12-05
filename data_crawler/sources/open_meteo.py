@@ -5,8 +5,10 @@ See https://open-meteo.com/en/docs for the API documentation.
 """
 import itertools
 from typing import Dict, Any, List, Optional
+import json
+import logging
 
-import requests, json
+import requests
 
 import data_crawler.sources.abc.http_cache as http_cache
 import data_crawler.access.jsonpath as jx
@@ -67,10 +69,10 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
 
     API_ENDPOINT = "https://api.open-meteo.com/v1/forecast"
 
-    def __init__(self, source_parameters: dict, **kwargs):
+    def __init__(self, source_parameters: dict, executor_name: str = "-", **kwargs):
         """
         Initializes the Open-Meteo forecasting API but does not trigger any query
-
+        :param executor_name: The name of the executor for debugging purpose
         :param source_parameters: The source parameters according to the configuration.
             Required keys:
               - latitude: float, the latitude of the location
@@ -86,7 +88,11 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
               - wind_speed_unit: str, the unit of the wind speed (default "ms" other option "kmh")
         :param kwargs: Any extra arguments that will be sent to the super class
         """
-        super(OpenMeteoForecast, self).__init__(source_parameters=source_parameters, **kwargs)
+        super(OpenMeteoForecast, self).__init__(
+            source_parameters=source_parameters, executor_name=executor_name, **kwargs
+        )
+
+        self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{executor_name}")
 
         self._latitude = float(source_parameters["latitude"])
         self._longitude = float(source_parameters["longitude"])
@@ -99,6 +105,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         self._elevation = source_parameters.get("elevation")
         self._models = source_parameters.get("models", "best_match")
         self._wind_speed_unit = source_parameters.get("wind_speed_unit", "ms")
+
 
     @property
     def static_request_parameters(self) -> Dict[str, Any]:
@@ -117,8 +124,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         if self._wind_speed_unit is not None:
             params["wind_speed_unit"] = self._wind_speed_unit
 
-        print("static_request_parameters")
-        print(json.dumps(params, indent=4))
+        self._logger.debug(f"Static_request_parameters: {json.dumps(params, indent=4)}")
 
         return params
 
