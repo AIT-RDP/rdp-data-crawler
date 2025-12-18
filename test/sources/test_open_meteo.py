@@ -293,3 +293,175 @@ def test_forecast_minutely_15_parameters():
     
     assert "forecast_minutely_15" not in params_no_15min_result
     assert "minutely_15" not in params_no_15min_result
+
+
+def test_fetch_data_bundle_separate_messages(simplified_base_response, forecast_base_parameters):
+    """Tests that fetch_data_bundle yields separate messages for hourly and 15-minute data"""
+    
+    # Configure with 15-minute data enabled
+    params_with_15min = {
+        **forecast_base_parameters,
+        "enable_minutely_15": True,
+        "hourly_variables": ["temperature_2m", "wind_speed_10m", "wind_speed_80m"],
+        "minutely_15_variables": ["temperature_2m", "wind_speed_10m", "wind_speed_80m"]
+    }
+    
+    # Add 15-minute data to test fixture
+    test_response = simplified_base_response.copy()
+    test_response["minutely_15"] = {
+        "time": ["2024-01-15T00:00", "2024-01-15T00:15", "2024-01-15T00:30", "2024-01-15T00:45"],
+        "temperature_2m": [3.5, 3.4, 3.3, 3.2],
+        "wind_speed_10m": [12.5, 12.3, 12.1, 11.9],
+        "wind_speed_80m": [22.3, 22.2, 22.0, 21.8]
+    }
+    
+    api = open_meteo.OpenMeteoForecast(source_parameters=params_with_15min)
+    messages = list(api.fetch_data_bundle(raw_forecast=test_response))
+    
+    # Should yield 2 messages: one hourly, one 15-minute
+    assert len(messages) == 2, f"Expected 2 messages, got {len(messages)}"
+    
+    # Verify first message is hourly data
+    hourly_msg = messages[0]
+    assert hasattr(hourly_msg, 'payload'), "Message should have payload attribute"
+    assert hasattr(hourly_msg, 'metadata'), "Message should have metadata attribute"
+    assert "observation_time" in hourly_msg.payload
+    assert len(hourly_msg.payload["observation_time"]) == 7  # From the test fixture
+    assert "air_temperature_2m" in hourly_msg.payload
+    assert "wind_speed_10m" in hourly_msg.payload
+    assert "wind_speed_80m" in hourly_msg.payload
+    # Should include common metadata
+    assert "latitude" in hourly_msg.payload
+    assert "longitude" in hourly_msg.payload
+    assert hourly_msg.payload["latitude"] == 52.52
+    
+    # Verify second message is 15-minute data
+    minutely_msg = messages[1]
+    assert "observation_time" in minutely_msg.payload
+    assert len(minutely_msg.payload["observation_time"]) == 4  # 15-minute intervals
+    assert "air_temperature_2m" in minutely_msg.payload
+    assert "wind_speed_10m" in minutely_msg.payload
+    assert "wind_speed_80m" in minutely_msg.payload
+    # Should include common metadata
+    assert "latitude" in minutely_msg.payload
+    assert "longitude" in minutely_msg.payload
+    assert minutely_msg.payload["latitude"] == 52.52
+
+
+def test_fetch_data_bundle_hourly_only(simplified_base_response, forecast_base_parameters):
+    """Tests that fetch_data_bundle yields only hourly message when 15-minute data is disabled"""
+    
+    # Configure without 15-minute data
+    params_hourly_only = {
+        **forecast_base_parameters,
+        "enable_minutely_15": False,
+        "hourly_variables": ["temperature_2m", "wind_speed_10m"]
+    }
+    
+    api = open_meteo.OpenMeteoForecast(source_parameters=params_hourly_only)
+    messages = list(api.fetch_data_bundle(raw_forecast=simplified_base_response))
+    
+    # Should yield only 1 message (hourly)
+    assert len(messages) == 1, f"Expected 1 message when 15-minute disabled, got {len(messages)}"
+    
+    hourly_msg = messages[0]
+    assert "observation_time" in hourly_msg.payload
+    assert len(hourly_msg.payload["observation_time"]) == 7
+    assert "air_temperature_2m" in hourly_msg.payload
+
+
+def test_transform_hourly_data(simplified_base_response):
+    """Tests the new _transform_hourly_data static method"""
+    
+    hourly_vars = ["temperature_2m", "wind_speed_10m", "wind_speed_80m", "precipitation"]
+    result = open_meteo.OpenMeteoForecast._transform_hourly_data(
+        simplified_base_response, 
+        hourly_vars
+    )
+    
+    # Check that hourly data was extracted
+    assert "observation_time" in result
+    assert len(result["observation_time"]) == 7
+    assert "air_temperature_2m" in result
+    assert result["air_temperature_2m"] == [3.5, 3.1, 2.8, 2.5, 2.3, 2.0, 1.8]
+    assert "wind_speed_10m" in result
+    assert "wind_speed_80m" in result
+    assert "precipitation_total" in result
+    
+    # Should have forecast_time
+    assert "forecast_time" in result
+    assert result["forecast_time"] == "2024-01-15T00:00:00+00:00"
+
+
+def test_transform_minutely_15_data():
+    """Tests the new _transform_minutely_15_data static method"""
+    
+    # Create a test response with 15-minute data
+    test_response = {
+        "minutely_15": {
+            "time": ["2024-01-15T00:00", "2024-01-15T00:15", "2024-01-15T00:30"],
+            "temperature_2m": [10.5, 10.6, 10.7],
+            "wind_speed_10m": [5.0, 5.2, 5.4]
+        }
+    }
+    
+    minutely_vars = ["temperature_2m", "wind_speed_10m"]
+    result = open_meteo.OpenMeteoForecast._transform_minutely_15_data(
+        test_response,
+        minutely_vars
+    )
+    
+    # Check that 15-minute data was extracted
+    assert "observation_time" in result
+    assert len(result["observation_time"]) == 3
+    assert "air_temperature_2m" in result
+    assert result["air_temperature_2m"] == [10.5, 10.6, 10.7]
+    assert "wind_speed_10m" in result
+    assert result["wind_speed_10m"] == [5.0, 5.2, 5.4]
+    
+    # Should have forecast_time
+    assert "forecast_time" in result
+
+
+def test_extract_common_metadata(simplified_base_response):
+    """Tests the new _extract_common_metadata static method"""
+    
+    metadata = open_meteo.OpenMeteoForecast._extract_common_metadata(simplified_base_response)
+    
+    assert "latitude" in metadata
+    assert "longitude" in metadata
+    assert "elevation" in metadata
+    assert metadata["latitude"] == 52.52
+    assert metadata["longitude"] == 13.419
+    assert metadata["elevation"] == 38.0
+
+
+def test_backward_compatibility_combined_format(simplified_base_response, forecast_base_parameters):
+    """Tests that the old fetch_data method still returns combined hourly and 15-minute data"""
+    
+    # Configure with 15-minute data enabled
+    params_with_15min = {
+        **forecast_base_parameters,
+        "enable_minutely_15": True,
+        "hourly_variables": ["temperature_2m", "wind_speed_10m"],
+        "minutely_15_variables": ["temperature_2m", "wind_speed_10m"]
+    }
+    
+    # Add 15-minute data to test fixture
+    test_response = simplified_base_response.copy()
+    test_response["minutely_15"] = {
+        "time": ["2024-01-15T00:00", "2024-01-15T00:15"],
+        "temperature_2m": [3.5, 3.4],
+        "wind_speed_10m": [12.5, 12.3]
+    }
+    
+    api = open_meteo.OpenMeteoForecast(source_parameters=params_with_15min)
+    combined_data = api.fetch_data(raw_forecast=test_response)
+    
+    # Should have both hourly and 15-minute data in the same dict (with _15min suffix for 15-minute)
+    assert "observation_time" in combined_data  # Hourly
+    assert "observation_time_15min" in combined_data  # 15-minute
+    assert len(combined_data["observation_time"]) == 7
+    assert len(combined_data["observation_time_15min"]) == 2
+    assert "air_temperature_2m" in combined_data  # Hourly temperature
+    assert "air_temperature_2m_15min" in combined_data  # 15-minute temperature
