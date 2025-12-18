@@ -12,6 +12,8 @@ import requests
 
 import data_crawler.sources.abc.http_cache as http_cache
 import data_crawler.access.jsonpath as jx
+from data_crawler.sources.abc.message import Message
+from typing import Generator
 
 
 class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
@@ -181,6 +183,9 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         """
         Fetches the forecasting information and translates it into a common Redis-ready nomenclature
 
+        This method combines hourly and 15-minute data into a single message for backward compatibility.
+        For separate messages, the system will automatically use fetch_data_bundle() instead.
+
         :param raw_forecast: The raw forecast for testing purpose. It is not advised to use the parameter productively.
         :return: The dictionary of forecasts following the common nomenclature. See the AbstractSourceAPI class for more
             information on the expected output format.
@@ -201,23 +206,59 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         )
         return redis_forecast
 
+    def fetch_data_bundle(self, raw_forecast: Optional[dict] = None) -> Generator[Message, None, None]:
+        """
+        Fetches the forecasting information and yields separate messages for hourly and 15-minute data
+
+        This method queries the API once but publishes the hourly and 15-minute forecasts as separate
+        Redis messages, allowing downstream consumers to subscribe to only the data resolution they need.
+
+        :param raw_forecast: The raw forecast for testing purpose. It is not advised to use the parameter productively.
+        :return: A generator yielding Message objects with hourly and (optionally) 15-minute forecast data
+        """
+        # Fetch raw data from API if not provided
+        if raw_forecast is None:
+            response: requests.Response = self.session.get(
+                self.API_ENDPOINT,
+                params=self.static_request_parameters
+            )
+            response.raise_for_status()
+            raw_forecast = response.json()
+
+        # Extract common metadata (shared by both messages)
+        common_metadata = self._extract_common_metadata(raw_forecast)
+        print('i am heeeereeee')
+
+        # Always yield hourly data message
+        if "hourly" in raw_forecast:
+            hourly_data = self._transform_hourly_data(raw_forecast, self._hourly_variables)
+            hourly_data.update(common_metadata)
+            
+            self._logger.debug(f"Yielding hourly forecast message with {len(hourly_data.get('observation_time', []))} timesteps")
+            yield Message(
+                payload=hourly_data,
+                metadata={}  # can specify a certain stream name here.
+            )
+
+        # Yield 15-minute data message if enabled and available
+        if self._enable_minutely_15 and "minutely_15" in raw_forecast:
+            minutely_data = self._transform_minutely_15_data(raw_forecast, self._minutely_15_variables)
+            minutely_data.update(common_metadata)
+            
+            self._logger.debug(f"Yielding 15-minute forecast message with {len(minutely_data.get('observation_time', []))} timesteps")
+            yield Message(
+                payload=minutely_data,
+                metadata={}  # Can be configured to route to specific streams if needed
+            )
+
     @staticmethod
-    def _transform_to_redis_format(raw_forecast: dict, hourly_variables: List[str], 
-                                   minutely_15_variables: Optional[List[str]] = None) -> Dict[str, Any]:
+    def _get_variable_mapping() -> Dict[str, str]:
         """
-        Transforms the Open-Meteo forecast to the common Redis representation
-
-        The function does some rudimentary checks but does not validate the schema entirely.
+        Returns the mapping from Open-Meteo variable names to our internal nomenclature
         
-        :param raw_forecast: The raw JSON response from Open-Meteo API
-        :param hourly_variables: List of hourly variables that were queried
-        :param minutely_15_variables: Optional list of 15-minute variables that were queried
-        :return: Dictionary in the common Redis format
+        :return: Dictionary mapping Open-Meteo variable names to internal names
         """
-
-        # Mapping from Open-Meteo variable names to our internal nomenclature
-        # Aligned with weatherbit and yr.no naming conventions
-        variable_mapping = {
+        return {
             # Temperature
             "temperature_2m": "air_temperature_2m",
             "apparent_temperature": "apparent_temperature",
@@ -259,6 +300,106 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             # UV
             "uv_index": "uv_index",
         }
+
+    @staticmethod
+    def _extract_common_metadata(raw_forecast: dict) -> Dict[str, Any]:
+        """
+        Extracts common metadata (lat, lon, elevation, generation time) from raw forecast
+        
+        :param raw_forecast: The raw JSON response from Open-Meteo API
+        :return: Dictionary with common metadata fields
+        """
+        extractors = [
+            jx.PathExtractor("longitude", "longitude", is_list=False),
+            jx.PathExtractor("latitude", "latitude", is_list=False),
+            jx.PathExtractor("elevation", "elevation", is_list=False, drop_missing=True),
+            jx.PathExtractor("generationtime_ms", "generationtime_ms", is_list=False, drop_missing=True),
+        ]
+        
+        return dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
+
+    @staticmethod
+    def _transform_hourly_data(raw_forecast: dict, hourly_variables: List[str]) -> Dict[str, Any]:
+        """
+        Transforms the Open-Meteo hourly forecast data to the common Redis representation
+        
+        :param raw_forecast: The raw JSON response from Open-Meteo API
+        :param hourly_variables: List of hourly variables that were queried
+        :return: Dictionary in the common Redis format with hourly data
+        """
+        if "hourly" not in raw_forecast:
+            return {}
+        
+        variable_mapping = OpenMeteoForecast._get_variable_mapping()
+        extractors = []
+        
+        # Time axis - use [*] to extract individual items from the array
+        extractors.append(jx.DatetimePathExtractor("observation_time", "hourly.time[*]"))
+        
+        # Add extractors for each hourly variable that was queried
+        for var in hourly_variables:
+            internal_name = variable_mapping.get(var, var)
+            src_path = f"hourly.{var}[*]"
+            extractors.append(
+                jx.PathExtractor(internal_name, src_path, is_list=True, drop_missing=True)
+            )
+        
+        result = dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
+        
+        # Add a forecast_time based on the first observation time if available
+        if "observation_time" in result and len(result["observation_time"]) > 0:
+            result["forecast_time"] = result["observation_time"][0]
+        
+        return result
+
+    @staticmethod
+    def _transform_minutely_15_data(raw_forecast: dict, minutely_15_variables: List[str]) -> Dict[str, Any]:
+        """
+        Transforms the Open-Meteo 15-minute forecast data to the common Redis representation
+        
+        :param raw_forecast: The raw JSON response from Open-Meteo API
+        :param minutely_15_variables: List of 15-minute variables that were queried
+        :return: Dictionary in the common Redis format with 15-minute data
+        """
+        if "minutely_15" not in raw_forecast:
+            return {}
+        
+        variable_mapping = OpenMeteoForecast._get_variable_mapping()
+        extractors = []
+        
+        # Time axis for 15-minute data
+        extractors.append(jx.DatetimePathExtractor("observation_time", "minutely_15.time[*]"))
+        
+        # Add extractors for each 15-minute variable
+        for var in minutely_15_variables:
+            internal_name = variable_mapping.get(var, var)
+            src_path = f"minutely_15.{var}[*]"
+            extractors.append(
+                jx.PathExtractor(internal_name, src_path, is_list=True, drop_missing=True)
+            )
+        
+        result = dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
+        
+        # Add a forecast_time based on the first observation time if available
+        if "observation_time" in result and len(result["observation_time"]) > 0:
+            result["forecast_time"] = result["observation_time"][0]
+        
+        return result
+
+    @staticmethod
+    def _transform_to_redis_format(raw_forecast: dict, hourly_variables: List[str], 
+                                   minutely_15_variables: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Transforms the Open-Meteo forecast to the common Redis representation (combined hourly and 15-min data)
+
+        This method is kept for backward compatibility. For separate messages, use fetch_data_bundle() instead.
+        
+        :param raw_forecast: The raw JSON response from Open-Meteo API
+        :param hourly_variables: List of hourly variables that were queried
+        :param minutely_15_variables: Optional list of 15-minute variables that were queried
+        :return: Dictionary in the common Redis format
+        """
+        variable_mapping = OpenMeteoForecast._get_variable_mapping()
 
         extractors = [
             # Meta-data (scalar values)
@@ -312,10 +453,10 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
 
         return redis_forecast
 
-## testing a = OpenMeteoForecast(source_parameters={"latitude": 52.593, "longitude": 4.752, 
-## testing                                          "enable_minutely_15": True, 
-## testing                                          "minutely_15_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"], "hourly_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"]}) #, "wind_speed_unit": "kmh"})
-## testing print(a.static_request_parameters)
-## testing b = a.fetch_data()
-## testing #print(json.dumps(b, indent=4))
-## testing print('done')
+a = OpenMeteoForecast(source_parameters={"latitude": 52.593, "longitude": 4.752, 
+                                         "enable_minutely_15": True, 
+                                         "minutely_15_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"], "hourly_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"]}) #, "wind_speed_unit": "kmh"})
+print(a.static_request_parameters)
+b = a.fetch_data_bundle()
+#print(json.dumps(b, indent=4))
+print('done')
