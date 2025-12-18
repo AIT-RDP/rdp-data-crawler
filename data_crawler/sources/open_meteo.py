@@ -227,7 +227,6 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
 
         # Extract common metadata (shared by both messages)
         common_metadata = self._extract_common_metadata(raw_forecast)
-        print('i am heeeereeee')
 
         # Always yield hourly data message
         if "hourly" in raw_forecast:
@@ -453,10 +452,10 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
 
         return redis_forecast
 
-a = OpenMeteoForecast(source_parameters={"latitude": 52.593, "longitude": 4.752, 
-                                         "enable_minutely_15": True, 
-                                         "minutely_15_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"], "hourly_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"]}) #, "wind_speed_unit": "kmh"})
-print(a.static_request_parameters)
-b = a.fetch_data_bundle()
-#print(json.dumps(b, indent=4))
-print('done')
+## testing a = OpenMeteoForecast(source_parameters={"latitude": 52.593, "longitude": 4.752, 
+## testing                                          "enable_minutely_15": True, 
+## testing                                          "minutely_15_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"], "hourly_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"]}) #, "wind_speed_unit": "kmh"})
+## testing print(a.static_request_parameters)
+## testing b = a.fetch_data_bundle()
+## testing #print(json.dumps(b, indent=4))
+## testing print('done')
