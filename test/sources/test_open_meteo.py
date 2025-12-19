@@ -181,7 +181,6 @@ def test_forecast_optional_parameters():
         "longitude": 13.0,
         "forecast_days": 10,
         "past_days": 2,
-        "timezone": "Europe/Berlin",
         "altitude": 50.0,
         "models": "ecmwf_ifs04",
         "cache": {"directory": ".cache-test-persistent"}
@@ -192,7 +191,7 @@ def test_forecast_optional_parameters():
 
     assert params["forecast_days"] == 10
     assert params["past_days"] == 2
-    assert params["timezone"] == "Europe/Berlin"
+    assert params["timezone"] == "UTC"  # Timezone must always be UTC to avoid spurious time shifts
     assert params["elevation"] == 50.0
     assert params["models"] == "ecmwf_ifs04"
 

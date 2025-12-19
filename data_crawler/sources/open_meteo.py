@@ -123,7 +123,6 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
                   (default 96 = 24 hours). Only used if enable_minutely_15 is True.
                   Note: 15-minute data is limited to ~4 days (384 timesteps) by the API.
               - past_days: int, number of past days to include (0-92, default 0)
-              - timezone: str, timezone for the response (default "UTC")
               - altitude: float, custom elevation in meters
               - models: str, the weather model to use (default "best_match")
                   Common options: "best_match", "ecmwf_ifs04", "gfs_seamless", "icon_seamless"
@@ -146,7 +145,6 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         self._forecast_days = source_parameters.get("forecast_days", 7)
         self._forecast_minutely_15 = source_parameters.get("forecast_minutely_15", 96)  # 24 hours = 96 timesteps
         self._past_days = source_parameters.get("past_days", 0)
-        self._timezone = source_parameters.get("timezone", "UTC")
         self._altitude = source_parameters.get("altitude")
         self._models = source_parameters.get("models", "best_match")
         self._wind_speed_unit = source_parameters.get("wind_speed_unit", "ms")
@@ -160,7 +158,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             "hourly": ",".join(self._hourly_variables),
             "forecast_days": self._forecast_days,
             "past_days": self._past_days,
-            "timezone": self._timezone,
+            "timezone": "UTC",  # Only UTC is supported right not to avoid timezone conversion issues
             "models": self._models,
         }
 
