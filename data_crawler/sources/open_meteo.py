@@ -124,7 +124,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
                   Note: 15-minute data is limited to ~4 days (384 timesteps) by the API.
               - past_days: int, number of past days to include (0-92, default 0)
               - timezone: str, timezone for the response (default "UTC")
-              - elevation: float, custom elevation in meters
+              - altitude: float, custom elevation in meters
               - models: str, the weather model to use (default "best_match")
                   Common options: "best_match", "ecmwf_ifs04", "gfs_seamless", "icon_seamless"
               - wind_speed_unit: str, the unit of the wind speed (default "ms" other option "kmh")
@@ -147,7 +147,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         self._forecast_minutely_15 = source_parameters.get("forecast_minutely_15", 96)  # 24 hours = 96 timesteps
         self._past_days = source_parameters.get("past_days", 0)
         self._timezone = source_parameters.get("timezone", "UTC")
-        self._elevation = source_parameters.get("elevation")
+        self._altitude = source_parameters.get("altitude")
         self._models = source_parameters.get("models", "best_match")
         self._wind_speed_unit = source_parameters.get("wind_speed_unit", "ms")
 
@@ -169,8 +169,8 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             params["minutely_15"] = ",".join(self._minutely_15_variables)
             params["forecast_minutely_15"] = self._forecast_minutely_15
 
-        if self._elevation is not None:
-            params["elevation"] = self._elevation
+        if self._altitude is not None:
+            params["elevation"] = self._altitude
         if self._wind_speed_unit is not None:
             params["wind_speed_unit"] = self._wind_speed_unit
 
@@ -304,7 +304,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
     @staticmethod
     def _extract_common_metadata(raw_forecast: dict) -> Dict[str, Any]:
         """
-        Extracts common metadata (lat, lon, elevation, generation time) from raw forecast
+        Extracts common metadata (lat, lon, altitude, generation time) from raw forecast
         
         :param raw_forecast: The raw JSON response from Open-Meteo API
         :return: Dictionary with common metadata fields
@@ -312,7 +312,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         extractors = [
             jx.PathExtractor("longitude", "longitude", is_list=False),
             jx.PathExtractor("latitude", "latitude", is_list=False),
-            jx.PathExtractor("elevation", "elevation", is_list=False, drop_missing=True),
+            jx.PathExtractor("altitude", "elevation", is_list=False, drop_missing=True),
             jx.PathExtractor("generationtime_ms", "generationtime_ms", is_list=False, drop_missing=True),
         ]
 
@@ -405,7 +405,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             # Meta-data (scalar values)
             jx.PathExtractor("longitude", "longitude", is_list=False),
             jx.PathExtractor("latitude", "latitude", is_list=False),
-            jx.PathExtractor("elevation", "elevation", is_list=False, drop_missing=True),
+            jx.PathExtractor("altitude", "elevation", is_list=False, drop_missing=True),
         ]
 
         # Extract hourly data if available

@@ -46,7 +46,7 @@ def test_forecast_parsing(simplified_base_response: dict, forecast_base_paramete
     # Check metadata
     assert response_data["longitude"] == 13.419
     assert response_data["latitude"] == 52.52
-    assert response_data["elevation"] == 38.0
+    assert response_data["altitude"] == 38.0
 
     # Check time axis (with timezone information in ISO8601 format)
     assert response_data["observation_time"] == [
@@ -182,7 +182,7 @@ def test_forecast_optional_parameters():
         "forecast_days": 10,
         "past_days": 2,
         "timezone": "Europe/Berlin",
-        "elevation": 50.0,
+        "altitude": 50.0,
         "models": "ecmwf_ifs04",
         "cache": {"directory": ".cache-test-persistent"}
     }
@@ -430,10 +430,10 @@ def test_extract_common_metadata(simplified_base_response):
 
     assert "latitude" in metadata
     assert "longitude" in metadata
-    assert "elevation" in metadata
+    assert "altitude" in metadata
     assert metadata["latitude"] == 52.52
     assert metadata["longitude"] == 13.419
-    assert metadata["elevation"] == 38.0
+    assert metadata["altitude"] == 38.0
 
 
 def test_backward_compatibility_combined_format(simplified_base_response, forecast_base_parameters):
