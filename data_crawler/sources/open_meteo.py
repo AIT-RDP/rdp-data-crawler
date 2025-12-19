@@ -138,7 +138,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
 
         self._latitude = float(source_parameters["latitude"])
         self._longitude = float(source_parameters["longitude"])
-        
+
         # Optional parameters
         self._hourly_variables = source_parameters.get("hourly_variables", self.DEFAULT_HOURLY_VARIABLES)
         self._enable_minutely_15 = source_parameters.get("enable_minutely_15", False)
@@ -150,7 +150,6 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         self._elevation = source_parameters.get("elevation")
         self._models = source_parameters.get("models", "best_match")
         self._wind_speed_unit = source_parameters.get("wind_speed_unit", "ms")
-
 
     @property
     def static_request_parameters(self) -> Dict[str, Any]:
@@ -164,12 +163,12 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             "timezone": self._timezone,
             "models": self._models,
         }
-        
+
         # Add 15-minute data if enabled
         if self._enable_minutely_15:
             params["minutely_15"] = ",".join(self._minutely_15_variables)
             params["forecast_minutely_15"] = self._forecast_minutely_15
-        
+
         if self._elevation is not None:
             params["elevation"] = self._elevation
         if self._wind_speed_unit is not None:
@@ -200,7 +199,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             raw_forecast = response.json()
 
         redis_forecast = self._transform_to_redis_format(
-            raw_forecast, 
+            raw_forecast,
             self._hourly_variables,
             self._minutely_15_variables if self._enable_minutely_15 else None
         )
@@ -232,8 +231,9 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         if "hourly" in raw_forecast:
             hourly_data = self._transform_hourly_data(raw_forecast, self._hourly_variables)
             hourly_data.update(common_metadata)
-            
-            self._logger.debug(f"Yielding hourly forecast message with {len(hourly_data.get('observation_time', []))} timesteps")
+
+            self._logger.debug(
+                f"Yielding hourly forecast message with {len(hourly_data.get('observation_time', []))} timesteps")
             yield Message(
                 payload=hourly_data,
                 metadata={}  # can specify a certain stream name here.
@@ -243,8 +243,9 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         if self._enable_minutely_15 and "minutely_15" in raw_forecast:
             minutely_data = self._transform_minutely_15_data(raw_forecast, self._minutely_15_variables)
             minutely_data.update(common_metadata)
-            
-            self._logger.debug(f"Yielding 15-minute forecast message with {len(minutely_data.get('observation_time', []))} timesteps")
+
+            self._logger.debug(
+                f"Yielding 15-minute forecast message with {len(minutely_data.get('observation_time', []))} timesteps")
             yield Message(
                 payload=minutely_data,
                 metadata={}  # Can be configured to route to specific streams if needed
@@ -314,7 +315,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             jx.PathExtractor("elevation", "elevation", is_list=False, drop_missing=True),
             jx.PathExtractor("generationtime_ms", "generationtime_ms", is_list=False, drop_missing=True),
         ]
-        
+
         return dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
 
     @staticmethod
@@ -328,13 +329,13 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         """
         if "hourly" not in raw_forecast:
             return {}
-        
+
         variable_mapping = OpenMeteoForecast._get_variable_mapping()
         extractors = []
-        
+
         # Time axis - use [*] to extract individual items from the array
         extractors.append(jx.DatetimePathExtractor("observation_time", "hourly.time[*]"))
-        
+
         # Add extractors for each hourly variable that was queried
         for var in hourly_variables:
             internal_name = variable_mapping.get(var, var)
@@ -342,13 +343,13 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             extractors.append(
                 jx.PathExtractor(internal_name, src_path, is_list=True, drop_missing=True)
             )
-        
+
         result = dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
-        
+
         # Add a forecast_time based on the first observation time if available
         if "observation_time" in result and len(result["observation_time"]) > 0:
             result["forecast_time"] = result["observation_time"][0]
-        
+
         return result
 
     @staticmethod
@@ -362,13 +363,13 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         """
         if "minutely_15" not in raw_forecast:
             return {}
-        
+
         variable_mapping = OpenMeteoForecast._get_variable_mapping()
         extractors = []
-        
+
         # Time axis for 15-minute data
         extractors.append(jx.DatetimePathExtractor("observation_time", "minutely_15.time[*]"))
-        
+
         # Add extractors for each 15-minute variable
         for var in minutely_15_variables:
             internal_name = variable_mapping.get(var, var)
@@ -376,17 +377,17 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             extractors.append(
                 jx.PathExtractor(internal_name, src_path, is_list=True, drop_missing=True)
             )
-        
+
         result = dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
-        
+
         # Add a forecast_time based on the first observation time if available
         if "observation_time" in result and len(result["observation_time"]) > 0:
             result["forecast_time"] = result["observation_time"][0]
-        
+
         return result
 
     @staticmethod
-    def _transform_to_redis_format(raw_forecast: dict, hourly_variables: List[str], 
+    def _transform_to_redis_format(raw_forecast: dict, hourly_variables: List[str],
                                    minutely_15_variables: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Transforms the Open-Meteo forecast to the common Redis representation (combined hourly and 15-min data)
@@ -406,12 +407,12 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             jx.PathExtractor("latitude", "latitude", is_list=False),
             jx.PathExtractor("elevation", "elevation", is_list=False, drop_missing=True),
         ]
-        
+
         # Extract hourly data if available
         if "hourly" in raw_forecast:
             # Time axis - use [*] to extract individual items from the array
             extractors.append(jx.DatetimePathExtractor("observation_time", "hourly.time[*]"))
-            
+
             # Add extractors for each hourly variable that was queried
             # Use [*] to extract individual items from each hourly array
             for var in hourly_variables:
@@ -420,12 +421,12 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
                 extractors.append(
                     jx.PathExtractor(internal_name, src_path, is_list=True, drop_missing=True)
                 )
-        
+
         # Extract 15-minute data if available and requested
         if minutely_15_variables is not None and "minutely_15" in raw_forecast:
             # Time axis for 15-minute data - use a different key to distinguish from hourly
             extractors.append(jx.DatetimePathExtractor("observation_time_15min", "minutely_15.time[*]"))
-            
+
             # Add extractors for each 15-minute variable
             # Append "_15min" suffix to distinguish from hourly data
             for var in minutely_15_variables:
@@ -442,7 +443,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         )
 
         redis_forecast = dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
-        
+
         # Add a forecast_time based on the first observation time if available
         # Prioritize 15-minute data if available, otherwise use hourly
         if "observation_time_15min" in redis_forecast and len(redis_forecast["observation_time_15min"]) > 0:

@@ -42,7 +42,7 @@ def test_forecast_parsing(simplified_base_response: dict, forecast_base_paramete
     response_data = api.fetch_data(raw_forecast=simplified_base_response)
 
     assert response_data is not None
-    
+
     # Check metadata
     assert response_data["longitude"] == 13.419
     assert response_data["latitude"] == 52.52
@@ -64,7 +64,7 @@ def test_forecast_parsing(simplified_base_response: dict, forecast_base_paramete
     assert response_data["relative_humidity_2m"] == [85.0, 87.0, 89.0, 91.0, 92.0, 93.0, 94.0]
     assert response_data["dew_point_temperature_2m"] == [1.2, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5]
     assert response_data["apparent_temperature"] == [0.5, 0.0, -0.3, -0.6, -0.8, -1.1, -1.3]
-    
+
     # Check pressure
     assert response_data["air_pressure_at_sea_level"] == [1015.2, 1015.4, 1015.6, 1015.8, 1016.0, 1016.2, 1016.4]
     assert response_data["surface_pressure"] == [1011.5, 1011.7, 1011.9, 1012.1, 1012.3, 1012.5, 1012.7]
@@ -74,7 +74,7 @@ def test_forecast_parsing(simplified_base_response: dict, forecast_base_paramete
     assert response_data["cloud_area_fraction_low"] == [20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0]
     assert response_data["cloud_area_fraction_medium"] == [30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0]
     assert response_data["cloud_area_fraction_high"] == [50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0]
-    
+
     # Check visibility
     assert response_data["visibility"] == [24000, 22000, 20000, 18000, 16000, 14000, 12000]
 
@@ -82,14 +82,14 @@ def test_forecast_parsing(simplified_base_response: dict, forecast_base_paramete
     assert response_data["wind_speed_10m"] == [12.5, 11.8, 11.2, 10.5, 9.8, 9.2, 8.5]
     assert response_data["wind_direction_10m"] == [270.0, 275.0, 280.0, 285.0, 290.0, 295.0, 300.0]
     assert response_data["wind_gusts_10m"] == [22.5, 21.2, 20.0, 18.7, 17.5, 16.2, 15.0]
-    
+
     # Check higher altitude winds (for wind energy applications)
     assert response_data["wind_speed_80m"] == [22.3, 21.1, 20.0, 18.8, 17.6, 16.5, 15.3]
     assert response_data["wind_direction_80m"] == [265.0, 270.0, 275.0, 280.0, 285.0, 290.0, 295.0]
-    
+
     assert response_data["wind_speed_120m"] == [26.3, 25.1, 24.0, 22.8, 21.6, 20.5, 19.3]
     assert response_data["wind_direction_120m"] == [260.0, 265.0, 270.0, 275.0, 280.0, 285.0, 290.0]
-    
+
     assert response_data["wind_speed_180m"] == [30.1, 28.5, 27.0, 25.4, 23.9, 22.3, 20.8]
     assert response_data["wind_direction_180m"] == [255.0, 260.0, 265.0, 270.0, 275.0, 280.0, 285.0]
 
@@ -98,15 +98,15 @@ def test_forecast_parsing(simplified_base_response: dict, forecast_base_paramete
     assert response_data["precipitation_probability"] == [0, 5, 10, 20, 30, 45, 60]
     assert response_data["rain"] == [0.0, 0.0, 0.1, 0.2, 0.3, 0.5, 0.8]
     assert response_data["snowfall"] == [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    
+
     # Check weather code
     assert response_data["weather_code"] == [3, 3, 61, 61, 61, 63, 63]
-    
+
     # Check radiation (shortwave mapped to global_horizontal_irradiation like weatherbit)
     assert response_data["global_horizontal_irradiation"] == [0.0, 0.0, 0.0, 0.0, 0.0, 5.0, 25.0]
     assert response_data["direct_radiation"] == [0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 10.0]
     assert response_data["diffuse_radiation"] == [0.0, 0.0, 0.0, 0.0, 0.0, 3.0, 15.0]
-    
+
     # Check UV index
     assert response_data["uv_index"] == [0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.3]
 
@@ -118,20 +118,20 @@ def test_forecast_online(forecast_base_parameters):
     response_data = api.fetch_data()
 
     assert response_data is not None
-    
+
     # Check that we got forecast_time with timezone information
     assert "forecast_time" in response_data
     forecast_time = datetime.datetime.fromisoformat(response_data["forecast_time"])
     # Verify timezone is present
     assert forecast_time.tzinfo is not None, "forecast_time should include timezone information"
     assert forecast_time > datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=1)
-    
+
     # Check that wind data at various heights is present
     assert "wind_speed_10m" in response_data
     assert "wind_speed_80m" in response_data
     assert "wind_speed_120m" in response_data
     assert len(response_data["wind_speed_10m"]) > 0
-    
+
     # Check that all wind speeds are reasonable (0-300 km/h)
     for speed in response_data["wind_speed_80m"]:
         if speed is not None:
@@ -144,7 +144,7 @@ def test_forecast_request_parameters(forecast_base_parameters, config_fkt):
 
     api = open_meteo.OpenMeteoForecast(source_parameters=config_fkt(forecast_base_parameters))
     params = api.static_request_parameters
-    
+
     assert "latitude" in params
     assert params["latitude"] == 52.52
     assert "longitude" in params
@@ -166,10 +166,10 @@ def test_forecast_custom_variables():
         "hourly_variables": ["wind_speed_80m", "wind_speed_120m", "wind_direction_80m"],
         "cache": {"directory": ".cache-test-persistent"}
     }
-    
+
     api = open_meteo.OpenMeteoForecast(source_parameters=custom_params)
     params = api.static_request_parameters
-    
+
     assert params["hourly"] == "wind_speed_80m,wind_speed_120m,wind_direction_80m"
 
 
@@ -186,10 +186,10 @@ def test_forecast_optional_parameters():
         "models": "ecmwf_ifs04",
         "cache": {"directory": ".cache-test-persistent"}
     }
-    
+
     api = open_meteo.OpenMeteoForecast(source_parameters=full_params)
     params = api.static_request_parameters
-    
+
     assert params["forecast_days"] == 10
     assert params["past_days"] == 2
     assert params["timezone"] == "Europe/Berlin"
@@ -203,7 +203,7 @@ def test_forecast_wind_heights_online():
     
     This is useful for wind energy applications where hub heights vary.
     """
-    
+
     minimal_params = {
         "latitude": 52.52,
         "longitude": 13.405,
@@ -211,19 +211,19 @@ def test_forecast_wind_heights_online():
         "forecast_days": 3,
         "cache": {"directory": ".cache-test-persistent"}
     }
-    
+
     api = open_meteo.OpenMeteoForecast(source_parameters=minimal_params)
     response_data = api.fetch_data()
-    
+
     assert response_data is not None
     assert "wind_speed_10m" in response_data
     assert "wind_speed_80m" in response_data
     assert "wind_speed_120m" in response_data
     assert "wind_speed_180m" in response_data
-    
+
     # With 3 forecast days and hourly resolution, we should have ~72 data points
     assert len(response_data["wind_speed_80m"]) >= 48  # At least 2 days worth
-    
+
     # Wind speed should generally increase with height
     # Check a few samples where this relationship holds
     for i in range(min(5, len(response_data["wind_speed_10m"]))):
@@ -237,13 +237,13 @@ def test_forecast_wind_heights_online():
 
 def test_api_endpoint():
     """Tests that the correct API endpoint is used"""
-    
+
     assert open_meteo.OpenMeteoForecast.API_ENDPOINT == "https://api.open-meteo.com/v1/forecast"
 
 
 def test_forecast_minutely_15_parameters():
     """Tests that forecast_minutely_15 parameter is correctly set for 15-minute data"""
-    
+
     # Test with 15-minute data enabled and custom forecast_minutely_15
     params_with_15min = {
         "latitude": 52.52,
@@ -254,10 +254,10 @@ def test_forecast_minutely_15_parameters():
         "forecast_days": 10,  # Hourly data for 10 days
         "cache": {"directory": ".cache-test-persistent"}
     }
-    
+
     api = open_meteo.OpenMeteoForecast(source_parameters=params_with_15min)
     params = api.static_request_parameters
-    
+
     # Verify both forecast parameters are present and different
     assert "forecast_days" in params
     assert params["forecast_days"] == 10
@@ -265,7 +265,7 @@ def test_forecast_minutely_15_parameters():
     assert params["forecast_minutely_15"] == 192
     assert "minutely_15" in params
     assert params["minutely_15"] == "wind_speed_10m,temperature_2m"
-    
+
     # Test with 15-minute data enabled but using default forecast_minutely_15 (96 = 24 hours)
     params_default_15min = {
         "latitude": 52.52,
@@ -273,13 +273,13 @@ def test_forecast_minutely_15_parameters():
         "enable_minutely_15": True,
         "cache": {"directory": ".cache-test-persistent"}
     }
-    
+
     api_default = open_meteo.OpenMeteoForecast(source_parameters=params_default_15min)
     params_default = api_default.static_request_parameters
-    
+
     assert "forecast_minutely_15" in params_default
     assert params_default["forecast_minutely_15"] == 96  # Default is 24 hours
-    
+
     # Test without 15-minute data - forecast_minutely_15 should not be present
     params_no_15min = {
         "latitude": 52.52,
@@ -287,17 +287,17 @@ def test_forecast_minutely_15_parameters():
         "enable_minutely_15": False,
         "cache": {"directory": ".cache-test-persistent"}
     }
-    
+
     api_no_15min = open_meteo.OpenMeteoForecast(source_parameters=params_no_15min)
     params_no_15min_result = api_no_15min.static_request_parameters
-    
+
     assert "forecast_minutely_15" not in params_no_15min_result
     assert "minutely_15" not in params_no_15min_result
 
 
 def test_fetch_data_bundle_separate_messages(simplified_base_response, forecast_base_parameters):
     """Tests that fetch_data_bundle yields separate messages for hourly and 15-minute data"""
-    
+
     # Configure with 15-minute data enabled
     params_with_15min = {
         **forecast_base_parameters,
@@ -305,7 +305,7 @@ def test_fetch_data_bundle_separate_messages(simplified_base_response, forecast_
         "hourly_variables": ["temperature_2m", "wind_speed_10m", "wind_speed_80m"],
         "minutely_15_variables": ["temperature_2m", "wind_speed_10m", "wind_speed_80m"]
     }
-    
+
     # Add 15-minute data to test fixture
     test_response = simplified_base_response.copy()
     test_response["minutely_15"] = {
@@ -314,13 +314,13 @@ def test_fetch_data_bundle_separate_messages(simplified_base_response, forecast_
         "wind_speed_10m": [12.5, 12.3, 12.1, 11.9],
         "wind_speed_80m": [22.3, 22.2, 22.0, 21.8]
     }
-    
+
     api = open_meteo.OpenMeteoForecast(source_parameters=params_with_15min)
     messages = list(api.fetch_data_bundle(raw_forecast=test_response))
-    
+
     # Should yield 2 messages: one hourly, one 15-minute
     assert len(messages) == 2, f"Expected 2 messages, got {len(messages)}"
-    
+
     # Verify first message is hourly data
     hourly_msg = messages[0]
     assert hasattr(hourly_msg, 'payload'), "Message should have payload attribute"
@@ -334,7 +334,7 @@ def test_fetch_data_bundle_separate_messages(simplified_base_response, forecast_
     assert "latitude" in hourly_msg.payload
     assert "longitude" in hourly_msg.payload
     assert hourly_msg.payload["latitude"] == 52.52
-    
+
     # Verify second message is 15-minute data
     minutely_msg = messages[1]
     assert "observation_time" in minutely_msg.payload
@@ -350,20 +350,20 @@ def test_fetch_data_bundle_separate_messages(simplified_base_response, forecast_
 
 def test_fetch_data_bundle_hourly_only(simplified_base_response, forecast_base_parameters):
     """Tests that fetch_data_bundle yields only hourly message when 15-minute data is disabled"""
-    
+
     # Configure without 15-minute data
     params_hourly_only = {
         **forecast_base_parameters,
         "enable_minutely_15": False,
         "hourly_variables": ["temperature_2m", "wind_speed_10m"]
     }
-    
+
     api = open_meteo.OpenMeteoForecast(source_parameters=params_hourly_only)
     messages = list(api.fetch_data_bundle(raw_forecast=simplified_base_response))
-    
+
     # Should yield only 1 message (hourly)
     assert len(messages) == 1, f"Expected 1 message when 15-minute disabled, got {len(messages)}"
-    
+
     hourly_msg = messages[0]
     assert "observation_time" in hourly_msg.payload
     assert len(hourly_msg.payload["observation_time"]) == 7
@@ -372,13 +372,13 @@ def test_fetch_data_bundle_hourly_only(simplified_base_response, forecast_base_p
 
 def test_transform_hourly_data(simplified_base_response):
     """Tests the new _transform_hourly_data static method"""
-    
+
     hourly_vars = ["temperature_2m", "wind_speed_10m", "wind_speed_80m", "precipitation"]
     result = open_meteo.OpenMeteoForecast._transform_hourly_data(
-        simplified_base_response, 
+        simplified_base_response,
         hourly_vars
     )
-    
+
     # Check that hourly data was extracted
     assert "observation_time" in result
     assert len(result["observation_time"]) == 7
@@ -387,7 +387,7 @@ def test_transform_hourly_data(simplified_base_response):
     assert "wind_speed_10m" in result
     assert "wind_speed_80m" in result
     assert "precipitation_total" in result
-    
+
     # Should have forecast_time
     assert "forecast_time" in result
     assert result["forecast_time"] == "2024-01-15T00:00:00+00:00"
@@ -395,7 +395,7 @@ def test_transform_hourly_data(simplified_base_response):
 
 def test_transform_minutely_15_data():
     """Tests the new _transform_minutely_15_data static method"""
-    
+
     # Create a test response with 15-minute data
     test_response = {
         "minutely_15": {
@@ -404,13 +404,13 @@ def test_transform_minutely_15_data():
             "wind_speed_10m": [5.0, 5.2, 5.4]
         }
     }
-    
+
     minutely_vars = ["temperature_2m", "wind_speed_10m"]
     result = open_meteo.OpenMeteoForecast._transform_minutely_15_data(
         test_response,
         minutely_vars
     )
-    
+
     # Check that 15-minute data was extracted
     assert "observation_time" in result
     assert len(result["observation_time"]) == 3
@@ -418,16 +418,16 @@ def test_transform_minutely_15_data():
     assert result["air_temperature_2m"] == [10.5, 10.6, 10.7]
     assert "wind_speed_10m" in result
     assert result["wind_speed_10m"] == [5.0, 5.2, 5.4]
-    
+
     # Should have forecast_time
     assert "forecast_time" in result
 
 
 def test_extract_common_metadata(simplified_base_response):
     """Tests the new _extract_common_metadata static method"""
-    
+
     metadata = open_meteo.OpenMeteoForecast._extract_common_metadata(simplified_base_response)
-    
+
     assert "latitude" in metadata
     assert "longitude" in metadata
     assert "elevation" in metadata
@@ -438,7 +438,7 @@ def test_extract_common_metadata(simplified_base_response):
 
 def test_backward_compatibility_combined_format(simplified_base_response, forecast_base_parameters):
     """Tests that the old fetch_data method still returns combined hourly and 15-minute data"""
-    
+
     # Configure with 15-minute data enabled
     params_with_15min = {
         **forecast_base_parameters,
@@ -446,7 +446,7 @@ def test_backward_compatibility_combined_format(simplified_base_response, foreca
         "hourly_variables": ["temperature_2m", "wind_speed_10m"],
         "minutely_15_variables": ["temperature_2m", "wind_speed_10m"]
     }
-    
+
     # Add 15-minute data to test fixture
     test_response = simplified_base_response.copy()
     test_response["minutely_15"] = {
@@ -454,10 +454,10 @@ def test_backward_compatibility_combined_format(simplified_base_response, foreca
         "temperature_2m": [3.5, 3.4],
         "wind_speed_10m": [12.5, 12.3]
     }
-    
+
     api = open_meteo.OpenMeteoForecast(source_parameters=params_with_15min)
     combined_data = api.fetch_data(raw_forecast=test_response)
-    
+
     # Should have both hourly and 15-minute data in the same dict (with _15min suffix for 15-minute)
     assert "observation_time" in combined_data  # Hourly
     assert "observation_time_15min" in combined_data  # 15-minute
