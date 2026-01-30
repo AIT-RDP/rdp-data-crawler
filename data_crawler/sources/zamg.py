@@ -80,7 +80,7 @@ class _AbstractGeosphereTimeSeriesAPI(http_cache.GenericHTTPSourceAPI, abc.ABC):
     def _resolve_endpoint_url(endpoint: _EndpointConfig) -> str:
         """Returns the base URL of the particular endpoint"""
 
-        return f"https://dataset.api.hub.zamg.ac.at/v1/{endpoint.type}/{endpoint.mode}/{endpoint.resource_id}"
+        return f"https://dataset.api.hub.geosphere.at/v1/{endpoint.type}/{endpoint.mode}/{endpoint.resource_id}"
 
     @property
     def logger(self) -> logging.Logger:
@@ -219,13 +219,15 @@ class MeasurementStationData(_AbstractGeosphereTimeSeriesAPI, history.AbstractTi
     Fetches the measurement station data provided in 10 minute resolution
 
     The API currently implements the climate and tawes endpoint which mostly differ by their delay and available data
-    points. A description of the climate dataset can be found at https://data.hub.zamg.ac.at/dataset/klima-v1-10min .
-    Be aware that the data is only available until midnight, the day before. Hence, the data source aligns all requests
-    to a full day and only updates new days, if needed. The meta-fields can be accessed at
-    https://dataset.api.hub.zamg.ac.at/v1/station/historical/klima-v1-10min/metadata .
+    points. A description of the climate dataset can be found at https://data.hub.geosphere.at/dataset/klima-v1-10min .
+    Be aware that originallt, the data is only available until midnight, the day before. Hence, the data source aligns
+    all requests to a full day and only updates new days, if needed. The meta-fields can be accessed at
+    https://dataset.api.hub.geosphere.at/v1/station/historical/klima-v1-10min/metadata . As of January 2006, only
+    historic information is available via the climate endpoint version 1, that is implemented herein. For more recent
+    data, v2 needs to be used. See issue #102 for more details.
 
     Similarly, the TAWES meta fields are accessible at
-    https://dataset.api.hub.zamg.ac.at/v1/station/historical/tawes-v1-10min/metadata . Note that both TAWES and climate
+    https://dataset.api.hub.geosphere.at/v1/station/historical/tawes-v1-10min/metadata . Note that both TAWES and climate
     datasets use different station ids. One can use the meta-endpoint to extract the station ids as well.
     """
     _endpoint_configs = {
