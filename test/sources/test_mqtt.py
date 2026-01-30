@@ -1,11 +1,51 @@
 import asyncio
 import json
+import os
 import uuid
+from dataclasses import dataclass
 import pytest
 import zstandard as zstd
 import paho.mqtt.client as mqtt
 from data_crawler.sources.mqtt import MqttSource
 from rdp_mqtt.sparkplug.sparkplug_encode import encode_data_message, get_sparkplug_topic
+
+
+@dataclass
+class MqttBrokerConfig:
+    """Configuration for MQTT broker connection."""
+    host: str
+    port: int
+
+
+@pytest.fixture
+def mqtt_broker_plaintext() -> MqttBrokerConfig:
+    """Fixture providing MQTT broker configuration for plaintext connections.
+
+    Reads from environment variables:
+    - DATA_CRAWLER_MQTT_HOST
+    - DATA_CRAWLER_MQTT_PORT
+
+    Falls back to broker.emqx.io:1883 if not set.
+    """
+    host = os.getenv("DATA_CRAWLER_MQTT_HOST", "broker.emqx.io")
+    port = int(os.getenv("DATA_CRAWLER_MQTT_PORT", "1883"))
+    return MqttBrokerConfig(host=host, port=port)
+
+
+@pytest.fixture
+def mqtt_broker_ssl() -> MqttBrokerConfig:
+    """Fixture providing MQTT broker configuration for SSL connections.
+
+    Reads from environment variables:
+    - DATA_CRAWLER_MQTT_HOST
+    - DATA_CRAWLER_MQTT_SSL_PORT
+
+    Falls back to broker.emqx.io:8883 if not set.
+    """
+    host = os.getenv("DATA_CRAWLER_MQTT_HOST", "broker.emqx.io")
+    port = int(os.getenv("DATA_CRAWLER_MQTT_SSL_PORT", "8883"))
+    return MqttBrokerConfig(host=host, port=port)
+
 
 async def create_connected_mqtt_publisher(broker: str = "broker.emqx.io", port: int = 1883) -> mqtt.Client:
     """Create and connect a Paho MQTT publisher with proper connection handling and retries."""
@@ -62,17 +102,15 @@ async def create_connected_mqtt_publisher(broker: str = "broker.emqx.io", port: 
 
 
 @pytest.mark.asyncio
-async def test_mqtt_source_fetch_data():
+async def test_mqtt_source_fetch_data(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test fetching data from the MQTT source.
     """
-    host = "broker.emqx.io"
-    port = 1883
     topic = f"test/data_crawler/source/{uuid.uuid4()}"
     
     params = {
-        "host": host,
-        "port": port,
+        "host": mqtt_broker_plaintext.host,
+        "port": mqtt_broker_plaintext.port,
         "topic": topic,
         "ssl": False,
     }
@@ -82,8 +120,8 @@ async def test_mqtt_source_fetch_data():
     
     test_data = {"sensor": "temperature", "value": 23.5, "timestamp": "2024-01-01T12:00:00Z"}
     
-    publisher = await create_connected_mqtt_publisher(host, port)
-    
+    publisher = await create_connected_mqtt_publisher(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
+
     received_messages = []
     
     try:
@@ -128,17 +166,15 @@ async def test_mqtt_source_fetch_data():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_source_multiple_messages():
+async def test_mqtt_source_multiple_messages(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test fetching multiple messages from the MQTT source.
     """
-    host = "broker.emqx.io"
-    port = 1883
     topic = f"test/data_crawler/source/multi/{uuid.uuid4()}"
     
     params = {
-        "host": host,
-        "port": port,
+        "host": mqtt_broker_plaintext.host,
+        "port": mqtt_broker_plaintext.port,
         "topic": topic,
         "ssl": False,
     }
@@ -152,8 +188,8 @@ async def test_mqtt_source_multiple_messages():
         {"sensor": "pressure", "value": 1013.25, "id": 3}
     ]
     
-    publisher = await create_connected_mqtt_publisher(host, port)
-    
+    publisher = await create_connected_mqtt_publisher(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
+
     received_messages = []
     
     try:
@@ -204,17 +240,15 @@ async def test_mqtt_source_multiple_messages():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_source_ssl_connection():
+async def test_mqtt_source_ssl_connection(mqtt_broker_ssl: MqttBrokerConfig):
     """
     Test MQTT source with SSL connection (using broker.emqx.io SSL port).
     """
-    host = "broker.emqx.io"
-    port = 8883  # SSL port
     topic = f"test/data_crawler/source/ssl/{uuid.uuid4()}"
 
     params = {
-        "host": host,
-        "port": port,
+        "host": mqtt_broker_ssl.host,
+        "port": mqtt_broker_ssl.port,
         "topic": topic,
         "ssl": True,
         "validate_certificate": False,  # Disable certificate validation for testing
@@ -253,7 +287,7 @@ async def test_mqtt_source_ssl_connection():
                     loop.call_soon_threadsafe(connect_failed.set)
             
             publisher.on_connect = on_connect
-            publisher.connect(host, port, 60)
+            publisher.connect(mqtt_broker_ssl.host, mqtt_broker_ssl.port, 60)
             publisher.loop_start()
             
             await asyncio.wait(
@@ -329,17 +363,15 @@ async def test_mqtt_source_ssl_connection():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_source_qos_levels():
+async def test_mqtt_source_qos_levels(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test MQTT source with different QoS levels.
     """
-    host = "broker.emqx.io"
-    port = 1883
     topic = f"test/data_crawler/source/qos/{uuid.uuid4()}"
 
     params = {
-        "host": host,
-        "port": port,
+        "host": mqtt_broker_plaintext.host,
+        "port": mqtt_broker_plaintext.port,
         "topic": topic,
         "ssl": False,
         "qos": 2,  # Exactly once delivery
@@ -350,7 +382,7 @@ async def test_mqtt_source_qos_levels():
 
     test_data = {"sensor": "temperature", "value": 23.5, "qos_test": True}
 
-    publisher = await create_connected_mqtt_publisher(host, port)
+    publisher = await create_connected_mqtt_publisher(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
 
     received_messages = []
 
@@ -396,18 +428,16 @@ async def test_mqtt_source_qos_levels():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_source_wildcard_topic():
+async def test_mqtt_source_wildcard_topic(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test MQTT source with wildcard topic subscription.
     """
-    host = "broker.emqx.io"
-    port = 1883
     base_topic = f"test/data_crawler/source/wildcard/{uuid.uuid4()}"
     wildcard_topic = f"{base_topic}/+"
 
     params = {
-        "host": host,
-        "port": port,
+        "host": mqtt_broker_plaintext.host,
+        "port": mqtt_broker_plaintext.port,
         "topic": wildcard_topic,
         "ssl": False,
     }
@@ -421,7 +451,7 @@ async def test_mqtt_source_wildcard_topic():
         {"sensor": "pressure", "subtopic": "press"}
     ]
 
-    publisher = await create_connected_mqtt_publisher(host, port)
+    publisher = await create_connected_mqtt_publisher(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
 
     received_messages = []
 
@@ -471,18 +501,16 @@ async def test_mqtt_source_wildcard_topic():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_source_retained_messages():
+async def test_mqtt_source_retained_messages(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test MQTT source with retained messages.
     """
-    host = "broker.emqx.io"
-    port = 1883
     topic = f"test/data_crawler/source/retained/{uuid.uuid4()}"
 
     test_data = {"sensor": "temperature", "value": 23.5, "retained": True}
 
     # First, publish a retained message
-    publisher = await create_connected_mqtt_publisher(host, port)
+    publisher = await create_connected_mqtt_publisher(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
 
     try:
         # Publish retained message
@@ -495,8 +523,8 @@ async def test_mqtt_source_retained_messages():
 
     # Now create source after the retained message was published
     params = {
-        "host": host,
-        "port": port,
+        "host": mqtt_broker_plaintext.host,
+        "port": mqtt_broker_plaintext.port,
         "topic": topic,
         "ssl": False,
     }
@@ -534,7 +562,7 @@ async def test_mqtt_source_retained_messages():
 
         # Clean up retained message with robust connection
         try:
-            cleanup_publisher = await create_connected_mqtt_publisher(host, port)
+            cleanup_publisher = await create_connected_mqtt_publisher(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
             cleanup_publisher.publish(topic, "", retain=True)  # Delete retained message
             await asyncio.sleep(0.5)
             cleanup_publisher.loop_stop()
@@ -545,18 +573,16 @@ async def test_mqtt_source_retained_messages():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_source_reconnection():
+async def test_mqtt_source_reconnection(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test MQTT source reconnection behavior (basic test).
     This test verifies the source can be restarted without issues.
     """
-    host = "broker.emqx.io"
-    port = 1883
     topic = f"test/data_crawler/source/reconnect/{uuid.uuid4()}"
 
     params = {
-        "host": host,
-        "port": port,
+        "host": mqtt_broker_plaintext.host,
+        "port": mqtt_broker_plaintext.port,
         "topic": topic,
         "ssl": False,
     }
@@ -577,7 +603,7 @@ async def test_mqtt_source_reconnection():
         test_data = {"sensor": "temperature", "value": 23.5, "reconnect_test": True}
 
         publisher = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
-        publisher.connect(host, port)
+        publisher.connect(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
         publisher.loop_start()
 
         received_messages = []
@@ -611,17 +637,15 @@ async def test_mqtt_source_reconnection():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_source_sparkplug_decode():
+async def test_mqtt_source_sparkplug_decode(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test MQTT source with Sparkplug payload decoding.
     """
-    host = "broker.emqx.io"
-    port = 1883
     topic = f"spBv1.0/TestGroup/DDATA/TestNode/TestDevice_{uuid.uuid4()}"
 
     params = {
-        "host": host,
-        "port": port,
+        "host": mqtt_broker_plaintext.host,
+        "port": mqtt_broker_plaintext.port,
         "topic": topic,
         "ssl": False,
         "payload_parser": "sparkplug",
@@ -644,7 +668,7 @@ async def test_mqtt_source_sparkplug_decode():
         sparkplug_payload = encode_data_message(test_metrics)
 
         publisher = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
-        publisher.connect(host, port)
+        publisher.connect(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
         publisher.loop_start()
 
         received_messages = []
@@ -697,17 +721,15 @@ async def test_mqtt_source_sparkplug_decode():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_source_json_zstd_payload():
+async def test_mqtt_source_json_zstd_payload(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test MQTT source with compressed JSON payload.
     """
-    host = "broker.emqx.io"
-    port = 1883
     topic = f"test/data_crawler/source/zstd/{uuid.uuid4()}"
 
     params = {
-        "host": host,
-        "port": port,
+        "host": mqtt_broker_plaintext.host,
+        "port": mqtt_broker_plaintext.port,
         "topic": topic,
         "ssl": False,
         "payload_parser": "json_zstd",
@@ -723,7 +745,7 @@ async def test_mqtt_source_json_zstd_payload():
         "zstd_test": True
     }
 
-    publisher = await create_connected_mqtt_publisher(host, port)
+    publisher = await create_connected_mqtt_publisher(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
 
     received_messages = []
 
