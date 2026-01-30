@@ -29,10 +29,12 @@ def mqtt_broker_plaintext() -> MqttBrokerConfig:
     - DATA_CRAWLER_MQTT_HOST
     - DATA_CRAWLER_MQTT_PORT
 
-    Falls back to broker.emqx.io:1883 if not set.
+    Falls back to broker.emqx.io:1883 if not set simultaneously.
     """
-    host = os.getenv("DATA_CRAWLER_MQTT_HOST", "broker.emqx.io")
-    port = int(os.getenv("DATA_CRAWLER_MQTT_PORT", "1883"))
+    if "DATA_CRAWLER_MQTT_HOST" in os.environ and "DATA_CRAWLER_MQTT_PORT" in os.environ:
+        host, port = os.getenv("DATA_CRAWLER_MQTT_HOST"), int(os.getenv("DATA_CRAWLER_MQTT_PORT"))
+    else:
+        host, port = "broker.emqx.io", 1883
     logger.info(f"Using MQTT plaintext broker at {host}:{port}")
     return MqttBrokerConfig(host=host, port=port)
 
@@ -45,10 +47,12 @@ def mqtt_broker_ssl() -> MqttBrokerConfig:
     - DATA_CRAWLER_MQTT_HOST
     - DATA_CRAWLER_MQTT_SSL_PORT
 
-    Falls back to broker.emqx.io:8883 if not set.
+    Falls back to broker.emqx.io:8883 if not set simultaneously.
     """
-    host = os.getenv("DATA_CRAWLER_MQTT_HOST", "broker.emqx.io")
-    port = int(os.getenv("DATA_CRAWLER_MQTT_SSL_PORT", "8883"))
+    if "DATA_CRAWLER_MQTT_HOST" in os.environ and "DATA_CRAWLER_MQTT_SSL_PORT" in os.environ:
+        host, port = os.getenv("DATA_CRAWLER_MQTT_HOST"), int(os.getenv("DATA_CRAWLER_MQTT_SSL_PORT"))
+    else:
+        host, port = "broker.emqx.io", 8883
     logger.info(f"Using MQTT SSL broker at {host}:{port}")
     return MqttBrokerConfig(host=host, port=port)
 
