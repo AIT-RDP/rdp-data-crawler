@@ -3,11 +3,15 @@ import json
 import os
 import uuid
 from dataclasses import dataclass
+import logging
+
 import pytest
 import zstandard as zstd
 import paho.mqtt.client as mqtt
 from data_crawler.sources.mqtt import MqttSource
 from rdp_mqtt.sparkplug.sparkplug_encode import encode_data_message, get_sparkplug_topic
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -29,6 +33,7 @@ def mqtt_broker_plaintext() -> MqttBrokerConfig:
     """
     host = os.getenv("DATA_CRAWLER_MQTT_HOST", "broker.emqx.io")
     port = int(os.getenv("DATA_CRAWLER_MQTT_PORT", "1883"))
+    logger.info(f"Using MQTT plaintext broker at {host}:{port}")
     return MqttBrokerConfig(host=host, port=port)
 
 
@@ -44,40 +49,42 @@ def mqtt_broker_ssl() -> MqttBrokerConfig:
     """
     host = os.getenv("DATA_CRAWLER_MQTT_HOST", "broker.emqx.io")
     port = int(os.getenv("DATA_CRAWLER_MQTT_SSL_PORT", "8883"))
+    logger.info(f"Using MQTT SSL broker at {host}:{port}")
     return MqttBrokerConfig(host=host, port=port)
 
 
 async def create_connected_mqtt_publisher(broker: str = "broker.emqx.io", port: int = 1883) -> mqtt.Client:
     """Create and connect a Paho MQTT publisher with proper connection handling and retries."""
-    
+
     max_retries = 3
     retry_delay = 1
     client_id = f"test-pub-{uuid.uuid4()}"
-    
+
     for attempt in range(max_retries):
-        publisher = mqtt.Client(client_id=f"{client_id}_{attempt}", callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+        publisher = mqtt.Client(client_id=f"{client_id}_{attempt}",
+                                callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
         connected = asyncio.Event()
         connect_failed = asyncio.Event()
         loop = asyncio.get_running_loop()
-        
+
         def on_connect(client, userdata, flags, rc, properties=None):
             if rc == 0:
                 loop.call_soon_threadsafe(connected.set)
             else:
                 loop.call_soon_threadsafe(connect_failed.set)
-        
+
         publisher.on_connect = on_connect
-        
+
         try:
             publisher.connect(broker, port, 60)
             publisher.loop_start()
-            
+
             await asyncio.wait(
                 [asyncio.create_task(connected.wait()), asyncio.create_task(connect_failed.wait())],
                 timeout=5,  # Shorter timeout per attempt
                 return_when=asyncio.FIRST_COMPLETED,
             )
-            
+
             if connected.is_set() and not connect_failed.is_set():
                 # Success - give a moment for the connection to stabilize
                 await asyncio.sleep(0.1)
@@ -86,7 +93,7 @@ async def create_connected_mqtt_publisher(broker: str = "broker.emqx.io", port: 
                 # Failed - clean up and try again
                 publisher.loop_stop()
                 publisher.disconnect()
-                
+
         except Exception:
             # Connection error - clean up and try again
             try:
@@ -94,10 +101,10 @@ async def create_connected_mqtt_publisher(broker: str = "broker.emqx.io", port: 
                 publisher.disconnect()
             except Exception:
                 pass
-        
+
         if attempt < max_retries - 1:
             await asyncio.sleep(retry_delay * (attempt + 1))  # Exponential backoff
-    
+
     raise ConnectionError(f"MQTT broker connection failed after {max_retries} attempts")
 
 
@@ -107,41 +114,41 @@ async def test_mqtt_source_fetch_data(mqtt_broker_plaintext: MqttBrokerConfig):
     Test fetching data from the MQTT source.
     """
     topic = f"test/data_crawler/source/{uuid.uuid4()}"
-    
+
     params = {
         "host": mqtt_broker_plaintext.host,
         "port": mqtt_broker_plaintext.port,
         "topic": topic,
         "ssl": False,
     }
-    
+
     source = MqttSource.create(params, executor_name="test_mqtt")
     source.start()
-    
+
     test_data = {"sensor": "temperature", "value": 23.5, "timestamp": "2024-01-01T12:00:00Z"}
-    
+
     publisher = await create_connected_mqtt_publisher(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
 
     received_messages = []
-    
+
     try:
         # Give source and publisher time to connect
         await asyncio.sleep(2)
-        
+
         publisher.publish(topic, json.dumps(test_data))
-        
+
         # Iterate over the source's run method to get messages
         # Run in a separate thread to avoid blocking the test's event loop
         # and use a timeout to prevent indefinite blocking
         loop = asyncio.get_running_loop()
         run_task = loop.run_in_executor(None, lambda: next(source.run()))
-        
+
         try:
             message = await asyncio.wait_for(run_task, timeout=2)
             received_messages.append(message)
         except asyncio.TimeoutError:
             pass
-        
+
         assert len(received_messages) == 1
         assert received_messages[0] == test_data
     finally:
@@ -152,14 +159,14 @@ async def test_mqtt_source_fetch_data(mqtt_broker_plaintext: MqttBrokerConfig):
             await asyncio.sleep(0.1)  # Allow disconnect to complete
         except Exception as e:
             print(f"Publisher cleanup warning: {e}")
-        
+
         # Shutdown source
         try:
             source.shutdown()
             await asyncio.sleep(0.1)  # Allow source shutdown to complete
         except Exception as e:
             print(f"Source cleanup warning: {e}")
-        
+
         # Additional delay to ensure all threads terminate
         # The MqttSource uses a separate event loop in a thread
         await asyncio.sleep(0.5)
@@ -171,39 +178,39 @@ async def test_mqtt_source_multiple_messages(mqtt_broker_plaintext: MqttBrokerCo
     Test fetching multiple messages from the MQTT source.
     """
     topic = f"test/data_crawler/source/multi/{uuid.uuid4()}"
-    
+
     params = {
         "host": mqtt_broker_plaintext.host,
         "port": mqtt_broker_plaintext.port,
         "topic": topic,
         "ssl": False,
     }
-    
+
     source = MqttSource.create(params, executor_name="test_mqtt_multi")
     source.start()
-    
+
     test_messages = [
         {"sensor": "temperature", "value": 23.5, "id": 1},
         {"sensor": "humidity", "value": 65.0, "id": 2},
         {"sensor": "pressure", "value": 1013.25, "id": 3}
     ]
-    
+
     publisher = await create_connected_mqtt_publisher(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
 
     received_messages = []
-    
+
     try:
         # Give source and publisher time to connect
         await asyncio.sleep(2)
-        
+
         # Publish all test messages
         for msg in test_messages:
             publisher.publish(topic, json.dumps(msg))
             await asyncio.sleep(0.1)  # Small delay between messages
-        
+
         # Collect messages with timeout
         loop = asyncio.get_running_loop()
-        
+
         for i in range(len(test_messages)):
             try:
                 run_task = loop.run_in_executor(None, lambda: next(source.run()))
@@ -211,13 +218,13 @@ async def test_mqtt_source_multiple_messages(mqtt_broker_plaintext: MqttBrokerCo
                 received_messages.append(message)
             except asyncio.TimeoutError:
                 break
-        
+
         assert len(received_messages) == len(test_messages)
-        
+
         # Verify all messages were received with topic added
         for i, original_msg in enumerate(test_messages):
             assert original_msg in received_messages
-            
+
     finally:
         # Ensure publisher is properly cleaned up
         try:
@@ -226,14 +233,14 @@ async def test_mqtt_source_multiple_messages(mqtt_broker_plaintext: MqttBrokerCo
             await asyncio.sleep(0.1)  # Allow disconnect to complete
         except Exception as e:
             print(f"Publisher cleanup warning: {e}")
-        
+
         # Shutdown source
         try:
             source.shutdown()
             await asyncio.sleep(0.1)  # Allow source shutdown to complete
         except Exception as e:
             print(f"Source cleanup warning: {e}")
-        
+
         # Additional delay to ensure all threads terminate
         # The MqttSource uses a separate event loop in a thread
         await asyncio.sleep(0.5)
@@ -264,38 +271,39 @@ async def test_mqtt_source_ssl_connection(mqtt_broker_ssl: MqttBrokerConfig):
     retry_delay = 1
     client_id = f"test-ssl-pub-{uuid.uuid4()}"
     publisher = None
-    
+
     for attempt in range(max_retries):
         try:
-            publisher = mqtt.Client(client_id=f"{client_id}_{attempt}", callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
-            
+            publisher = mqtt.Client(client_id=f"{client_id}_{attempt}",
+                                    callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+
             # Set up SSL before connection
             import ssl
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
             publisher.tls_set_context(context)
-            
+
             connected = asyncio.Event()
             connect_failed = asyncio.Event()
             loop = asyncio.get_running_loop()
-            
+
             def on_connect(client, userdata, flags, rc, properties=None):
                 if rc == 0:
                     loop.call_soon_threadsafe(connected.set)
                 else:
                     loop.call_soon_threadsafe(connect_failed.set)
-            
+
             publisher.on_connect = on_connect
             publisher.connect(mqtt_broker_ssl.host, mqtt_broker_ssl.port, 60)
             publisher.loop_start()
-            
+
             await asyncio.wait(
                 [asyncio.create_task(connected.wait()), asyncio.create_task(connect_failed.wait())],
                 timeout=5,
                 return_when=asyncio.FIRST_COMPLETED,
             )
-            
+
             if connected.is_set() and not connect_failed.is_set():
                 break  # Success
             else:
@@ -303,7 +311,7 @@ async def test_mqtt_source_ssl_connection(mqtt_broker_ssl: MqttBrokerConfig):
                 publisher.loop_stop()
                 publisher.disconnect()
                 publisher = None
-                
+
         except Exception as e:
             print(f"SSL connection attempt {attempt + 1} failed: {e}")
             if publisher:
@@ -313,10 +321,10 @@ async def test_mqtt_source_ssl_connection(mqtt_broker_ssl: MqttBrokerConfig):
                 except Exception:
                     pass
                 publisher = None
-        
+
         if attempt < max_retries - 1:
             await asyncio.sleep(retry_delay)
-    
+
     if not publisher:
         pytest.skip("Could not establish SSL connection to MQTT broker after retries")
 
@@ -349,14 +357,14 @@ async def test_mqtt_source_ssl_connection(mqtt_broker_ssl: MqttBrokerConfig):
             await asyncio.sleep(0.1)  # Allow disconnect to complete
         except Exception as e:
             print(f"Publisher cleanup warning: {e}")
-        
+
         # Shutdown source
         try:
             source.shutdown()
             await asyncio.sleep(0.1)  # Allow source shutdown to complete
         except Exception as e:
             print(f"Source cleanup warning: {e}")
-        
+
         # Additional delay to ensure all threads terminate
         # The MqttSource uses a separate event loop in a thread
         await asyncio.sleep(0.5)
@@ -414,14 +422,14 @@ async def test_mqtt_source_qos_levels(mqtt_broker_plaintext: MqttBrokerConfig):
             await asyncio.sleep(0.1)  # Allow disconnect to complete
         except Exception as e:
             print(f"Publisher cleanup warning: {e}")
-        
+
         # Shutdown source
         try:
             source.shutdown()
             await asyncio.sleep(0.1)  # Allow source shutdown to complete
         except Exception as e:
             print(f"Source cleanup warning: {e}")
-        
+
         # Additional delay to ensure all threads terminate
         # The MqttSource uses a separate event loop in a thread
         await asyncio.sleep(0.5)
@@ -487,14 +495,14 @@ async def test_mqtt_source_wildcard_topic(mqtt_broker_plaintext: MqttBrokerConfi
             await asyncio.sleep(0.1)  # Allow disconnect to complete
         except Exception as e:
             print(f"Publisher cleanup warning: {e}")
-        
+
         # Shutdown source
         try:
             source.shutdown()
             await asyncio.sleep(0.1)  # Allow source shutdown to complete
         except Exception as e:
             print(f"Source cleanup warning: {e}")
-        
+
         # Additional delay to ensure all threads terminate
         # The MqttSource uses a separate event loop in a thread
         await asyncio.sleep(0.5)
@@ -562,7 +570,8 @@ async def test_mqtt_source_retained_messages(mqtt_broker_plaintext: MqttBrokerCo
 
         # Clean up retained message with robust connection
         try:
-            cleanup_publisher = await create_connected_mqtt_publisher(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
+            cleanup_publisher = await create_connected_mqtt_publisher(mqtt_broker_plaintext.host,
+                                                                      mqtt_broker_plaintext.port)
             cleanup_publisher.publish(topic, "", retain=True)  # Delete retained message
             await asyncio.sleep(0.5)
             cleanup_publisher.loop_stop()
@@ -783,14 +792,14 @@ async def test_mqtt_source_json_zstd_payload(mqtt_broker_plaintext: MqttBrokerCo
             await asyncio.sleep(0.1)  # Allow disconnect to complete
         except Exception as e:
             print(f"Publisher cleanup warning: {e}")
-        
+
         # Shutdown source
         try:
             source.shutdown()
             await asyncio.sleep(0.1)  # Allow source shutdown to complete
         except Exception as e:
             print(f"Source cleanup warning: {e}")
-        
+
         # Additional delay to ensure all threads terminate
         # The MqttSource uses a separate event loop in a thread
         await asyncio.sleep(0.5)
