@@ -15,7 +15,7 @@ def get_json_fixture(path: str):
     :return: A pytest fixture
     """
 
-    file = os.path.join(__file__, "../../", path)
+    file = os.path.join(__file__, "../../../", path)
     file = os.path.abspath(file)
 
     @pytest.fixture()
