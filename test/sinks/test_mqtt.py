@@ -3,6 +3,7 @@ import json
 import uuid
 import pytest
 import paho.mqtt.client as mqtt
+from common.mqtt_environment import MqttBrokerConfig, mqtt_broker_plaintext, mqtt_broker_ssl
 from data_crawler.sinks.mqtt import MqttSink, MqttSinkParameters, MqttSinkMetadata
 
 async def create_connected_mqtt_client(broker: str = "broker.emqx.io", port: int = 1883) -> mqtt.Client:
@@ -100,17 +101,15 @@ async def mqtt_subscriber():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_sink_insert_data():
+async def test_mqtt_sink_insert_data(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test inserting data into the MQTT sink and verifying it with a subscriber.
     """
-    host = "broker.emqx.io"
-    port = 1883
     topic = f"test/data_crawler/sink/{uuid.uuid4()}"
 
     params = MqttSinkParameters(
-        host=host,
-        port=port,
+        host=mqtt_broker_plaintext.host,
+        port=mqtt_broker_plaintext.port,
         topic=topic,
         ssl=False,
     )
@@ -131,7 +130,7 @@ async def test_mqtt_sink_insert_data():
         received_message = json.loads(msg.payload.decode())
         message_received_event.set()
 
-    subscriber = await create_connected_mqtt_client(host, port)
+    subscriber = await create_connected_mqtt_client(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
     subscriber.on_message = on_message
     subscriber.subscribe(topic)
 
@@ -161,18 +160,16 @@ async def test_mqtt_sink_insert_data():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_sink_topic_override():
+async def test_mqtt_sink_topic_override(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test that metadata can override the default topic.
     """
-    host = "broker.emqx.io"
-    port = 1883
     default_topic = f"test/data_crawler/sink/{uuid.uuid4()}"
     override_topic = f"test/data_crawler/sink/override/{uuid.uuid4()}"
 
     params = MqttSinkParameters(
-        host=host,
-        port=port,
+        host=mqtt_broker_plaintext.host,
+        port=mqtt_broker_plaintext.port,
         topic=default_topic,
         ssl=False,
     )
@@ -195,7 +192,7 @@ async def test_mqtt_sink_topic_override():
 
     subscriber = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
     subscriber.on_message = on_message
-    subscriber.connect(host, port)
+    subscriber.connect(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
     subscriber.subscribe(override_topic)
     subscriber.loop_start()
 
@@ -225,17 +222,15 @@ async def test_mqtt_sink_topic_override():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_sink_multiple_messages():
+async def test_mqtt_sink_multiple_messages(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test publishing multiple messages to the MQTT sink.
     """
-    host = "broker.emqx.io"
-    port = 1883
     topic = f"test/data_crawler/sink/multi/{uuid.uuid4()}"
 
     params = MqttSinkParameters(
-        host=host,
-        port=port,
+        host=mqtt_broker_plaintext.host,
+        port=mqtt_broker_plaintext.port,
         topic=topic,
         ssl=False,
     )
@@ -260,7 +255,7 @@ async def test_mqtt_sink_multiple_messages():
         if messages_received >= len(test_messages):
             all_messages_event.set()
 
-    subscriber = await create_connected_mqtt_client(host, port)
+    subscriber = await create_connected_mqtt_client(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
     subscriber.on_message = on_message
     subscriber.subscribe(topic)
 
@@ -295,17 +290,15 @@ async def test_mqtt_sink_multiple_messages():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_sink_empty_data():
+async def test_mqtt_sink_empty_data(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test publishing empty data to the MQTT sink.
     """
-    host = "broker.emqx.io"
-    port = 1883
     topic = f"test/data_crawler/sink/empty/{uuid.uuid4()}"
 
     params = MqttSinkParameters(
-        host=host,
-        port=port,
+        host=mqtt_broker_plaintext.host,
+        port=mqtt_broker_plaintext.port,
         topic=topic,
         ssl=False,
     )
@@ -324,7 +317,7 @@ async def test_mqtt_sink_empty_data():
         received_message = json.loads(msg.payload.decode())
         message_received_event.set()
 
-    subscriber = await create_connected_mqtt_client(host, port)
+    subscriber = await create_connected_mqtt_client(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
     subscriber.on_message = on_message
     subscriber.subscribe(topic)
 
@@ -354,17 +347,15 @@ async def test_mqtt_sink_empty_data():
 
 
 @pytest.mark.asyncio
-async def test_mqtt_sink_large_data():
+async def test_mqtt_sink_large_data(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test publishing large data payloads to the MQTT sink.
     """
-    host = "broker.emqx.io"
-    port = 1883
     topic = f"test/data_crawler/sink/large/{uuid.uuid4()}"
 
     params = MqttSinkParameters(
-        host=host,
-        port=port,
+        host=mqtt_broker_plaintext.host,
+        port=mqtt_broker_plaintext.port,
         topic=topic,
         ssl=False,
     )
@@ -396,7 +387,7 @@ async def test_mqtt_sink_large_data():
         received_message = json.loads(msg.payload.decode())
         message_received_event.set()
 
-    subscriber = await create_connected_mqtt_client(host, port)
+    subscriber = await create_connected_mqtt_client(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
     subscriber.on_message = on_message
     subscriber.subscribe(topic)
 
@@ -429,18 +420,16 @@ async def test_mqtt_sink_large_data():
 class TestMqttSinkBatching:
 
     @pytest.mark.asyncio
-    async def test_mqtt_sink_batching(self):
+    async def test_mqtt_sink_batching(self, mqtt_broker_plaintext: MqttBrokerConfig):
         """
         Test MQTT sink batching functionality.
         """
-        host = "broker.emqx.io"
-        port = 1883
         topic = f"test/data_crawler/sink/batch/{uuid.uuid4()}"
 
         # Configure batching: batch size of 3 messages
         params = MqttSinkParameters(
-            host=host,
-            port=port,
+            host=mqtt_broker_plaintext.host,
+            port=mqtt_broker_plaintext.port,
             topic=topic,
             ssl=False,
             batch_size=3,
@@ -479,7 +468,7 @@ class TestMqttSinkBatching:
 
         subscriber = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
         subscriber.on_message = on_message
-        subscriber.connect(host, port)
+        subscriber.connect(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
         subscriber.subscribe(topic)
         subscriber.loop_start()
 
@@ -508,18 +497,16 @@ class TestMqttSinkBatching:
                 await sink.mqtt_client.shutdown()
 
     @pytest.mark.asyncio
-    async def test_mqtt_sink_batch_timeout(self):
+    async def test_mqtt_sink_batch_timeout(self, mqtt_broker_plaintext: MqttBrokerConfig):
         """
         Test MQTT sink batch timeout functionality.
         """
-        host = "broker.emqx.io"
-        port = 1883
         topic = f"test/data_crawler/sink/timeout/{uuid.uuid4()}"
 
         # Configure batching with a small timeout
         params = MqttSinkParameters(
-            host=host,
-            port=port,
+            host=mqtt_broker_plaintext.host,
+            port=mqtt_broker_plaintext.port,
             topic=topic,
             ssl=False,
             batch_size=10,  # Large batch size
@@ -555,7 +542,7 @@ class TestMqttSinkBatching:
 
         subscriber = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
         subscriber.on_message = on_message
-        subscriber.connect(host, port)
+        subscriber.connect(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
         subscriber.subscribe(topic)
         subscriber.loop_start()
 
@@ -584,18 +571,16 @@ class TestMqttSinkBatching:
                 await sink.mqtt_client.shutdown()
 
     @pytest.mark.asyncio
-    async def test_mqtt_sink_no_batching(self):
+    async def test_mqtt_sink_no_batching(self, mqtt_broker_plaintext: MqttBrokerConfig):
         """
         Test MQTT sink with batching disabled (batch_size = 0).
         """
-        host = "broker.emqx.io"
-        port = 1883
         topic = f"test/data_crawler/sink/no_batch/{uuid.uuid4()}"
 
         # Configure with no batching
         params = MqttSinkParameters(
-            host=host,
-            port=port,
+            host=mqtt_broker_plaintext.host,
+            port=mqtt_broker_plaintext.port,
             topic=topic,
             ssl=False,
             batch_size=0,  # No batching
@@ -629,7 +614,7 @@ class TestMqttSinkBatching:
 
         subscriber = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
         subscriber.on_message = on_message
-        subscriber.connect(host, port)
+        subscriber.connect(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
         subscriber.subscribe(topic)
         subscriber.loop_start()
 
@@ -663,18 +648,16 @@ class TestMqttSinkBatching:
                 await sink.mqtt_client.shutdown()
 
     @pytest.mark.asyncio
-    async def test_mqtt_sink_batch_size_one(self):
+    async def test_mqtt_sink_batch_size_one(self, mqtt_broker_plaintext: MqttBrokerConfig):
         """
         Test MQTT sink with batch size of 1 (immediate sending).
         """
-        host = "broker.emqx.io"
-        port = 1883
         topic = f"test/data_crawler/sink/batch_one/{uuid.uuid4()}"
 
         # Configure with batch size of 1
         params = MqttSinkParameters(
-            host=host,
-            port=port,
+            host=mqtt_broker_plaintext.host,
+            port=mqtt_broker_plaintext.port,
             topic=topic,
             ssl=False,
             batch_size=1,  # Send immediately
@@ -701,7 +684,7 @@ class TestMqttSinkBatching:
 
         subscriber = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
         subscriber.on_message = on_message
-        subscriber.connect(host, port)
+        subscriber.connect(mqtt_broker_plaintext.host, mqtt_broker_plaintext.port)
         subscriber.subscribe(topic)
         subscriber.loop_start()
 
@@ -728,23 +711,21 @@ class TestMqttSinkBatching:
 
 
 @pytest.mark.asyncio
-async def test_mqtt_sink_sparkplug_data_types():
+async def test_mqtt_sink_sparkplug_data_types(mqtt_broker_plaintext: MqttBrokerConfig):
     """
     Test that MqttSink can publish Sparkplug data that can be received and decoded.
     Uses the same approach as working integration tests.
     """
     from rdp_mqtt.mqtt_client import MqttClient, MqttSettings
     
-    host = "broker.emqx.io"
-    port = 1883
     group_id = f"test_group_{uuid.uuid4().hex[:8]}"
     node_id = f"test_node_{uuid.uuid4().hex[:8]}"
     device_id = f"test_device_{uuid.uuid4().hex[:8]}"
 
     # Test using MqttClient directly (like working integration tests) to verify the approach works
     publisher_settings = MqttSettings(
-        host=host,
-        port=port,
+        host=mqtt_broker_plaintext.host,
+        port=mqtt_broker_plaintext.port,
         topic="not_used",  # Sparkplug generates its own topics
         ssl=False,
         payload_parser="sparkplug",
@@ -756,8 +737,8 @@ async def test_mqtt_sink_sparkplug_data_types():
     )
     
     subscriber_settings = MqttSettings(
-        host=host,
-        port=port,
+        host=mqtt_broker_plaintext.host,
+        port=mqtt_broker_plaintext.port,
         topic=f"spBv1.0/{group_id}/+/{node_id}/{device_id}",
         ssl=False,
         payload_parser="sparkplug",  # Must match publisher to decode Sparkplug messages
