@@ -8,7 +8,7 @@ import os
 import pytest
 
 import data_crawler.sources.open_meteo as open_meteo
-import helpers
+from common import helpers
 
 
 @pytest.fixture()

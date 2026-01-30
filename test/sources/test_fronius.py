@@ -8,7 +8,7 @@ import requests
 
 import data_crawler.access.storage as storage
 import data_crawler.sources.fronius as fronius
-import helpers
+from common import helpers
 
 inverter_rt_device_response_1 = helpers.get_json_fixture(
     "data/test/fronius-solarapi/GetInverterRealtimeData-Device-1-CommonInverterData-1.json"

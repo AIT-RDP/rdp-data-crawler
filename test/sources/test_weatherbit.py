@@ -6,7 +6,7 @@ import datetime
 import pytest
 
 import data_crawler.sources.weatherbit as weatherbit
-import helpers
+from common import helpers
 
 
 @pytest.fixture()

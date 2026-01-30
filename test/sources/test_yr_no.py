@@ -8,7 +8,8 @@ import os
 import pytest
 
 import data_crawler.sources.yr_no as yr_no
-import helpers
+from common import helpers
+
 
 @pytest.fixture()
 def simplified_base_response() -> dict:
