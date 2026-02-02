@@ -3,8 +3,9 @@ Implements the interface to the Open-Meteo Weather Forecast API
 
 See https://open-meteo.com/en/docs for the API documentation.
 """
+import datetime
 import itertools
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Iterable
 import json
 import logging
 
@@ -12,12 +13,14 @@ import requests
 
 import data_crawler.sources.abc.http_cache as http_cache
 import data_crawler.sources.abc.abstract_source as abstract_source
+import data_crawler.sources.abc.history as history
 import data_crawler.access.jsonpath as jx
-from data_crawler.sources.abc.message import Message
+from data_crawler.sources.abc.message import Message, MessageData
 from typing import Generator
 
 
-class OpenMeteoForecast(http_cache.SyncHTTPMixin, abstract_source.AbstractMultiMessageSourceAPI):
+class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMessageHistorySourceMixin,
+                        abstract_source.AbstractMultiMessageSourceAPI):
     """
     Queries the Open-Meteo Weather Forecast API
     
@@ -128,6 +131,7 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, abstract_source.AbstractMultiM
               - models: str, the weather model to use (default "best_match")
                   Common options: "best_match", "ecmwf_ifs04", "gfs_seamless", "icon_seamless"
               - wind_speed_unit: str, the unit of the wind speed (default "ms" other option "kmh")
+              - history_batch_size: int, number of days per historic data request (default 30)
         :param kwargs: Any extra arguments that will be sent to the super class
         """
         super(OpenMeteoForecast, self).__init__(
@@ -149,16 +153,15 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, abstract_source.AbstractMultiM
         self._altitude = source_parameters.get("altitude")
         self._models = source_parameters.get("models", "best_match")
         self._wind_speed_unit = source_parameters.get("wind_speed_unit", "ms")
+        self._history_batch_size = int(source_parameters.get("history_batch_size", 30))
 
     @property
-    def static_request_parameters(self) -> Dict[str, Any]:
+    def _static_request_parameters(self) -> Dict[str, Any]:
         """Returns a copy of the static request parameters for testing purpose"""
         params = {
             "latitude": self._latitude,
             "longitude": self._longitude,
             "hourly": ",".join(self._hourly_variables),
-            "forecast_days": self._forecast_days,
-            "past_days": self._past_days,
             "timezone": "UTC",  # Only UTC is supported right now to avoid timezone conversion issues
             "models": self._models,
         }
@@ -166,7 +169,6 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, abstract_source.AbstractMultiM
         # Add 15-minute data if enabled
         if self._enable_minutely_15:
             params["minutely_15"] = ",".join(self._minutely_15_variables)
-            params["forecast_minutely_15"] = self._forecast_minutely_15
 
         if self._altitude is not None:
             params["elevation"] = self._altitude
@@ -176,6 +178,41 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, abstract_source.AbstractMultiM
         self._logger.debug(f"Static_request_parameters: {json.dumps(params, indent=4)}")
 
         return params
+
+    def get_forecast_request_parameters(self, start_time: Optional[datetime.datetime] = None,
+                                        end_time: Optional[datetime.datetime] = None) -> Dict[str, Any]:
+        """
+        Returns the request parameters for the forecast API call, including optional start and stop times.
+
+        In case the start_time and stop_time are provided, the data range will be limited accordingly. Otherwise, the
+        configured horizon will be taken as reference and the starting point will be determined by the server.
+
+        :param start_time: Optional start time for the forecast data. The start time must be time zone aware  and will
+            be rounded to the next full day (00:00 UTC).
+        :param end_time: Optional stop time for the forecast data. The stop time must be time zone aware and will be
+            rounded to the previous full day (00:00 UTC).
+        :return: Dictionary with request parameters
+        """
+        params = self._static_request_parameters.copy()
+        if (start_time is None) != (end_time is None):
+            raise ValueError("Both start_time and end_time must be provided together.")
+
+        if start_time is not None and end_time is not None:
+            params["start_date"] = self._to_utc_date_string(start_time)
+            params["end_date"] = self._to_utc_date_string(end_time)
+        else:
+            # Use forecast_days and past_days if no explicit time range is given
+            params["forecast_days"] = self._forecast_days
+            params["past_days"] = self._past_days
+            if self._enable_minutely_15:
+                params["forecast_minutely_15"] = self._forecast_minutely_15
+        return params
+
+    @staticmethod
+    def _to_utc_date_string(dt: datetime.datetime) -> str:
+        """Converts the datetime to an UTC-aligned datetime string"""
+        dt = dt.astimezone(datetime.timezone.utc)
+        return dt.strftime("%Y-%m-%d")
 
     def fetch_data_bundle(self, raw_forecast: Optional[dict] = None) -> Generator[Message, None, None]:
         """
@@ -187,11 +224,66 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, abstract_source.AbstractMultiM
         :param raw_forecast: The raw forecast for testing purpose. It is not advised to use the parameter productively.
         :return: A generator yielding Message objects with hourly and (optionally) 15-minute forecast data
         """
+
+        yield from self._fetch_data(raw_forecast)
+
+    def fetch_timed_historic_data_bundle(
+            self, start_time: datetime.datetime, end_time: datetime.datetime, filter_clauses: Dict[str, Any],
+            raw_forecast: Optional[Iterable[dict]] = None
+    ) -> Generator[MessageData, None, None]:
+        """
+        Fetches the historic remote data into a bundle of multiple messages.
+
+        For each requested resolution (minutely, hourly), a dedicated message will be yielded. In case the time span
+        exceeds the history_batch_size, multiple requests will be issued to cover the full range. The output will be
+        divided into multiple messages as well.
+
+        :param raw_forecast: An optional iterable of raw forecast dicts for testing purpose. If provided, one dict per batch
+            will be used instead of querying the API.
+        :param start_time: The beginning of the historic data range. Must be time-zone aware.
+        :param end_time: The end of the historic data range. Must be time-zone aware.
+        :param filter_clauses: The configuration stanza that specifies the amount of historic data to return.
+        :return: The function will return a generator that yields one message at a time.
+        """
+
+        if raw_forecast is None:
+            raw_forecast = itertools.repeat(None)
+        raw_forecast_it = iter(raw_forecast)
+
+        fc_time = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+
+        batch_size = datetime.timedelta(days=self._history_batch_size)
+        batch_start = start_time
+        while batch_start < end_time:
+            batch_end = min(batch_start + batch_size, end_time)
+            self._logger.debug(f"Fetching historic data batch from {batch_start.isoformat()} to "
+                               f"{batch_end.isoformat()}")
+            for message in self._fetch_data(
+                    start_time=batch_start, end_time=batch_end, raw_forecast=next(raw_forecast_it)
+            ):
+                # Patch the forecast time since the forecasts were fetched now.
+                message.payload["forecast_time"] = fc_time
+                yield message
+            batch_start = batch_end
+
+    def _fetch_data(self, raw_forecast: Optional[dict] = None, start_time: Optional[datetime.datetime] = None,
+                    end_time: Optional[datetime.datetime] = None) -> Generator[Message, None, None]:
+        """
+        Fetches the forecasting information and yields separate messages for hourly and 15-minute data
+
+        :param raw_forecast: The raw forecast for testing purpose. It is not advised to use the parameter productively.
+        :param start_time: Optional start time for the forecast data. The start time must be time zone aware  and will
+            be rounded to the next full day (00:00 UTC).
+        :param end_time: Optional stop time for the forecast data. The stop time must be time zone aware and will be
+            rounded to the previous full day (00:00 UTC).
+        :return: A generator yielding Message objects with hourly and (optionally) 15-minute forecast data
+        """
+
         # Fetch raw data from API if not provided
         if raw_forecast is None:
             response: requests.Response = self.session.get(
                 self.API_ENDPOINT,
-                params=self.static_request_parameters
+                params=self.get_forecast_request_parameters(start_time, end_time)
             )
             response.raise_for_status()
             raw_forecast = response.json()
@@ -358,11 +450,10 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, abstract_source.AbstractMultiM
 
         return result
 
-
-## testing a = OpenMeteoForecast(source_parameters={"latitude": 52.593, "longitude": 4.752, 
+## testing a = OpenMeteoForecast(source_parameters={"latitude": 52.593, "longitude": 4.752,
 ## testing                                          "enable_minutely_15": True, 
 ## testing                                          "minutely_15_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"], "hourly_variables": ["wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "precipitation", "weather_code", "shortwave_radiation", "direct_radiation", "diffuse_radiation"]}) #, "wind_speed_unit": "kmh"})
-## testing print(a.static_request_parameters)
+## testing print(a._static_request_parameters)
 ## testing b = a.fetch_data_bundle()
 ## testing #print(json.dumps(b, indent=4))
 ## testing print('done')
