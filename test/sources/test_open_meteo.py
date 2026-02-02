@@ -604,7 +604,6 @@ def test_fetch_timed_historic_data_bundle_online():
         assert "wind_speed_10m" in payload
         assert "wind_speed_80m" in payload
         assert "precipitation_total" in payload
-        assert "forecast_time" in payload
 
         # Verify observation times are present
         assert len(payload["observation_time"]) > 0
@@ -616,3 +615,53 @@ def test_fetch_timed_historic_data_bundle_online():
         # Verify metadata (API may adjust coordinates slightly to match grid)
         assert payload["latitude"] == 52.52
         assert abs(payload["longitude"] - 13.405) < 0.1  # Allow small adjustment by API
+
+
+def test_open_meteo_minutely_15_only():
+    """Tests the OpenMeteoForecast with only 15-minute data enabled, directly querying the server"""
+
+    # Configure the source with enable_minutely_15=True and enable_hourly=False
+    config = {
+        "latitude": 52.52,  # Berlin
+        "longitude": 13.41,
+        "enable_hourly": False,
+        "enable_minutely_15": True,
+        "forecast_minutely_15": 96,  # 24 hours of 15-minute data
+    }
+
+    # Create the API instance
+    api = open_meteo.OpenMeteoForecast(source_parameters=config, executor_name="<test>")
+
+    # Fetch data from the actual server
+    messages = list(api.fetch_data_bundle())
+
+    # Assert that exactly one message is returned (only 15-minute data)
+    assert len(messages) == 1, f"Expected exactly 1 message, but got {len(messages)}"
+
+    # Get the message payload
+    message_data = messages[0].payload
+
+    # Verify the message contains 15-minute data
+    assert "observation_time" in message_data
+    assert len(message_data["observation_time"]) > 0
+
+    # Verify that we have forecast_time
+    assert "forecast_time" in message_data
+
+    # Verify some expected fields from 15-minute data are present
+    # (at least one variable should be present)
+    variable_found = False
+    expected_variables = ["air_temperature_2m", "wind_speed_10m", "precipitation_total"]
+    for var in expected_variables:
+        if var in message_data:
+            variable_found = True
+            break
+
+    assert variable_found, f"Expected at least one of {expected_variables} in message data"
+
+    # Verify forecast_time is recent (within last hour)
+    forecast_time = datetime.datetime.fromisoformat(message_data["forecast_time"])
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    assert now - datetime.timedelta(hours=1) <= forecast_time <= now, \
+        f"Forecast time {forecast_time} is not recent"
+

@@ -120,6 +120,7 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
             Optional keys:
               - hourly_variables: list[str], the hourly variables to query (defaults to DEFAULT_HOURLY_VARIABLES)
               - enable_minutely_15: bool, whether to include 15-minute data (default False)
+              - enable_hourly: bool, whether to include hourly data (default True)
               - minutely_15_variables: list[str], the 15-minute variables to query 
                   (defaults to DEFAULT_MINUTELY_15_VARIABLES if enable_minutely_15 is True)
               - forecast_days: int, number of forecast days for hourly data (1-16, default 7)
@@ -146,6 +147,7 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
         # Optional parameters
         self._hourly_variables = source_parameters.get("hourly_variables", self.DEFAULT_HOURLY_VARIABLES)
         self._enable_minutely_15 = source_parameters.get("enable_minutely_15", False)
+        self._enable_hourly = source_parameters.get("enable_hourly", True)
         self._minutely_15_variables = source_parameters.get("minutely_15_variables", self.DEFAULT_MINUTELY_15_VARIABLES)
         self._forecast_days = source_parameters.get("forecast_days", 7)
         self._forecast_minutely_15 = source_parameters.get("forecast_minutely_15", 96)  # 24 hours = 96 timesteps
@@ -155,16 +157,22 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
         self._wind_speed_unit = source_parameters.get("wind_speed_unit", "ms")
         self._history_batch_size = int(source_parameters.get("history_batch_size", 30))
 
+        if not self._enable_hourly and not self._enable_minutely_15:
+            raise ValueError("At least one of 'enable_hourly' or 'enable_minutely_15' must be set to True.")
+
     @property
     def _static_request_parameters(self) -> Dict[str, Any]:
         """Returns a copy of the static request parameters for testing purpose"""
         params = {
             "latitude": self._latitude,
             "longitude": self._longitude,
-            "hourly": ",".join(self._hourly_variables),
             "timezone": "UTC",  # Only UTC is supported right now to avoid timezone conversion issues
             "models": self._models,
         }
+
+        # Add hourly data if enabled
+        if self._enable_hourly:
+            params["hourly"] = ",".join(self._hourly_variables)
 
         # Add 15-minute data if enabled
         if self._enable_minutely_15:
@@ -288,7 +296,7 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
         common_metadata = self._extract_common_metadata(raw_forecast)
 
         # Always yield hourly data message
-        if "hourly" in raw_forecast:
+        if self._enable_hourly and "hourly" in raw_forecast:
             hourly_data = self._transform_hourly_data(raw_forecast, self._hourly_variables, forecast_time)
             hourly_data.update(common_metadata)
 
