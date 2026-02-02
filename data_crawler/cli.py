@@ -9,7 +9,7 @@ import logging.config
 import signal
 import time
 import warnings
-from typing import Optional, Iterable, List, Dict
+from typing import Optional, Iterable, List, Dict, Any
 
 import click
 import prometheus_client as prom
@@ -183,11 +183,52 @@ def _parse_override_clauses(override_clauses: Iterable[str]) -> dict:
 
         dst_dict = ret_dict
         for level in level_names[:-1]:
+            level = _parse_override_level_id(level)
             dst_dict[level] = dst_dict.get(level, {})  # make sure there is an entry
             dst_dict = dst_dict[level]
         dst_dict[level_names[-1]] = value
 
+    ret_dict = _squash_list_overrides(ret_dict)
     return ret_dict
+
+
+def _parse_override_level_id(level) -> str | int:
+    """Parses a level id that may be either string or integer. Integers must be surrounded by square brackets."""
+    if level.startswith("[") and level.endswith("]"):
+        return int(level[1:-1])
+    else:
+        return level
+
+
+def _squash_list_overrides(override_config: dict | Any) -> dict | list | Any:
+    """
+    Recursively converts dictionaries with all integer keys to list elements.
+
+    In case intermediate elements are missing, an error is raised.
+    :param override_config: The override configuration to parse
+    :return: The converted configuration with lists instead of dicts where applicable
+    """
+
+    if not isinstance(override_config, dict):
+        return override_config
+
+    # Check if all keys are integers (and dict is not empty)
+    all_int_keys = len(override_config) > 0 and all(isinstance(k, int) for k in override_config.keys())
+    if all_int_keys:
+        max_index = max(override_config.keys())
+
+        out_list = []
+        for i in range(max_index + 1):
+            if i not in override_config:
+                raise ValueError(f"Cannot convert override configuration to list since index {i} is missing "
+                                 f"in {override_config.keys()}")
+            out_list.append(_squash_list_overrides(override_config[i]))
+        return out_list
+    else:
+        out_dict = {}
+        for k, v in override_config.items():
+            out_dict[k] = _squash_list_overrides(v)
+        return out_dict
 
 
 def _startup_prometheus_client(prometheus_config: Optional[dict] = None):
