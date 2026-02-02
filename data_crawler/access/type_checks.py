@@ -33,3 +33,24 @@ TimedeltaType = typing_extensions.Annotated[
     datetime.timedelta,
     pydantic.BeforeValidator(_transform_timedelta)
 ]
+
+
+def to_timezone(value: datetime.tzinfo | str) -> datetime.tzinfo:
+    """
+    Transforms a possibly string-based timezone into a proper tzinfo object
+
+    The function tries to import pytz in order to leverage its timezone capabilities. In case pytz is not
+    installed, the function will raise an error.
+    """
+
+    if isinstance(value, str):
+        try:
+            import pytz
+
+            return pytz.timezone(value)
+        except ImportError:
+            raise ValueError("The 'pytz' package is required to parse string-based timezones.")
+
+    else:
+        return value
+

@@ -1,15 +1,18 @@
 """
 Implements the day-ahead market prices from ENTSO-E Transparency Platform
 """
-
+import datetime
 from enum import IntEnum
-from typing import Any
+from typing import Any, Dict, Generator
 
 import entsoe
 import pandas as pd
 import pydantic
 
 import data_crawler.sources.abc.http_cache as http_cache
+import data_crawler.sources.abc.history as history
+import data_crawler.access.type_checks as type_checks
+from data_crawler.sources.abc.message import MessageData
 
 
 class Resolution(IntEnum):
@@ -48,7 +51,7 @@ class ENTSOEDATransparencyModel(pydantic.BaseModel):
     )
 
 
-class ENTSOEDATransparency(http_cache.GenericHTTPSourceAPI):
+class ENTSOEDATransparency(http_cache.GenericHTTPSourceAPI, history.AbstractTimedMultiMessageHistorySourceMixin):
     """
     Implements the day-ahead market prices from ENTSO-E Transparency Platform.
     """
@@ -73,6 +76,39 @@ class ENTSOEDATransparency(http_cache.GenericHTTPSourceAPI):
         :return: Retrieved data
         """
 
+        start_time = pd.Timestamp.now(tz=datetime.timezone.utc)
+        return self._fetch_da_block(start_time)
+
+    def fetch_timed_historic_data_bundle(self, start_time: datetime.datetime, end_time: datetime.datetime,
+                                         filter_clauses: Dict[str, Any]) -> Generator[MessageData, None, None]:
+        """
+        Fetches the historic remote data into a bundle of multiple messages.
+
+        For each aligned block of day-ahead prices, a separate message will be yielded. In case the start_time and
+        end_time marks do not align with the block sizes, the next block boundaries will be taken.
+
+        :param start_time: The beginning of the historic data range. Must be time-zone aware.
+        :param end_time: The end of the historic data range. Must be time-zone aware.
+        """
+
+        block_start = start_time
+        while block_start < end_time:
+            message = self._fetch_da_block(block_start)
+            yield message
+            block_start += datetime.timedelta(days=1)
+
+    def _fetch_da_block(self, start_time: datetime.datetime) -> dict[str, Any]:
+        """
+        Fetches a single block of day-ahead prices starting from the given time stamp.
+
+        The start time will be aligned to the next block boundary at the next day, midnight.
+        :param start_time: The start time for the block. Must be time-zone aware.
+        :return: The retrieved data block as single message
+        """
+
+        if start_time.tzinfo is None or start_time.tzinfo.utcoffset(start_time) is None:
+            raise ValueError(f"The start time {start_time.isoformat()} must be time-zone aware.")
+
         observation_time: list[pd.Timestamp] = []
         day_ahead_prices: list[float] = []
         day_ahead_resolution: list[int] = []
@@ -80,13 +116,13 @@ class ENTSOEDATransparency(http_cache.GenericHTTPSourceAPI):
 
         for day_ahead_country in self._source_parameters.day_ahead_prices:
             country_code = day_ahead_country.country_code
-            timezone = day_ahead_country.timezone
+            timezone = type_checks.to_timezone(day_ahead_country.timezone)
             resolution = day_ahead_country.resolution
 
-            now = pd.Timestamp.now(tz=timezone)
-            next_day_begin = (now + pd.DateOffset(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            local_start = start_time.astimezone(timezone)
+            next_day_begin = (local_start + pd.DateOffset(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
             next_day_end = (
-                    (now + pd.DateOffset(days=2)).replace(hour=0, minute=0, second=0, microsecond=0)
+                    (local_start + pd.DateOffset(days=2)).replace(hour=0, minute=0, second=0, microsecond=0)
                     - pd.Timedelta(minutes=resolution.value)
             )
 
