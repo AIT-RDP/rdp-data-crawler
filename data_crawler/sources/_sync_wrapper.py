@@ -201,8 +201,7 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
             self._log_start_of_cycle()
             try:
                 result = self._fetch_once()
-                if result is not None:
-                    yield from result
+                yield from result
             finally:
                 self._timer.operation_done()
             self._log_end_of_cycle(result is not None)
@@ -233,16 +232,16 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
         with self._activity_status_lock:
             self._activity_status.last_cycle_complete = ts_now
 
-    def _fetch_once(self) -> list[msg.MessageData] | None:
+    def _fetch_once(self) -> Generator[msg.MessageData, None, None]:
         """Performs one fetch and insert operation and returns the success status of the operations"""
 
         try:
             with self._prom_source_duration.labels(source_name=self._source_name).time():
                 message_gen = self._source_api.fetch_data_bundle()
-                return list(message_gen)
+                yield from message_gen
         except Exception as err:
-            self._logger.error(f"Skip one sample due to a {type(err).__name__}: {err}\n{traceback.format_exc()}")
-            return None
+            self._logger.error(f"(Partially) skip one sample due to a "
+                               f" {type(err).__name__}: {err}\n{traceback.format_exc()}")
 
     def shutdown(self) -> None:
         """Sets the termination event to shut down the periodic execution"""
