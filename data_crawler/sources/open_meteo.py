@@ -11,12 +11,13 @@ import logging
 import requests
 
 import data_crawler.sources.abc.http_cache as http_cache
+import data_crawler.sources.abc.abstract_source as abstract_source
 import data_crawler.access.jsonpath as jx
 from data_crawler.sources.abc.message import Message
 from typing import Generator
 
 
-class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
+class OpenMeteoForecast(http_cache.SyncHTTPMixin, abstract_source.AbstractMultiMessageSourceAPI):
     """
     Queries the Open-Meteo Weather Forecast API
     
@@ -158,7 +159,7 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
             "hourly": ",".join(self._hourly_variables),
             "forecast_days": self._forecast_days,
             "past_days": self._past_days,
-            "timezone": "UTC",  # Only UTC is supported right not to avoid timezone conversion issues
+            "timezone": "UTC",  # Only UTC is supported right now to avoid timezone conversion issues
             "models": self._models,
         }
 
@@ -175,33 +176,6 @@ class OpenMeteoForecast(http_cache.GenericHTTPSourceAPI):
         self._logger.debug(f"Static_request_parameters: {json.dumps(params, indent=4)}")
 
         return params
-
-    def fetch_data(self, raw_forecast: Optional[dict] = None) -> Dict[str, Any]:
-        """
-        Fetches the forecasting information and translates it into a common Redis-ready nomenclature
-
-        This method combines hourly and 15-minute data into a single message for backward compatibility.
-        For separate messages, the system will automatically use fetch_data_bundle() instead.
-
-        :param raw_forecast: The raw forecast for testing purpose. It is not advised to use the parameter productively.
-        :return: The dictionary of forecasts following the common nomenclature. See the AbstractSourceAPI class for more
-            information on the expected output format.
-        """
-
-        if raw_forecast is None:
-            response: requests.Response = self.session.get(
-                self.API_ENDPOINT,
-                params=self.static_request_parameters
-            )
-            response.raise_for_status()
-            raw_forecast = response.json()
-
-        redis_forecast = self._transform_to_redis_format(
-            raw_forecast,
-            self._hourly_variables,
-            self._minutely_15_variables if self._enable_minutely_15 else None
-        )
-        return redis_forecast
 
     def fetch_data_bundle(self, raw_forecast: Optional[dict] = None) -> Generator[Message, None, None]:
         """

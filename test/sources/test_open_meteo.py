@@ -8,6 +8,7 @@ import os
 import pytest
 
 import data_crawler.sources.open_meteo as open_meteo
+import data_crawler.sources.abc.message as message
 from common import helpers
 
 
@@ -39,7 +40,11 @@ def test_forecast_parsing(simplified_base_response: dict, forecast_base_paramete
     """Tests the parsing and transformation mechanism with a static response"""
 
     api = open_meteo.OpenMeteoForecast(source_parameters=config_fkt(forecast_base_parameters))
-    response_data = api.fetch_data(raw_forecast=simplified_base_response)
+    response_data = list(api.fetch_data_bundle(raw_forecast=simplified_base_response))
+
+    assert len(response_data) == 1
+    assert isinstance(response_data[0], message.Message)
+    response_data = response_data[0].payload
 
     assert response_data is not None
 
@@ -115,7 +120,11 @@ def test_forecast_online(forecast_base_parameters):
     """Queries the online forecast and does some basic integrity checks"""
 
     api = open_meteo.OpenMeteoForecast(source_parameters=forecast_base_parameters)
-    response_data = api.fetch_data()
+    response_data = list(api.fetch_data_bundle())
+
+    assert len(response_data) == 1
+    assert isinstance(response_data[0], message.Message)
+    response_data = response_data[0].payload
 
     assert response_data is not None
 
@@ -212,7 +221,11 @@ def test_forecast_wind_heights_online():
     }
 
     api = open_meteo.OpenMeteoForecast(source_parameters=minimal_params)
-    response_data = api.fetch_data()
+    response_data = list(api.fetch_data_bundle())
+
+    assert len(response_data) == 1
+    assert isinstance(response_data[0], message.Message)
+    response_data = response_data[0].payload
 
     assert response_data is not None
     assert "wind_speed_10m" in response_data
@@ -433,34 +446,3 @@ def test_extract_common_metadata(simplified_base_response):
     assert metadata["latitude"] == 52.52
     assert metadata["longitude"] == 13.419
     assert metadata["altitude"] == 38.0
-
-
-def test_backward_compatibility_combined_format(simplified_base_response, forecast_base_parameters):
-    """Tests that the old fetch_data method still returns combined hourly and 15-minute data"""
-
-    # Configure with 15-minute data enabled
-    params_with_15min = {
-        **forecast_base_parameters,
-        "enable_minutely_15": True,
-        "hourly_variables": ["temperature_2m", "wind_speed_10m"],
-        "minutely_15_variables": ["temperature_2m", "wind_speed_10m"]
-    }
-
-    # Add 15-minute data to test fixture
-    test_response = simplified_base_response.copy()
-    test_response["minutely_15"] = {
-        "time": ["2024-01-15T00:00", "2024-01-15T00:15"],
-        "temperature_2m": [3.5, 3.4],
-        "wind_speed_10m": [12.5, 12.3]
-    }
-
-    api = open_meteo.OpenMeteoForecast(source_parameters=params_with_15min)
-    combined_data = api.fetch_data(raw_forecast=test_response)
-
-    # Should have both hourly and 15-minute data in the same dict (with _15min suffix for 15-minute)
-    assert "observation_time" in combined_data  # Hourly
-    assert "observation_time_15min" in combined_data  # 15-minute
-    assert len(combined_data["observation_time"]) == 7
-    assert len(combined_data["observation_time_15min"]) == 2
-    assert "air_temperature_2m" in combined_data  # Hourly temperature
-    assert "air_temperature_2m_15min" in combined_data  # 15-minute temperature
