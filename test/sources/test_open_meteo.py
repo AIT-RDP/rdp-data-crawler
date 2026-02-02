@@ -221,7 +221,10 @@ def test_forecast_wind_heights_online():
     }
 
     api = open_meteo.OpenMeteoForecast(source_parameters=minimal_params)
+
+    ts_start = datetime.datetime.now(tz=datetime.timezone.utc)
     response_data = list(api.fetch_data_bundle())
+    ts_end = datetime.datetime.now(tz=datetime.timezone.utc)
 
     assert len(response_data) == 1
     assert isinstance(response_data[0], message.Message)
@@ -245,6 +248,9 @@ def test_forecast_wind_heights_online():
         if ws_10 is not None and ws_80 is not None and ws_120 is not None:
             # Allow some tolerance - wind shear doesn't always hold perfectly
             assert ws_80 >= ws_10 * 0.8, f"Wind at 80m ({ws_80}) unexpectedly lower than 10m ({ws_10})"
+
+    # Check the forecast time
+    assert ts_start <= datetime.datetime.fromisoformat(response_data["forecast_time"]) <= ts_end
 
 
 def test_api_endpoint():
@@ -433,7 +439,8 @@ def test_transform_minutely_15_data():
 
 
 @pytest.mark.parametrize("config_fkt", [helpers.direct_config, helpers.to_string_values])
-def test_fetch_timed_historic_data_bundle_single_batch(simplified_base_response: dict, forecast_base_parameters: dict, config_fkt):
+def test_fetch_timed_historic_data_bundle_single_batch(simplified_base_response: dict, forecast_base_parameters: dict,
+                                                       config_fkt):
     """Tests fetch_timed_historic_data_bundle with a single batch using injected raw data"""
 
     api = open_meteo.OpenMeteoForecast(source_parameters=config_fkt(forecast_base_parameters))
@@ -472,7 +479,8 @@ def test_fetch_timed_historic_data_bundle_single_batch(simplified_base_response:
 
 
 @pytest.mark.parametrize("config_fkt", [helpers.direct_config, helpers.to_string_values])
-def test_fetch_timed_historic_data_bundle_multiple_batches(simplified_base_response: dict, forecast_base_parameters: dict, config_fkt):
+def test_fetch_timed_historic_data_bundle_multiple_batches(simplified_base_response: dict,
+                                                           forecast_base_parameters: dict, config_fkt):
     """Tests fetch_timed_historic_data_bundle with multiple batches using injected raw data"""
 
     # Configure with small batch size for testing

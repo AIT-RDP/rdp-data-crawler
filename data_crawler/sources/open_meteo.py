@@ -250,20 +250,13 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
             raw_forecast = itertools.repeat(None)
         raw_forecast_it = iter(raw_forecast)
 
-        fc_time = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
-
         batch_size = datetime.timedelta(days=self._history_batch_size)
         batch_start = start_time
         while batch_start < end_time:
             batch_end = min(batch_start + batch_size, end_time)
             self._logger.debug(f"Fetching historic data batch from {batch_start.isoformat()} to "
                                f"{batch_end.isoformat()}")
-            for message in self._fetch_data(
-                    start_time=batch_start, end_time=batch_end, raw_forecast=next(raw_forecast_it)
-            ):
-                # Patch the forecast time since the forecasts were fetched now.
-                message.payload["forecast_time"] = fc_time
-                yield message
+            yield from self._fetch_data(start_time=batch_start, end_time=batch_end, raw_forecast=next(raw_forecast_it))
             batch_start = batch_end
 
     def _fetch_data(self, raw_forecast: Optional[dict] = None, start_time: Optional[datetime.datetime] = None,
@@ -288,12 +281,15 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
             response.raise_for_status()
             raw_forecast = response.json()
 
+        # No forecast time is delivered by the server. Hence, the local time of retrieval will be taken.
+        forecast_time = datetime.datetime.now(tz=datetime.timezone.utc)
+
         # Extract common metadata (shared by both messages)
         common_metadata = self._extract_common_metadata(raw_forecast)
 
         # Always yield hourly data message
         if "hourly" in raw_forecast:
-            hourly_data = self._transform_hourly_data(raw_forecast, self._hourly_variables)
+            hourly_data = self._transform_hourly_data(raw_forecast, self._hourly_variables, forecast_time)
             hourly_data.update(common_metadata)
 
             self._logger.debug(
@@ -305,7 +301,7 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
 
         # Yield 15-minute data message if enabled and available
         if self._enable_minutely_15 and "minutely_15" in raw_forecast:
-            minutely_data = self._transform_minutely_15_data(raw_forecast, self._minutely_15_variables)
+            minutely_data = self._transform_minutely_15_data(raw_forecast, self._minutely_15_variables, forecast_time)
             minutely_data.update(common_metadata)
 
             self._logger.debug(
@@ -383,12 +379,15 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
         return dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
 
     @staticmethod
-    def _transform_hourly_data(raw_forecast: dict, hourly_variables: List[str]) -> Dict[str, Any]:
+    def _transform_hourly_data(raw_forecast: dict, hourly_variables: List[str],
+                               forecast_time: Optional[datetime.datetime] = None) -> Dict[str, Any]:
         """
         Transforms the Open-Meteo hourly forecast data to the common Redis representation
         
         :param raw_forecast: The raw JSON response from Open-Meteo API
         :param hourly_variables: List of hourly variables that were queried
+        :param forecast_time: An externally provided forecast time (optional) In case none is supplied, the first
+            sample after past_days will be taken.
         :return: Dictionary in the common Redis format with hourly data
         """
         if "hourly" not in raw_forecast:
@@ -411,18 +410,23 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
         result = dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
 
         # Add a forecast_time based on the first observation time if available
-        if "observation_time" in result and len(result["observation_time"]) > 0:
+        if "observation_time" in result and len(result["observation_time"]) > 0 and forecast_time is None:
             result["forecast_time"] = result["observation_time"][0]
+        else:
+            result["forecast_time"] = forecast_time.isoformat()
 
         return result
 
     @staticmethod
-    def _transform_minutely_15_data(raw_forecast: dict, minutely_15_variables: List[str]) -> Dict[str, Any]:
+    def _transform_minutely_15_data(raw_forecast: dict, minutely_15_variables: List[str],
+                                    forecast_time: Optional[datetime.datetime] = None) -> Dict[str, Any]:
         """
         Transforms the Open-Meteo 15-minute forecast data to the common Redis representation
         
         :param raw_forecast: The raw JSON response from Open-Meteo API
         :param minutely_15_variables: List of 15-minute variables that were queried
+        :param forecast_time: An externally provided forecast time (optional) In case none is supplied, the first
+            sample will be taken.
         :return: Dictionary in the common Redis format with 15-minute data
         """
         if "minutely_15" not in raw_forecast:
@@ -445,8 +449,10 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
         result = dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
 
         # Add a forecast_time based on the first observation time if available
-        if "observation_time" in result and len(result["observation_time"]) > 0:
+        if "observation_time" in result and len(result["observation_time"]) > 0 and forecast_time is None:
             result["forecast_time"] = result["observation_time"][0]
+        else:
+            result["forecast_time"] = forecast_time.isoformat()
 
         return result
 
