@@ -1,6 +1,7 @@
 """
 Contains all redis-related sink configuration directives
 """
+import datetime
 import json
 import string
 from typing import Any, Optional
@@ -75,8 +76,28 @@ class RedisStream(abstract_sink.AbstractSinkAPI):
         data = data.copy()  # To be on the safe side. Remove if it turns out to be a performance bottleneck
         data.update(self._config.tags)
 
-        encoded_data = {key: json.dumps(val) for key, val in data.items()}
+        encoded_data = {key: json.dumps(self._prepare_for_encoding(val)) for key, val in data.items()}
         self._client.xadd(stream_template.substitute(data), encoded_data)
+
+    @staticmethod
+    def _prepare_for_encoding(data: Any) -> Any:
+        """Recursively translates some data types into JSON serializable structures"""
+        if data is None or any(isinstance(data, t) for t in (str, int, float, bool)):
+            return data  # Shortcut the execution
+        elif isinstance(data, dict):
+            return {key: RedisStream._prepare_for_encoding(val) for key, val in data.items()}
+        elif isinstance(data, list):
+            return [RedisStream._prepare_for_encoding(item) for item in data]
+        elif isinstance(data, tuple):
+            return [RedisStream._prepare_for_encoding(item) for item in data]
+        elif isinstance(data, datetime.datetime):
+            return data.isoformat()
+        elif isinstance(data, datetime.date):
+            return data.isoformat()
+        elif isinstance(data, datetime.timedelta):
+            return data.total_seconds()
+        else:
+            return data  # Just in case I forgot something
 
     @staticmethod
     def parameter_model() -> type[abstract_sink.SinkParameters]:
