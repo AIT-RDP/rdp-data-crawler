@@ -21,6 +21,14 @@ test_python_3_10:
       alias: mosquitto
     - name: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/redis
       alias: redis
+    - name: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/influxdb:2
+      alias: influxdb
+      variables:
+        DOCKER_INFLUXDB_INIT_MODE: "setup"
+        DOCKER_INFLUXDB_INIT_USERNAME: ${DATA_CRAWLER_INFLUX_USER}
+        DOCKER_INFLUXDB_INIT_PASSWORD: ${DATA_CRAWLER_INFLUX_PASSWORD}
+        DOCKER_INFLUXDB_INIT_ORG: "ait"
+        DOCKER_INFLUXDB_INIT_BUCKET: "ait-bucket"
   tags:
     - docker
     - x86_64
@@ -31,6 +39,11 @@ test_python_3_10:
     DATA_CRAWLER_REDIS_HOST: "redis"
     DATA_CRAWLER_REDIS_PORT: "6379"
     DATA_CRAWLER_REDIS_DB: 0
+    # InfluxDB connection settings for the InfluxDB source tests.
+    DATA_CRAWLER_INFLUX_URL: "http://influxdb:8086"
+    DATA_CRAWLER_INFLUX_ORG: "ait"
+    DATA_CRAWLER_INFLUX_USER: ${DATA_CRAWLER_INFLUX_USER}
+    DATA_CRAWLER_INFLUX_PASSWORD: ${DATA_CRAWLER_INFLUX_PASSWORD}
   script:
     - pip install --no-cache-dir -r requirements-dev.txt
     # Authenticate the third-party dependencies

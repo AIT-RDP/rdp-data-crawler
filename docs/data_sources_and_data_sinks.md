@@ -285,6 +285,56 @@ redis:
   db: 0
 ```
 
+#### InfluxDB
+**Interface Type**: Source
+
+**Type Name**: `data_crawler.sources.influxdb.InfluxDBSource`
+
+**Description**: The InfluxDB source fetches time-series data from an InfluxDB instance using Flux queries. The source 
+maintains a rolling time window to fetch only new data in subsequent queries. Each table returned by the Flux query is 
+transformed into a separate message, with columns mapped directly to message fields. The source supports batching of 
+data fetches to handle large time ranges efficiently.
+
+**Parameters**:
+* `url`: The URL of the InfluxDB instance.
+* `token`: The authentication token for InfluxDB.
+* `org`: The organization name in InfluxDB.
+* `query`: The Flux query to fetch the data. The query can use the parameters `_start_time` and `_stop_time` which are 
+  automatically injected by the source to control the time range of the query.
+* `initial_history`: The past duration to fetch data from on the first query. After the initial query, only new samples 
+  will be returned. Defaults to 1 hour.
+* `lag_time`: The lag time to account for late arriving data. The source will query data up to the current time minus 
+  this lag time. Defaults to 0 minutes.
+* `batch_duration`: Optional parameter to fetch data in batches of the specified duration. If not set, all data between 
+  start and stop time is fetched in a single query. This is useful for handling large time ranges that might exceed 
+  query limits or memory constraints.
+
+**Example**: The following configuration snippet defines an InfluxDB source that reads temperature sensor data:
+
+```yaml
+  sensors.influxdb:
+    type: "data_crawler.sources.influxdb.InfluxDBSource"
+    source parameter:
+      url: "https://influxdb.example.com"
+      token: "${INFLUXDB_TOKEN}"
+      org: "my-organization"
+      query: |
+        from(bucket: "sensors")
+          |> range(start: _start_time, stop: _stop_time)
+          |> filter(fn: (r) => r["_measurement"] == "temperature")
+          |> filter(fn: (r) => r["location"] == "building_a")
+      initial_history: 24h
+      lag_time: 5m
+      batch_duration: 1h
+    polling:
+      frequency: 5m
+    redis:
+      stream: "measurements.sensors.temperature"
+      tags:
+        location: "building_a"
+        data_provider: "InfluxDB"
+```
+
 ## Energy- and Market-Related Services
 #### ENTSO-E Transparency Platform - Day-Ahead Market Prices
 **Interface Type**: Source

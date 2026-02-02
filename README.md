@@ -89,6 +89,20 @@ data sources:
 Note that the redis sink allows to append arbitrary but static message fields. This can be used to set meta-data that 
 is needed for further data processing.
 
+In order to simplify repeating configurations and share a common redis connection pool, the redis server information is 
+outsourced to a common root-level `redis` section as follows.
+
+```yaml
+version: 1
+data sources: []  # The source configuration as described above
+
+redis:  # Common Redis server configuration
+  host: redis.example.local # The hostname or IP address of the Redis server
+  port: 6379  # The port of the Redis server
+  password: ${REDIS_PASSWORD}  # The password to access the Redis server. Can be left out, if no password is set.
+  db: 0  # The Redis database index to use
+```
+
 ## Polling Configuration
 
 Sources that require regular polling can be configured via the `polling` section. In order to determine the timing and 
@@ -181,6 +195,7 @@ The following overview lists the main ones. Detailed configurations can be found
   * `data_crawler.sinks.opc_ua.OPCUA` OPC UA sink
   * `data_crawler.sinks.redis.RedisStream`: Redis stream sink (default)
   * `data_crawler.sources.teltonika_modbus.TeltonikaModbus`: REST interface to receive Modbus data via Teltonica devices
+  * `data_crawler.sources.influxdb.InfluxDBSource`: InfluxDB source to read time series data from an InfluxDB instance
 
 * Energy- and market-related services:
   * ENTSO-E

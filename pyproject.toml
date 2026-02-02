@@ -31,6 +31,7 @@ asyncua = {version = "^1.1.5", optional = true}
 pandera = {version = "^0.20.3", optional = true}
 websocket-client = {version = "^1.8.0", optional = true}
 rdp-mqtt = {git = "https://github.com/AIT-RDP/rdp-mqtt", rev = "5a991645b908d04857110fd285f8f4096fa8819d", optional = true}
+influxdb-client = {extras = ["influx"], version = "^1.50.0"}
 
 [tool.poetry.extras]
 modbus = ["modbus-crawler", "pandera"]
