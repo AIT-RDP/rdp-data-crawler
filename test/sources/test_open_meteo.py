@@ -665,3 +665,341 @@ def test_open_meteo_minutely_15_only():
     assert now - datetime.timedelta(hours=1) <= forecast_time <= now, \
         f"Forecast time {forecast_time} is not recent"
 
+
+# ==================== OpenMeteoHistory Test Cases ====================
+
+
+@pytest.fixture()
+def history_response() -> dict:
+    """Returns the Open-Meteo history test response"""
+
+    file = os.path.join(__file__, "../../../data/test/open-meteo-history.json")
+    file = os.path.abspath(file)
+
+    with open(file, "r") as f:
+        data = json.load(f)
+    return data
+
+
+@pytest.fixture()
+def history_base_parameters() -> dict:
+    """Returns a set of base parameters for Open-Meteo History (Berlin)"""
+
+    return {
+        "latitude": 52.52,
+        "longitude": 13.405,
+        "cache": {"directory": ".cache-test-persistent"}
+    }
+
+
+@pytest.mark.parametrize("config_fkt", [helpers.direct_config, helpers.to_string_values])
+def test_history_parsing(history_response: dict, history_base_parameters: dict, config_fkt):
+    """Tests the parsing and transformation mechanism with static response data"""
+
+    api = open_meteo.OpenMeteoHistory(source_parameters=config_fkt(history_base_parameters))
+
+    # Use fetch_timed_historic_data_bundle with injected raw data
+    start_time = datetime.datetime(2026, 1, 18, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    end_time = datetime.datetime(2026, 1, 19, 0, 0, 0, tzinfo=datetime.timezone.utc)
+
+    response_data = list(api.fetch_timed_historic_data_bundle(
+        start_time=start_time,
+        end_time=end_time,
+        filter_clauses={},
+        raw_data=iter([history_response])
+    ))
+
+    assert len(response_data) == 1
+    assert isinstance(response_data[0], message.Message)
+    response_data = response_data[0].payload
+
+    assert response_data is not None
+
+    # Check metadata
+    assert response_data["longitude"] == 13.407822
+    assert response_data["latitude"] == 52.54833
+    assert response_data["altitude"] == 38.0
+
+    # Check time axis (24 hourly observations)
+    assert "observation_time" in response_data
+    assert len(response_data["observation_time"]) == 24
+
+    # Verify first and last timestamps
+    assert response_data["observation_time"][0] == "2026-01-18T00:00:00+00:00"
+    assert response_data["observation_time"][-1] == "2026-01-18T23:00:00+00:00"
+
+    # Check temperature - first and last values
+    assert "air_temperature_2m" in response_data
+    assert response_data["air_temperature_2m"][0] == 1.0
+    assert response_data["air_temperature_2m"][-1] == -1.3
+
+    # Check humidity - first and last values
+    assert "relative_humidity_2m" in response_data
+    assert response_data["relative_humidity_2m"][0] == 98
+    assert response_data["relative_humidity_2m"][-1] == 79
+
+    # Check dew point - first and last values
+    assert "dew_point_temperature_2m" in response_data
+    assert response_data["dew_point_temperature_2m"][0] == 0.8
+    assert response_data["dew_point_temperature_2m"][-1] == -4.4
+
+    # Check apparent temperature - first and last values
+    assert "apparent_temperature" in response_data
+    assert response_data["apparent_temperature"][0] == -2.9
+    assert response_data["apparent_temperature"][-1] == -6.0
+
+    # Check pressure - first and last values
+    assert "air_pressure_at_sea_level" in response_data
+    assert response_data["air_pressure_at_sea_level"][0] == 1027.9
+    assert response_data["air_pressure_at_sea_level"][-1] == 1027.5
+
+    assert "surface_pressure" in response_data
+    assert response_data["surface_pressure"][0] == 1023.0
+    assert response_data["surface_pressure"][-1] == 1022.6
+
+    # Check cloud cover - first and last values
+    assert "cloud_area_fraction" in response_data
+    assert response_data["cloud_area_fraction"][0] == 14
+    assert response_data["cloud_area_fraction"][-1] == 0
+
+    assert "cloud_area_fraction_low" in response_data
+    assert response_data["cloud_area_fraction_low"][0] == 14
+    assert response_data["cloud_area_fraction_low"][-1] == 0
+
+    assert "cloud_area_fraction_medium" in response_data
+    assert response_data["cloud_area_fraction_medium"][0] == 0
+    assert response_data["cloud_area_fraction_medium"][-1] == 0
+
+    assert "cloud_area_fraction_high" in response_data
+    assert response_data["cloud_area_fraction_high"][0] == 0
+    assert response_data["cloud_area_fraction_high"][-1] == 0
+
+    # Check 10m wind - first and last values
+    assert "wind_speed_10m" in response_data
+    assert response_data["wind_speed_10m"][0] == 3.80
+    assert response_data["wind_speed_10m"][-1] == 3.86
+
+    assert "wind_direction_10m" in response_data
+    assert response_data["wind_direction_10m"][0] == 103
+    assert response_data["wind_direction_10m"][-1] == 124
+
+    assert "wind_gusts_10m" in response_data
+    assert response_data["wind_gusts_10m"][0] == 7.40
+    assert response_data["wind_gusts_10m"][-1] == 7.70
+
+    # Check 100m wind - first and last values
+    assert "wind_speed_100m" in response_data
+    assert response_data["wind_speed_100m"][0] == 7.59
+    assert response_data["wind_speed_100m"][-1] == 8.14
+
+    assert "wind_direction_100m" in response_data
+    assert response_data["wind_direction_100m"][0] == 112
+    assert response_data["wind_direction_100m"][-1] == 133
+
+    # Check precipitation - first and last values
+    assert "precipitation_total" in response_data
+    assert response_data["precipitation_total"][0] == 0.00
+    assert response_data["precipitation_total"][-1] == 0.00
+
+    assert "rain" in response_data
+    assert response_data["rain"][0] == 0.00
+    assert response_data["rain"][-1] == 0.00
+
+    assert "snowfall" in response_data
+    assert response_data["snowfall"][0] == 0.00
+    assert response_data["snowfall"][-1] == 0.00
+
+    assert "snow_depth" in response_data
+    assert response_data["snow_depth"][0] == 0.00
+    assert response_data["snow_depth"][-1] == 0.00
+
+    # Check weather code - first and last values
+    assert "weather_code" in response_data
+    assert response_data["weather_code"][0] == 0
+    assert response_data["weather_code"][-1] == 0
+
+    # Check radiation - first and last values
+    assert "global_horizontal_irradiation" in response_data
+    assert response_data["global_horizontal_irradiation"][0] == 0.0
+    assert response_data["global_horizontal_irradiation"][-1] == 0.0
+
+    assert "direct_radiation" in response_data
+    assert response_data["direct_radiation"][0] == 0.0
+    assert response_data["direct_radiation"][-1] == 0.0
+
+    assert "diffuse_radiation" in response_data
+    assert response_data["diffuse_radiation"][0] == 0.0
+    assert response_data["diffuse_radiation"][-1] == 0.0
+
+    assert "direct_normal_irradiance" in response_data
+    assert response_data["direct_normal_irradiance"][0] == 0.0
+    assert response_data["direct_normal_irradiance"][-1] == 0.0
+
+
+def test_history_fetch_data_bundle_injected(history_response: dict, history_base_parameters: dict):
+    """Tests fetch_data_bundle with injected data"""
+
+    api = open_meteo.OpenMeteoHistory(source_parameters=history_base_parameters)
+
+    # Set internal start time to a day in the past
+    api._start_time = datetime.datetime(2026, 1, 18, 0, 0, 0, tzinfo=datetime.timezone.utc)
+
+    # Mock the _fetch_single_batch to use injected data
+    original_method = api._fetch_single_batch
+
+    def mock_fetch_single_batch(start_time, end_time, raw_data):
+        return original_method(start_time, end_time, raw_data=history_response)
+
+    api._fetch_single_batch = mock_fetch_single_batch
+
+    # First call should return a message
+    messages = list(api.fetch_data_bundle())
+    assert len(messages) == 1
+    assert isinstance(messages[0], message.Message)
+
+    payload = messages[0].payload
+    assert "observation_time" in payload
+    assert len(payload["observation_time"]) == 24
+    assert "air_temperature_2m" in payload
+
+    # Second call on the same day should return no messages
+    messages_second = list(api.fetch_data_bundle())
+    assert len(messages_second) == 0, "Expected no messages on second call on same day"
+
+
+def test_history_fetch_timed_historic_data_bundle_single_batch(history_response: dict,
+                                                                history_base_parameters: dict):
+    """Tests fetch_timed_historic_data_bundle with a single batch"""
+
+    api = open_meteo.OpenMeteoHistory(source_parameters=history_base_parameters)
+
+    start_time = datetime.datetime(2026, 1, 18, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    end_time = datetime.datetime(2026, 1, 19, 0, 0, 0, tzinfo=datetime.timezone.utc)
+
+    messages = list(api.fetch_timed_historic_data_bundle(
+        start_time=start_time,
+        end_time=end_time,
+        filter_clauses={},
+        raw_data=iter([history_response])
+    ))
+
+    # Should yield 1 message for single day
+    assert len(messages) == 1
+    assert isinstance(messages[0], message.Message)
+
+    payload = messages[0].payload
+    assert "observation_time" in payload
+    assert len(payload["observation_time"]) == 24
+    assert "air_temperature_2m" in payload
+    assert payload["air_temperature_2m"][0] == 1.0
+    assert payload["air_temperature_2m"][-1] == -1.3
+
+
+def test_history_fetch_timed_historic_data_bundle_multiple_batches(history_response: dict,
+                                                                    history_base_parameters: dict):
+    """Tests fetch_timed_historic_data_bundle with multiple batches"""
+
+    # Configure with small batch size for testing
+    params = {**history_base_parameters, "batch_size": 2}
+    api = open_meteo.OpenMeteoHistory(source_parameters=params)
+
+    # Time range spanning 5 days - should create 3 batches with batch_size=2
+    start_time = datetime.datetime(2026, 1, 18, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    end_time = datetime.datetime(2026, 1, 23, 0, 0, 0, tzinfo=datetime.timezone.utc)
+
+    # Inject raw data for 3 batches
+    messages = list(api.fetch_timed_historic_data_bundle(
+        start_time=start_time,
+        end_time=end_time,
+        filter_clauses={},
+        raw_data=iter([history_response, history_response, history_response])
+    ))
+
+    # Should yield 3 messages (3 batches: days 0-2, 2-4, 4-5)
+    assert len(messages) == 3
+
+    # Verify all messages have correct structure
+    for msg in messages:
+        assert isinstance(msg, message.Message)
+        payload = msg.payload
+
+        assert "observation_time" in payload
+        assert "air_temperature_2m" in payload
+        assert "wind_speed_10m" in payload
+        assert payload["latitude"] == 52.54833
+        assert payload["longitude"] == 13.407822
+
+
+def test_history_online():
+    """Tests OpenMeteoHistory by fetching live data from the API"""
+
+    params = {
+        "latitude": 52.52,
+        "longitude": 13.405,
+        "variables": ["temperature_2m", "wind_speed_10m", "wind_speed_100m", "precipitation"],
+        "cache": {"directory": ".cache-test-persistent"}
+    }
+
+    api = open_meteo.OpenMeteoHistory(source_parameters=params)
+
+    # Fetch 2 days of historic data
+    end_time = datetime.datetime.now(tz=datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    start_time = end_time - datetime.timedelta(days=2)
+
+    messages = list(api.fetch_timed_historic_data_bundle(
+        start_time=start_time,
+        end_time=end_time,
+        filter_clauses={}
+    ))
+
+    # Should yield 1 message (within default batch size)
+    assert len(messages) == 1
+    assert isinstance(messages[0], message.Message)
+
+    payload = messages[0].payload
+
+    # Verify observation times are present
+    assert "observation_time" in payload
+    assert len(payload["observation_time"]) > 0
+
+    # Verify requested variables are present
+    assert "air_temperature_2m" in payload
+    assert "wind_speed_10m" in payload
+    assert "wind_speed_100m" in payload
+    assert "precipitation_total" in payload
+
+    # Verify metadata
+    assert "latitude" in payload
+    assert "longitude" in payload
+    assert abs(payload["latitude"] - 52.52) < 0.1
+    assert abs(payload["longitude"] - 13.405) < 0.1
+
+
+def test_history_fetch_data_bundle_online():
+    """Tests fetch_data_bundle by fetching live data from the API"""
+
+    params = {
+        "latitude": 52.52,
+        "longitude": 13.405,
+        "initial_history": 2,  # Only fetch 2 days to keep test fast
+        "lag_time": 3,
+        "variables": ["temperature_2m", "wind_speed_10m", "precipitation"],
+        "cache": {"directory": ".cache-test-persistent"}
+    }
+
+    api = open_meteo.OpenMeteoHistory(source_parameters=params)
+
+    # First call should return data
+    messages = list(api.fetch_data_bundle())
+    assert len(messages) == 1
+    assert isinstance(messages[0], message.Message)
+
+    payload = messages[0].payload
+    assert "observation_time" in payload
+    assert len(payload["observation_time"]) > 0
+    assert "air_temperature_2m" in payload
+
+    # Second call on the same day should return no messages
+    messages_second = list(api.fetch_data_bundle())
+    assert len(messages_second) == 0, "Expected no messages on second call on same day"
+
