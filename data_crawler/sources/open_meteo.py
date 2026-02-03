@@ -5,11 +5,13 @@ See https://open-meteo.com/en/docs for the API documentation.
 """
 import datetime
 import itertools
-from typing import Dict, Any, List, Optional, Iterable
+from abc import ABC
+from typing import Dict, Any, List, Optional, Iterable, Iterator
 import json
 import logging
 
 import requests
+import pydantic
 
 import data_crawler.sources.abc.http_cache as http_cache
 import data_crawler.sources.abc.abstract_source as abstract_source
@@ -19,8 +21,130 @@ from data_crawler.sources.abc.message import Message, MessageData
 from typing import Generator
 
 
-class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMessageHistorySourceMixin,
-                        abstract_source.AbstractMultiMessageSourceAPI):
+class _OpenMeteoBase(http_cache.SyncHTTPMixin, abstract_source.AbstractMultiMessageSourceAPI, ABC):
+    """
+    Abstract base class for Open-Meteo sources
+
+    The class holds common functionalities such as message parsing helpers to avoid duplicate code
+    """
+
+    def __init__(self, source_parameters: dict, executor_name: str = "-", **kwargs):
+        """
+        Initializes the Open-Meteo base class
+
+        :param executor_name: The name of the executor for debugging purpose
+        :param source_parameters: The source parameters according to the configuration.
+        :param kwargs: Any extra arguments that will be sent to the super class
+        """
+        super(_OpenMeteoBase, self).__init__(
+            source_parameters=source_parameters, executor_name=executor_name, **kwargs
+        )
+
+        self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{executor_name}")
+
+    @staticmethod
+    def _extract_common_metadata(raw_forecast: dict) -> Dict[str, Any]:
+        """
+        Extracts common metadata (lat, lon, altitude, generation time) from raw forecast
+
+        :param raw_forecast: The raw JSON response from Open-Meteo API
+        :return: Dictionary with common metadata fields
+        """
+        extractors = [
+            jx.PathExtractor("longitude", "longitude", is_list=False),
+            jx.PathExtractor("latitude", "latitude", is_list=False),
+            jx.PathExtractor("altitude", "elevation", is_list=False, drop_missing=True),
+            jx.PathExtractor("generationtime_ms", "generationtime_ms", is_list=False, drop_missing=True),
+        ]
+
+        return dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
+
+    @staticmethod
+    def _transform_hourly_data(raw_forecast: dict, hourly_variables: List[str]) -> Dict[str, Any]:
+        """
+        Transforms the Open-Meteo hourly forecast data to the common Redis representation
+
+        :param raw_forecast: The raw JSON response from Open-Meteo API
+        :param hourly_variables: List of hourly variables that were queried
+        :return: Dictionary in the common Redis format with hourly data
+        """
+        if "hourly" not in raw_forecast:
+            return {}
+
+        variable_mapping = _OpenMeteoBase._get_variable_mapping()
+        extractors = []
+
+        # Time axis - use [*] to extract individual items from the array
+        extractors.append(jx.DatetimePathExtractor("observation_time", "hourly.time[*]"))
+
+        # Add extractors for each hourly variable that was queried
+        for var in hourly_variables:
+            internal_name = variable_mapping.get(var, var)
+            src_path = f"hourly.{var}[*]"
+            extractors.append(
+                jx.PathExtractor(internal_name, src_path, is_list=True, drop_missing=True)
+            )
+
+        result = dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
+        return result
+
+    @staticmethod
+    def _get_variable_mapping() -> Dict[str, str]:
+        """
+        Returns the mapping from Open-Meteo variable names to our internal nomenclature
+
+        :return: Dictionary mapping Open-Meteo variable names to internal names
+        """
+        return {
+            # Temperature
+            "temperature_2m": "air_temperature_2m",
+            "apparent_temperature": "apparent_temperature",
+            # Humidity
+            "relative_humidity_2m": "relative_humidity_2m",
+            "dew_point_2m": "dew_point_temperature_2m",
+            # Pressure
+            "pressure_msl": "air_pressure_at_sea_level",
+            "surface_pressure": "surface_pressure",
+            # Clouds
+            "cloud_cover": "cloud_area_fraction",
+            "cloud_cover_low": "cloud_area_fraction_low",
+            "cloud_cover_mid": "cloud_area_fraction_medium",
+            "cloud_cover_high": "cloud_area_fraction_high",
+            # Visibility
+            "visibility": "visibility",
+            # Wind 10m
+            "wind_speed_10m": "wind_speed_10m",
+            "wind_direction_10m": "wind_direction_10m",
+            "wind_gusts_10m": "wind_gusts_10m",
+            # Wind at higher altitudes (for wind energy)
+            "wind_speed_80m": "wind_speed_80m",
+            "wind_speed_100m": "wind_speed_100m",
+            "wind_speed_120m": "wind_speed_120m",
+            "wind_speed_180m": "wind_speed_180m",
+            "wind_direction_80m": "wind_direction_80m",
+            "wind_direction_120m": "wind_direction_120m",
+            "wind_direction_100m": "wind_direction_100m",
+            "wind_direction_180m": "wind_direction_180m",
+            # Precipitation
+            "precipitation": "precipitation_total",
+            "precipitation_probability": "precipitation_probability",
+            "rain": "rain",
+            "snowfall": "snowfall",
+            "weather_code": "weather_code",
+            "showers": "precipitation_showers",
+            "snow_depth": "snow_depth",
+            # Radiation
+            "shortwave_radiation": "global_horizontal_irradiation",
+            "direct_radiation": "direct_radiation",
+            "diffuse_radiation": "diffuse_radiation",
+            "direct_normal_irradiance": "direct_normal_irradiance",
+            # UV
+            "uv_index": "uv_index",
+        }
+
+
+class OpenMeteoForecast(history.AbstractTimedMultiMessageHistorySourceMixin,
+                        _OpenMeteoBase):
     """
     Queries the Open-Meteo Weather Forecast API
     
@@ -64,6 +188,7 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
         "precipitation_probability",
         "rain",
         "snowfall",
+        "snow_depth",
         "weather_code",
         # Radiation
         "shortwave_radiation",
@@ -105,6 +230,7 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
         "shortwave_radiation",
         "direct_radiation",
         "diffuse_radiation",
+        "direct_normal_irradiance"
     ]
 
     API_ENDPOINT = "https://api.open-meteo.com/v1/forecast"
@@ -138,8 +264,6 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
         super(OpenMeteoForecast, self).__init__(
             source_parameters=source_parameters, executor_name=executor_name, **kwargs
         )
-
-        self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{executor_name}")
 
         self._latitude = float(source_parameters["latitude"])
         self._longitude = float(source_parameters["longitude"])
@@ -320,78 +444,11 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
             )
 
     @staticmethod
-    def _get_variable_mapping() -> Dict[str, str]:
-        """
-        Returns the mapping from Open-Meteo variable names to our internal nomenclature
-        
-        :return: Dictionary mapping Open-Meteo variable names to internal names
-        """
-        return {
-            # Temperature
-            "temperature_2m": "air_temperature_2m",
-            "apparent_temperature": "apparent_temperature",
-            # Humidity
-            "relative_humidity_2m": "relative_humidity_2m",
-            "dew_point_2m": "dew_point_temperature_2m",
-            # Pressure
-            "pressure_msl": "air_pressure_at_sea_level",
-            "surface_pressure": "surface_pressure",
-            # Clouds
-            "cloud_cover": "cloud_area_fraction",
-            "cloud_cover_low": "cloud_area_fraction_low",
-            "cloud_cover_mid": "cloud_area_fraction_medium",
-            "cloud_cover_high": "cloud_area_fraction_high",
-            # Visibility
-            "visibility": "visibility",
-            # Wind 10m
-            "wind_speed_10m": "wind_speed_10m",
-            "wind_direction_10m": "wind_direction_10m",
-            "wind_gusts_10m": "wind_gusts_10m",
-            # Wind at higher altitudes (for wind energy)
-            "wind_speed_80m": "wind_speed_80m",
-            "wind_speed_120m": "wind_speed_120m",
-            "wind_speed_180m": "wind_speed_180m",
-            "wind_direction_80m": "wind_direction_80m",
-            "wind_direction_120m": "wind_direction_120m",
-            "wind_direction_180m": "wind_direction_180m",
-            # Precipitation
-            "precipitation": "precipitation_total",
-            "precipitation_probability": "precipitation_probability",
-            "rain": "rain",
-            "snowfall": "snowfall",
-            "weather_code": "weather_code",
-            # Radiation
-            "shortwave_radiation": "global_horizontal_irradiation",
-            "direct_radiation": "direct_radiation",
-            "diffuse_radiation": "diffuse_radiation",
-            "direct_normal_irradiance": "direct_normal_irradiance",
-            # UV
-            "uv_index": "uv_index",
-        }
-
-    @staticmethod
-    def _extract_common_metadata(raw_forecast: dict) -> Dict[str, Any]:
-        """
-        Extracts common metadata (lat, lon, altitude, generation time) from raw forecast
-        
-        :param raw_forecast: The raw JSON response from Open-Meteo API
-        :return: Dictionary with common metadata fields
-        """
-        extractors = [
-            jx.PathExtractor("longitude", "longitude", is_list=False),
-            jx.PathExtractor("latitude", "latitude", is_list=False),
-            jx.PathExtractor("altitude", "elevation", is_list=False, drop_missing=True),
-            jx.PathExtractor("generationtime_ms", "generationtime_ms", is_list=False, drop_missing=True),
-        ]
-
-        return dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
-
-    @staticmethod
     def _transform_hourly_data(raw_forecast: dict, hourly_variables: List[str],
                                forecast_time: Optional[datetime.datetime] = None) -> Dict[str, Any]:
         """
         Transforms the Open-Meteo hourly forecast data to the common Redis representation
-        
+
         :param raw_forecast: The raw JSON response from Open-Meteo API
         :param hourly_variables: List of hourly variables that were queried
         :param forecast_time: An externally provided forecast time (optional) In case none is supplied, the first
@@ -401,21 +458,7 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
         if "hourly" not in raw_forecast:
             return {}
 
-        variable_mapping = OpenMeteoForecast._get_variable_mapping()
-        extractors = []
-
-        # Time axis - use [*] to extract individual items from the array
-        extractors.append(jx.DatetimePathExtractor("observation_time", "hourly.time[*]"))
-
-        # Add extractors for each hourly variable that was queried
-        for var in hourly_variables:
-            internal_name = variable_mapping.get(var, var)
-            src_path = f"hourly.{var}[*]"
-            extractors.append(
-                jx.PathExtractor(internal_name, src_path, is_list=True, drop_missing=True)
-            )
-
-        result = dict(itertools.chain(*[ext.extract_information(raw_forecast).items() for ext in extractors]))
+        result = _OpenMeteoBase._transform_hourly_data(raw_forecast, hourly_variables)
 
         # Add a forecast_time based on the first observation time if available
         if "observation_time" in result and len(result["observation_time"]) > 0 and forecast_time is None:
@@ -463,6 +506,203 @@ class OpenMeteoForecast(http_cache.SyncHTTPMixin, history.AbstractTimedMultiMess
             result["forecast_time"] = forecast_time.isoformat()
 
         return result
+
+
+_HISTORY_DEFAULT_HOURLY_VARIABLES = [
+    # Temperature and humidity
+    "temperature_2m",
+    "relative_humidity_2m",
+    "dew_point_2m",
+    "apparent_temperature",
+    # Pressure
+    "pressure_msl",
+    "surface_pressure",
+    # Clouds
+    "cloud_cover",
+    "cloud_cover_low",
+    "cloud_cover_mid",
+    "cloud_cover_high",
+    # Wind at various heights
+    "wind_speed_10m",
+    "wind_speed_100m",
+
+    "wind_direction_10m",
+    "wind_direction_100m",
+    "wind_gusts_10m",
+
+    # Precipitation
+    "precipitation",
+    "rain",
+    "snowfall",
+    "snow_depth",
+    "weather_code",
+    # Radiation
+    "shortwave_radiation",
+    "direct_radiation",
+    "diffuse_radiation",
+    "direct_normal_irradiance",
+]
+
+
+class OpenMeteoHistoryParameters(pydantic.BaseModel):
+    """
+    Pydantic model for Open-Meteo historical data source parameters
+
+    Timing parameters are generally in days because the Open-Meteo API works with full days, only.
+    """
+
+    latitude: float = pydantic.Field(description="Latitude of the location")
+    longitude: float = pydantic.Field(description="Longitude of the location")
+
+    variables: List[str] = pydantic.Field(
+        default=_HISTORY_DEFAULT_HOURLY_VARIABLES,
+        description="List of hourly variables to query"
+    )
+    model: Optional[str] = pydantic.Field(
+        description="Reanalysis model to use for historical data.",
+        default="best_match"
+    )
+
+    lag_time: Optional[int] = pydantic.Field(
+        description="Optional lag time in days to account for data availability delays",
+        default=3, ge=3
+    )
+    initial_history: Optional[int] = pydantic.Field(
+        description="Initial history duration in days to fetch data from the past",
+        default=30, ge=1
+    )
+    batch_size: Optional[int] = pydantic.Field(
+        description="Number of days per historic data request batch",
+        default=30 * 6, ge=1
+    )
+
+
+class OpenMeteoHistory(history.AbstractTimedMultiMessageHistorySourceMixin,
+                       _OpenMeteoBase):
+    """
+    Implements the Open-Meteo historical weather data source assessing the reanalysis data
+    """
+
+    API_ENDPOINT = "https://archive-api.open-meteo.com/v1/archive"
+
+    def __init__(self, source_parameters: dict | OpenMeteoHistoryParameters, executor_name: str = "-", **kwargs):
+        """
+        Initializes the Open-Meteo historical data source.
+
+        :param source_parameters: The source parameters according to the configuration
+        :param executor_name: The name of the executor for debugging purpose
+        :param kwargs: Any extra arguments that will be sent to the super class
+        """
+        super().__init__(source_parameters=source_parameters, executor_name=executor_name, **kwargs)
+
+        if isinstance(source_parameters, dict):
+            source_parameters = OpenMeteoHistoryParameters.model_validate(source_parameters)
+
+        if not isinstance(source_parameters, OpenMeteoHistoryParameters):
+            raise TypeError("source_parameters must be a dict or OpenMeteoHistoryParameters instance")
+
+        self._params = source_parameters
+        self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{executor_name}")
+
+        # Determine the aligned start time
+        self._start_time = datetime.datetime.now(tz=datetime.timezone.utc)
+        self._start_time = self._start_time.replace(hour=0, minute=0, second=0, microsecond=0)
+        self._start_time -= datetime.timedelta(days=self._params.initial_history + self._params.lag_time)
+
+    def fetch_data_bundle(self) -> Generator[MessageData, None, None]:
+        """Fetches the most recent remote data. In case no new data is available, no messages will be yielded."""
+
+        end_time = datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=self._params.lag_time)
+        end_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        if self._start_time < end_time:
+            yield from self._fetch_messages(self._start_time, end_time, raw_data=None)
+            self._start_time = end_time
+
+    def fetch_timed_historic_data_bundle(
+            self, start_time: datetime.datetime, end_time: datetime.datetime,
+            filter_clauses: Dict[str, Any], raw_data: Optional[Iterator[dict]] = None
+    ) -> Generator[MessageData, None, None]:
+        """
+        Fetches the historic remote data into a bundle of multiple messages.
+        :param start_time: The beginning of the historic data range. Must be time-zone aware.
+        :param end_time: The end of the historic data range. Must be time-zone aware
+        :param filter_clauses: Any additional filter clauses for the historic data request. Currently unused.
+        :param raw_data: Optional iterator of raw data dicts for testing. If provided, will be used instead of API calls.
+        :return: The function will return a generator that yields one message at a time.
+        """
+        yield from self._fetch_messages(start_time, end_time, raw_data=raw_data)
+
+    def _fetch_messages(self, start_time: datetime.datetime, end_time: datetime.datetime,
+                        raw_data: Optional[Iterator[dict]]) -> Generator[MessageData, None, None]:
+        """
+        Fetches the messages for the given time range
+
+        :param start_time: The start time of the data range
+        :param end_time: The end time of the data range
+        :param raw_data: An optional iterator of raw data for testing purpose. If provided, one dict per batch will be
+            used instead of querying the API.
+        :return: A generator yielding MessageData objects with the historical data
+        """
+
+        start_time = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        if raw_data is None:
+            raw_data = itertools.repeat(None)
+        raw_data_it = iter(raw_data)
+
+        batch_size = datetime.timedelta(days=self._params.batch_size)
+        batch_start = start_time
+        while batch_start < end_time:
+            batch_end = min(batch_start + batch_size, end_time)
+            self._logger.debug(f"Fetching historic data batch from {batch_start.isoformat()} to "
+                               f"{batch_end.isoformat()}")
+
+            # Fetch raw data from API if not provided
+            message = self._fetch_single_batch(batch_start, batch_end, raw_data=next(raw_data_it))
+            yield message
+            batch_start = batch_end
+
+    def _fetch_single_batch(self, start_time: datetime.datetime, end_time: datetime.datetime,
+                            raw_data: Optional[dict]) -> MessageData:
+        """
+        Fetches a single batch of historical data
+
+        :param start_time: The start time of the data range
+        :param end_time: The end time of the data range
+        :param raw_data: An optional raw data dict for testing purpose. If provided, it will be used instead of querying
+            the API.
+        :return: A MessageData object with the historical data
+        """
+
+        # Fetch raw data from API if not provided
+        if raw_data is None:
+            response: requests.Response = self.session.get(
+                self.API_ENDPOINT,
+                params={
+                    "latitude": self._params.latitude,
+                    "longitude": self._params.longitude,
+                    "hourly": ",".join(self._params.variables),
+                    "start_date": start_time.strftime("%Y-%m-%d"),
+                    "end_date": end_time.strftime("%Y-%m-%d"),
+                    "timezone": "GMT",
+                    "models": self._params.model,
+                    "wind_speed_unit": "ms"
+                }
+            )
+            response.raise_for_status()
+            raw_data = response.json()
+
+        # Transform and return message
+        data = self._transform_hourly_data(raw_data, self._params.variables)
+        data.update(self._extract_common_metadata(raw_data))
+
+        self._logger.debug(f"Fetched historic forecast message with {len(data.get('observation_time', []))} timesteps")
+        return Message(
+            payload=data,
+            metadata={}
+        )
 
 ## testing a = OpenMeteoForecast(source_parameters={"latitude": 52.593, "longitude": 4.752,
 ## testing                                          "enable_minutely_15": True, 
