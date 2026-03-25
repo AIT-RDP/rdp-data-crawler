@@ -276,6 +276,122 @@ def test_tawes_station_parsing_full_message(tawes_station_parameters, simplified
 
 
 @pytest.fixture()
+def simplified_climate_v2_response() -> dict:
+    """Returns a simplified Geosphere climate-v2 measurement station response"""
+
+    file = os.path.join(__file__, "../../../data/test/geosphere.at-climate-v2-reduced.json")
+    file = os.path.abspath(file)
+
+    with open(file, "r") as f:
+        data = json.load(f)
+    return data
+
+
+@pytest.fixture()
+def climate_v2_station_parameters() -> dict:
+    """Returns an exemplary configuration of the climate-v2 station source"""
+
+    return {
+        "station id": "105",
+        "endpoint": "climate-v2",
+        "data points": ["tl", "rf", "p", "pred", "dd", "ddx", "ff", "ffam", "ffx",
+                        "cglo", "chim", "so", "rr", "rrm", "sh", "tb10", "tb20", "tb50", "ts"],
+        "initial history": "96h",
+        "timeout": "10s",
+    }
+
+
+def test_climate_v2_station_parsing_default_reduction(climate_v2_station_parameters, simplified_climate_v2_response):
+    """Tests climate-v2 parsing with the default drop-excessive-timestamps reduction"""
+
+    api = zamg.MeasurementStationData(source_parameters=climate_v2_station_parameters, executor_name="<test>")
+    response_data = api.fetch_data(raw_data=simplified_climate_v2_response)
+
+    assert response_data is not None
+
+    # All seven timestamps have non-None values in every field, so none are dropped
+    assert response_data["observation_time"] == [
+        "2026-03-16T10:30:00+00:00",
+        "2026-03-16T10:40:00+00:00",
+        "2026-03-16T10:50:00+00:00",
+        "2026-03-16T11:00:00+00:00",
+        "2026-03-16T11:10:00+00:00",
+        "2026-03-16T11:20:00+00:00",
+        "2026-03-16T11:30:00+00:00",
+    ]
+
+    # GeoJSON coordinates[0] -> longitude, coordinates[1] -> latitude
+    # The fixture stores them as [48.24861, 16.35639]
+    assert response_data["longitude"] == 48.24861
+    assert response_data["latitude"] == 16.35639
+
+    assert response_data["zamg_station_id"] == 105
+
+    # Air parameters
+    assert response_data["air_temperature_2m"] == [7.3, 7.2, 6.9, 6.5, 6.5, 6.8, 7.1]
+    assert response_data["relative_humidity_2m"] == [78, 80, 81, 81, 81, 81, 79]
+    assert response_data["air_pressure"] == [993.3, 993.4, 993.5, 993.3, 993.0, 992.8, 992.6]
+    assert response_data["air_pressure_at_sea_level"] == [1018.0, 1018.1, 1018.2, 1018.1, 1017.8, 1017.5, 1017.3]
+
+    # Wind parameters
+    assert response_data["wind_direction_10m"] == [292, 295, 280, 282, 282, 256, 248]
+    assert response_data["wind_direction_gust_10m"] == [297, 299, 303, 276, 267, 284, 252]
+    assert response_data["wind_speed_10m"] == [3.6, 3.5, 3.6, 3.3, 2.4, 2.1, 2.0]
+    assert response_data["wind_speed_10m_avg"] == [3.7, 3.6, 3.8, 3.5, 2.5, 2.2, 2.2]
+    assert response_data["wind_speed_gust_10m"] == [6.1, 7.5, 6.7, 6.6, 5.6, 4.3, 4.5]
+
+    # Radiation — cglo/chim are 1:1 scaled
+    assert response_data["global_horizontal_irradiation"] == [65, 64, 51, 39, 86, 136, 178]
+    assert response_data["diffuse_irradiation"] == [64, 63, 50, 39, 84, 132, 173]
+
+    # Sunshine fraction: raw [s] * 100 / (60*10) -> [%]; all zeros here
+    assert response_data["sunshine_fraction"] == pytest.approx([0.0] * 7)
+
+    # Precipitation
+    assert response_data["precipitation_total_10min"] == [0, 0, 0.2, 0.2, 0, 0, 0]
+    # precipitation_time_fraction: raw [min] * 0.1 * 100 -> [%]
+    assert response_data["precipitation_time_fraction"] == pytest.approx([100.0, 100.0, 100.0, 100.0, 30.0, 0.0, 0.0])
+
+    # Snow depth: raw [cm] * 10 -> [mm]; all zeros here
+    assert response_data["snow_depth"] == pytest.approx([0.0] * 7)
+
+    # Soil temperatures
+    assert response_data["soil_temperature_10_cm"] == [7.7, 7.7, 7.7, 7.7, 7.7, 7.7, 7.7]
+    assert response_data["soil_temperature_20_cm"] == [8.1, 8.1, 8.1, 8.1, 8.1, 8.1, 8.1]
+    assert response_data["soil_temperature_50_cm"] == [8.5, 8.5, 8.5, 8.4, 8.4, 8.4, 8.4]
+    assert response_data["air_temperature_5cm"] == [6.6, 6.5, 6.3, 5.8, 5.9, 6.5, 7.5]
+
+
+def test_climate_v2_station_parsing_full_message(climate_v2_station_parameters, simplified_climate_v2_response):
+    """Tests climate-v2 parsing with all filtering disabled (no timestamp or observation dropping)"""
+
+    climate_v2_station_parameters["drop excessive time stamps"] = False
+    climate_v2_station_parameters["drop missing observations"] = False
+
+    api = zamg.MeasurementStationData(source_parameters=climate_v2_station_parameters, executor_name="<test>")
+    response_data = api.fetch_data(raw_data=simplified_climate_v2_response)
+
+    assert response_data is not None
+
+    # With filtering disabled all seven timestamps are still present (the fixture has no trailing Nones)
+    assert len(response_data["observation_time"]) == 7
+    assert response_data["observation_time"][0] == "2026-03-16T10:30:00+00:00"
+    assert response_data["observation_time"][-1] == "2026-03-16T11:30:00+00:00"
+
+    # Verify that every mapped field is present in the response
+    expected_keys = [
+        "air_temperature_2m", "relative_humidity_2m", "air_pressure", "air_pressure_at_sea_level",
+        "wind_direction_10m", "wind_direction_gust_10m", "wind_speed_10m", "wind_speed_10m_avg",
+        "wind_speed_gust_10m", "global_horizontal_irradiation", "diffuse_irradiation", "sunshine_fraction",
+        "precipitation_total_10min", "precipitation_time_fraction", "snow_depth",
+        "soil_temperature_10_cm", "soil_temperature_20_cm", "soil_temperature_50_cm", "air_temperature_5cm",
+    ]
+    for key in expected_keys:
+        assert key in response_data, f"Expected key '{key}' missing from response"
+        assert len(response_data[key]) == 7, f"Expected 7 values for '{key}'"
+
+
+@pytest.fixture()
 def nwp_parameters_minimal() -> dict:
     """Returns an exemplary configuration of a minimal NWP configuration"""
 
@@ -487,8 +603,8 @@ def test_ensemble_basic_parsing_and_computations(ensemble_parameters_minimal, si
     assert result["sunshine_fraction"] == pytest.approx([85.5, 54.1, 6.3, 0.0], abs=1e-1)
     assert result["sunshine_fraction_p90"] == pytest.approx([95.3, 84.1, 57.3, 46.6], abs=1e-1)
 
-    assert result["air_temperature_2m_p10"] == [25.0, 25.1,  25.3,  23.7]
-    assert result["air_temperature_2m"] == [25, 25.7, 26,  25.8]
+    assert result["air_temperature_2m_p10"] == [25.0, 25.1, 25.3, 23.7]
+    assert result["air_temperature_2m"] == [25, 25.7, 26, 25.8]
     assert result["air_temperature_2m_p90"] == [26.1, 26.8, 26.6, 26.4]
 
     assert result["cloud_area_fraction_p10"] == [20, 40, 50, 60]
