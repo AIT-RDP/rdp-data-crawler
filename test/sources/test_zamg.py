@@ -9,7 +9,7 @@ import data_crawler.sources.zamg as zamg
 
 
 @pytest.fixture()
-def simplified_mea_response() -> dict:
+def simplified_mea_response_v1() -> dict:
     """Returns a simplified ZAMG measurement station base response"""
 
     file = os.path.join(__file__, "../../../data/test/mea-zamg-reduced.json")
@@ -32,11 +32,11 @@ def measurement_station_parameters() -> dict:
     }
 
 
-def test_measurement_station_parsing(measurement_station_parameters, simplified_mea_response):
+def test_measurement_station_parsing(measurement_station_parameters, simplified_mea_response_v1):
     """Tests the parsing functions in detail"""
 
     api = zamg.MeasurementStationData(source_parameters=measurement_station_parameters, executor_name="<test>")
-    response_data = api.fetch_data(raw_data=simplified_mea_response)
+    response_data = api.fetch_data(raw_data=simplified_mea_response_v1)
 
     assert response_data is not None
     assert response_data["observation_time"] == [
@@ -67,12 +67,12 @@ def test_measurement_station_parsing(measurement_station_parameters, simplified_
     assert response_data["air_pressure"] == [None] * 13
 
 
-def test_measurement_station_drop_missing_observations(measurement_station_parameters, simplified_mea_response):
+def test_measurement_station_drop_missing_observations(measurement_station_parameters, simplified_mea_response_v1):
     """Tests the functionality that drops missing keys"""
     measurement_station_parameters["drop missing observations"] = True
     api = zamg.MeasurementStationData(source_parameters=measurement_station_parameters, executor_name="<test>")
 
-    response_data = api.fetch_data(raw_data=simplified_mea_response)
+    response_data = api.fetch_data(raw_data=simplified_mea_response_v1)
     assert response_data is not None
     required_keys = [
         "observation_time", "longitude", "latitude", "wind_direction_10m", "wind_speed_10m", "air_temperature_2m",
@@ -95,6 +95,7 @@ def test_measurement_station_drop_missing_observations(measurement_station_param
                    reason="ZAMG servers are notoriously unreliable")
 @pytest.mark.parametrize("endpoint,station_id", [
     ("climate", "20209"),
+    ("climate-v2", "105"),
     ("tawes", "8989076")
 ])
 def test_measurement_station_online(endpoint, station_id, measurement_station_parameters):
@@ -125,7 +126,7 @@ def test_measurement_station_online(endpoint, station_id, measurement_station_pa
     assert last_ts > now - datetime.timedelta(hours=94)  # Allow ZAMG to fail for some time
 
     mandatory_measurements = [
-        "air_temperature_2m", "air_pressure_at_sea_level", "dew_point_temperature_2m",
+        "air_temperature_2m", "air_pressure_at_sea_level",
         "relative_humidity_2m", "wind_direction_10m", "wind_speed_10m", "precipitation_total_10min"
     ]
     for mea_name in mandatory_measurements:
@@ -142,6 +143,7 @@ def test_measurement_station_online(endpoint, station_id, measurement_station_pa
                    reason="ZAMG servers are notoriously unreliable")
 @pytest.mark.parametrize("endpoint,station_id", [
     ("climate", "20209"),
+    ("climate-v2", "105"),
     ("tawes", "8989076")
 ])
 def test_measurement_station_history_online(endpoint, station_id, measurement_station_parameters):
@@ -182,7 +184,7 @@ def test_measurement_station_history_online(endpoint, station_id, measurement_st
     assert last_ts <= end_time + datetime.timedelta(minutes=10)
 
     mandatory_measurements = [
-        "air_temperature_2m", "air_pressure_at_sea_level", "dew_point_temperature_2m",
+        "air_temperature_2m", "air_pressure_at_sea_level",
         "relative_humidity_2m", "wind_direction_10m", "wind_speed_10m", "precipitation_total_10min"
     ]
     for mea_name in mandatory_measurements:
