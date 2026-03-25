@@ -32,6 +32,7 @@ class _EndpointConfig:
     type: str  # Geosphere asset type (station, timeseries)
     mode: str  # Geosphere query mode (historical, current, forecast)
     resource_id: str  # The Geosphere resource ID (e.g., nwp-v1-1h-2500m)
+    deprecation_message: Optional[str] = None  # Optional message to be logged in case the endpoint is deprecated
 
 
 class _AbstractGeosphereTimeSeriesAPI(http_cache.GenericHTTPSourceAPI, abc.ABC):
@@ -55,6 +56,10 @@ class _AbstractGeosphereTimeSeriesAPI(http_cache.GenericHTTPSourceAPI, abc.ABC):
         if endpoint_name not in self.endpoint_configs:
             raise KeyError(f"Unsupported endpoint '{endpoint_name}'. Only {list(self.endpoint_configs.keys())} "
                            "are available.")
+
+        deprecation_message = self.endpoint_configs[endpoint_name].deprecation_message
+        if deprecation_message is not None:
+            self._logger.warning(f"The endpoint '{endpoint_name}' is deprecated. {deprecation_message}")
 
         self._local_mapping = self.endpoint_configs[endpoint_name].parameter_mapping
         data_points = list(source_parameters.get("data points", self._local_mapping.keys()))
@@ -255,8 +260,10 @@ class MeasurementStationData(_AbstractGeosphereTimeSeriesAPI, history.AbstractTi
             "TB2": _PRef(name="soil_temperature_20_cm"),  # [degC]
             "TB3": _PRef(name="soil_temperature_50_cm"),  # [degC]
             "TS": _PRef(name="air_temperature_5cm"),  # [degC]
-        }, type="station", mode="historical", resource_id="klima-v1-10min"),
-
+        },
+            type="station", mode="historical", resource_id="klima-v1-10min",
+            deprecation_message="Only hostoric values are recorded. Consider transition to climate-v2"
+        ),
         "tawes": _EndpointConfig(parameter_mapping={
             "TL": _PRef(name="air_temperature_2m"),  # [degC]
             "TP": _PRef(name="dew_point_temperature_2m"),  # [degC]
@@ -280,7 +287,36 @@ class MeasurementStationData(_AbstractGeosphereTimeSeriesAPI, history.AbstractTi
             "TB2": _PRef(name="soil_temperature_20_cm"),  # [degC]
             "TB3": _PRef(name="soil_temperature_50_cm"),  # [degC]
             "TS": _PRef(name="air_temperature_5cm"),  # [degC]
-        }, type="station", mode="historical", resource_id="tawes-v1-10min")
+        }, type="station", mode="historical", resource_id="tawes-v1-10min"),
+
+        "climate-v2": _EndpointConfig(parameter_mapping={
+            "tl": _PRef(name="air_temperature_2m"),  # [degC]
+            "rf": _PRef(name="relative_humidity_2m"),  # [%]
+
+            "p": _PRef(name="air_pressure"),  # [hPa]
+            "pred": _PRef(name="air_pressure_at_sea_level"),  # [hPa]
+
+            "dd": _PRef(name="wind_direction_10m"),  # [deg]
+            "ddx": _PRef(name="wind_direction_gust_10m"),  # [deg]
+            "ff": _PRef(name="wind_speed_10m"),  # [m/s]
+            "ffam": _PRef(name="wind_speed_10m_avg"),  # [m/s]
+            "ffx": _PRef(name="wind_speed_gust_10m"),  # [m/s]
+
+            "cglo": _PRef(name="global_horizontal_irradiation"),  # [W/m^2]
+            "chim": _PRef(name="diffuse_irradiation"),  # [W/m^2]
+            "so": _PRef(name="sunshine_fraction", scaling=100 / (60 * 10)),  # [s->%]
+
+            "rr": _PRef(name="precipitation_total_10min"),  # [mm]
+            "rrm": _PRef(name="precipitation_time_fraction", scaling=0.1 * 100),  # [min->%]
+            "sh": _PRef(name="snow_depth", scaling=10.0),  # [cm] converted to [mm]
+
+            "tb10": _PRef(name="soil_temperature_10_cm"),  # [degC]
+            "tb20": _PRef(name="soil_temperature_20_cm"),  # [degC]
+            "tb50": _PRef(name="soil_temperature_50_cm"),  # [degC]
+            "ts": _PRef(name="air_temperature_5cm"),  # [degC]
+        },
+            type="station", mode="historical", resource_id="klima-v2-10min",
+        ),
     }
 
     def __init__(self, source_parameters, executor_name, **kwargs):
@@ -419,9 +455,11 @@ class NumericalWeatherPredictionData(_AbstractGeosphereTimeSeriesAPI):
             "snowlmt_p10": _PRef("snowlimit_p10"),  # [m above ground]
             "snowlmt_p50": _PRef("snowlimit"),  # [m above ground]
             "snowlmt_p90": _PRef("snowlimit_p90"),  # [m above ground]
-            "sundur_p10": _PRef("sunshine_fraction_p10", scaling=1/3600*100),  # [s] sunshine duration in he interval
-            "sundur_p50": _PRef("sunshine_fraction", scaling=1/3600*100),  # [s] sunshine duration in the interval
-            "sundur_p90": _PRef("sunshine_fraction_p90", scaling=1/3600*100),  # [s] sunshine duration in the interval
+            "sundur_p10": _PRef("sunshine_fraction_p10", scaling=1 / 3600 * 100),
+            # [s] sunshine duration in he interval
+            "sundur_p50": _PRef("sunshine_fraction", scaling=1 / 3600 * 100),  # [s] sunshine duration in the interval
+            "sundur_p90": _PRef("sunshine_fraction_p90", scaling=1 / 3600 * 100),
+            # [s] sunshine duration in the interval
             "t2m_p10": _PRef("air_temperature_2m_p10"),  # [degC]
             "t2m_p50": _PRef("air_temperature_2m"),  # [degC]
             "t2m_p90": _PRef("air_temperature_2m_p90"),  # [degC]

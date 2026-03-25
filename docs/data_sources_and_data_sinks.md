@@ -68,7 +68,8 @@ sources and station IDs.
 * `station id`: The station ID to be queried. Note that the station is different for the TAWES and climate endpoints.
 * `initial history`: The past duration to fetch data from. After the initial query, only new samples will be returned. 
   Defaults to 48h.
-* `endpoint`: The name of the endpoint to be used. Either `TAWES` or `climate`. The default is `climate`.
+* `endpoint`: The name of the endpoint to be used. Either `TAWES`, `climate-v2`, or `climate` (deprecated). The 
+  default is `climate`, but this will be elevated to `climate-v2` in future releases.
 * `data points`: A list of data points to be fetched. The data point nomenclature corresponds to the Geosphere naming  
   and not the AIR RDP names. Please consider the Geosphere documentation for further details. Per default, all supported
   data points will be added.

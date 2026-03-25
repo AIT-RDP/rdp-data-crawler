@@ -41,7 +41,8 @@ wind_direction_10m_min;째;Float;no;Minimum direction the wind is coming from (0�
 wind_direction_10m_max;째;Float;no;Maximum direction the wind is coming from (0째 is north, 90째 east, etc.) at 10m above ground over the last measurement period
 wind_direction_10m_std;째;Float;no;Standard deviation of the measured wind direction within the last measurement period
 wind_direction_gust_10m;째;Float;no;Direction the wind gusts are coming from (0째 is north, 90째 east, etc.) at 10m above ground
-wind_speed_10m;m/s;Float;no;Wind speed at 10m above the ground
+wind_speed_10m;m/s;Float;no;Wind speed at 10m above the ground. If both vectorial and arithmetic mean are available, take the vectorial mean here.
+wind_speed_10m_avg;m/s;Float;no;Wind speed at 10m above the ground. Arithmetic mean values.
 wind_speed_10m_std;m/s;Float;no;Standard deviation of the wind speed above 10m on the ground
 wind_speed_gust_10m;m/s;Float;no;Wind speed of gusts at 10m above the ground
 precipitation_total_6h;mm;Float;no;Total precipitation amount for a 6h period. Covers solid and liquid precipitation. For solid one, the liquid equivalent at ~0째C is used.

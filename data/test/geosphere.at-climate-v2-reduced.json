@@ -1,0 +1,278 @@
+{
+  "media_type": "application/json",
+  "type": "FeatureCollection",
+  "version": "v1",
+  "timestamps": [
+    "2026-03-16T10:30+00:00",
+    "2026-03-16T10:40+00:00",
+    "2026-03-16T10:50+00:00",
+    "2026-03-16T11:00+00:00",
+    "2026-03-16T11:10+00:00",
+    "2026-03-16T11:20+00:00",
+    "2026-03-16T11:30+00:00"
+  ],
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          48.24861,
+          16.35639
+        ]
+      },
+      "properties": {
+        "parameters": {
+          "cglo": {
+            "name": "Globalstrahlung Mittelwert",
+            "unit": "W/m²",
+            "data": [
+              65,
+              64,
+              51,
+              39,
+              86,
+              136,
+              178
+            ]
+          },
+          "chim": {
+            "name": "Himmelsstrahlung Mittelwert",
+            "unit": "W/m²",
+            "data": [
+              64,
+              63,
+              50,
+              39,
+              84,
+              132,
+              173
+            ]
+          },
+          "dd": {
+            "name": "Windrichtung",
+            "unit": "°",
+            "data": [
+              292,
+              295,
+              280,
+              282,
+              282,
+              256,
+              248
+            ]
+          },
+          "ddx": {
+            "name": "Windrichtung zur Spitzenböe",
+            "unit": "°",
+            "data": [
+              297,
+              299,
+              303,
+              276,
+              267,
+              284,
+              252
+            ]
+          },
+          "ff": {
+            "name": "Windgeschwindigkeit 10m, vektorieller Mittelwert",
+            "unit": "m/s",
+            "data": [
+              3.6,
+              3.5,
+              3.6,
+              3.3,
+              2.4,
+              2.1,
+              2
+            ]
+          },
+          "ffam": {
+            "name": "Windgeschwindigkeit 10m, arithmetischer Mittelwert",
+            "unit": "m/s",
+            "data": [
+              3.7,
+              3.6,
+              3.8,
+              3.5,
+              2.5,
+              2.2,
+              2.2
+            ]
+          },
+          "ffx": {
+            "name": "Maximale Windgeschwindigkeit (Spitzenböe)",
+            "unit": "m/s",
+            "data": [
+              6.1,
+              7.5,
+              6.7,
+              6.6,
+              5.6,
+              4.3,
+              4.5
+            ]
+          },
+          "p": {
+            "name": "Luftdruck",
+            "unit": "hPa",
+            "data": [
+              993.3,
+              993.4,
+              993.5,
+              993.3,
+              993,
+              992.8,
+              992.6
+            ]
+          },
+          "pred": {
+            "name": "Reduzierter Luftdruck",
+            "unit": "hPa",
+            "data": [
+              1018,
+              1018.1,
+              1018.2,
+              1018.1,
+              1017.8,
+              1017.5,
+              1017.3
+            ]
+          },
+          "rf": {
+            "name": "Relative Feuchte",
+            "unit": "%",
+            "data": [
+              78,
+              80,
+              81,
+              81,
+              81,
+              81,
+              79
+            ]
+          },
+          "rr": {
+            "name": "Niederschlagssumme",
+            "unit": "mm",
+            "data": [
+              0,
+              0,
+              0.2,
+              0.2,
+              0,
+              0,
+              0
+            ]
+          },
+          "rrm": {
+            "name": "Niederschlagsdauer",
+            "unit": "min",
+            "data": [
+              10,
+              10,
+              10,
+              10,
+              3,
+              0,
+              0
+            ]
+          },
+          "sh": {
+            "name": "Gesamtschneehöhe, Schneepegelmessung",
+            "unit": "cm",
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "so": {
+            "name": "Sonnenscheindauer",
+            "unit": "s",
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "tb10": {
+            "name": "Erdbodentemperatur -10cm",
+            "unit": "°C",
+            "data": [
+              7.7,
+              7.7,
+              7.7,
+              7.7,
+              7.7,
+              7.7,
+              7.7
+            ]
+          },
+          "tb20": {
+            "name": "Erdbodentemperatur -20cm",
+            "unit": "°C",
+            "data": [
+              8.1,
+              8.1,
+              8.1,
+              8.1,
+              8.1,
+              8.1,
+              8.1
+            ]
+          },
+          "tb50": {
+            "name": "Erdbodentemperatur -50cm",
+            "unit": "°C",
+            "data": [
+              8.5,
+              8.5,
+              8.5,
+              8.4,
+              8.4,
+              8.4,
+              8.4
+            ]
+          },
+          "tl": {
+            "name": "Lufttemperatur 2m",
+            "unit": "°C",
+            "data": [
+              7.3,
+              7.2,
+              6.9,
+              6.5,
+              6.5,
+              6.8,
+              7.1
+            ]
+          },
+          "ts": {
+            "name": "Lufttemperatur 5cm",
+            "unit": "°C",
+            "data": [
+              6.6,
+              6.5,
+              6.3,
+              5.8,
+              5.9,
+              6.5,
+              7.5
+            ]
+          }
+        },
+        "station": 105
+      }
+    }
+  ]
+}
