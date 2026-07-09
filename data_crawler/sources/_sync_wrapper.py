@@ -7,6 +7,7 @@ import logging
 import math
 import random
 import threading
+import time
 import traceback
 from typing import Generator, Iterable, Dict, Any
 
@@ -189,6 +190,9 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
 
         while True:
             timeout = self._timer.get_remaining_seconds()
+            # Anchor the wall-clock deadline onto the monotonic clock used by Event.wait() so that a sub-millisecond
+            # skew between the two clocks cannot be misread as an early wakeup in the sanity check below.
+            deadline_timer = time.monotonic() + timeout
             if timeout > 0:
                 term_flag = self._termination_event.wait(timeout=timeout)
             else:
@@ -198,7 +202,7 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
                 self._logger.debug("Shut down the API crawler")
                 break
 
-            self._log_start_of_cycle()
+            self._log_start_of_cycle(deadline_timer)
             try:
                 result = self._fetch_once()
                 yield from result
@@ -206,11 +210,11 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
                 self._timer.operation_done()
             self._log_end_of_cycle(result is not None)
 
-    def _log_start_of_cycle(self):
+    def _log_start_of_cycle(self, deadline_timer: float):
         """Logs the start of the cycle and performs some basic sanity checks"""
 
         ts_now = datetime.datetime.now(tz=datetime.timezone.utc)
-        timeout = self._timer.get_remaining_seconds()
+        timeout = deadline_timer - time.monotonic()
         if timeout > 0.0:
             self._logger.error(f"The timer didn't awaited its timeout. {timeout} seconds left.")
             assert False, "The event didn't awaited its timeout."
