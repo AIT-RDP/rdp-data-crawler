@@ -204,14 +204,14 @@ class _QueryExecutorBase(abc.ABC):
                 meta_data.initial = self._initial
 
                 if self._data_sink.include_metadata:
-                    message.payload.update(meta_data.dict())
+                    message.payload.update(meta_data.model_dump())
 
                 self._dry_run or self._data_sink.insert_data(message.payload, meta_data)
             else:
                 meta_data = meta_class(initial=self._initial)
 
                 if self._data_sink.include_metadata:
-                    message.update(meta_data.dict())
+                    message.update(meta_data.model_dump())
 
                 self._dry_run or self._data_sink.insert_data(message, meta_data)
 
