@@ -100,14 +100,18 @@ class _ExecutionTimer:
     def operation_done(self):
         """Indicates that the operation was just completed and that the time can advance to the next step."""
 
-        self._next_tick_nominal += self._timer_interval
+        # How late we finished relative to the tick just executed. Positive means overdue.
+        # Note: get_remaining_seconds returns negative value if the tick is due.
+        overdue = -self.get_remaining_seconds()
+        num_skip = 0
+        if overdue > self._timer_interval + 2 * self._jitter:
+            # Drop whole missed intervals.
+            num_skip = math.floor(overdue / self._timer_interval)
+
+        self._next_tick_nominal += self._timer_interval * (1 + num_skip)
         self._next_tick_actual = self._next_tick_nominal + self._rnd.uniform(-self._jitter, self._jitter)
 
-        remaining = self.get_remaining_seconds()
-        if remaining > self._timer_interval + 2 * self._jitter:  # Skip some queries
-            num_skip = math.floor(remaining / self._timer_interval)
-            self._next_tick_actual += self._timer_interval * num_skip
-            self._next_tick_nominal += self._timer_interval * num_skip
+        if num_skip:
             self._logger.warning(f"Skipped {num_skip} queries since the previous queries were too much delayed.")
 
     @property
