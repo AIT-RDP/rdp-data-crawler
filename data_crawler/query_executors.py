@@ -67,7 +67,7 @@ class _QueryExecutorBase(abc.ABC):
         if self._dry_run:
             self._logger.info(f"DRY RUN is ON. Channel {name} will execute queries but does not forward anything.")
 
-        self._initial = True # Flag to indicate if the initial execution of the sink has already been performed
+        self._initial = True # Flag to indicate if the initial push to the sink is still outstanding
 
     @staticmethod
     def _resolve_save_boolean(value: bool | int | str) -> bool:
@@ -215,7 +215,7 @@ class _QueryExecutorBase(abc.ABC):
 
                 self._dry_run or self._data_sink.insert_data(message, meta_data)
 
-        self._initial = False # After the first execution, the initial flag is set to False
+        self._initial = False # After the first push to the sink, this flag is set to False
 
 class ThreadQueryExecutor(_QueryExecutorBase):
     """
