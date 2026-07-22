@@ -43,6 +43,7 @@ class RedisStream(abstract_sink.AbstractSinkAPI):
         self._client = redis.Redis(connection_pool=redis_pool)
         self._config = redis_config
         self._stream_template = string.Template(redis_config.stream) if redis_config.stream is not None else None
+        self._include_metadata = redis_config.include_metadata
 
     @classmethod
     def create(cls, sink_parameters: RedisStreamParameters, **kwargs) -> abstract_sink.AbstractSinkAPI:
@@ -106,3 +107,10 @@ class RedisStream(abstract_sink.AbstractSinkAPI):
     @staticmethod
     def metadata_model() -> type[abstract_sink.SinkMetadata]:
         return RedisStreamMetadata
+
+    @property
+    def include_metadata(self) -> bool:
+        """
+        Whether to include metadata in the data.
+        """
+        return self._include_metadata

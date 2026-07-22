@@ -17,12 +17,20 @@ class SinkParameters(pydantic.BaseModel):
     """
     Base class for the sink parameter model
     """
+    include_metadata: bool = pydantic.Field(
+        description="Whether to include metadata in the data.",
+        default=False,
+    )
 
 
 class SinkMetadata(pydantic.BaseModel):
     """
     Base class for metadata expected by the sink
     """
+    initial: bool = pydantic.Field(
+        description="Whether this is the initial execution of the sink.",
+        default=False,
+    )
 
 
 class AbstractSinkAPI(abc.ABC):
@@ -87,3 +95,11 @@ class AbstractSinkAPI(abc.ABC):
         """
 
         return SinkMetadata
+
+    @property
+    @abc.abstractmethod
+    def include_metadata(self) -> bool:
+        """
+        Whether to include metadata in the data.
+        """
+        raise NotImplementedError

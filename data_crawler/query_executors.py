@@ -67,6 +67,8 @@ class _QueryExecutorBase(abc.ABC):
         if self._dry_run:
             self._logger.info(f"DRY RUN is ON. Channel {name} will execute queries but does not forward anything.")
 
+        self._initial = True # Flag to indicate if the initial execution of the sink has already been performed
+
     @staticmethod
     def _resolve_save_boolean(value: bool | int | str) -> bool:
         """Resolves the boolean configuration raising an Exception if it cannot be interpreted"""
@@ -199,10 +201,21 @@ class _QueryExecutorBase(abc.ABC):
         for message in messages:
             if isinstance(message, msg.Message):
                 meta_data = meta_class.model_validate(message.metadata, strict=True)
+                meta_data.initial = self._initial
+
+                if self._data_sink.include_metadata:
+                    message.payload.update(meta_data.dict())
+
                 self._dry_run or self._data_sink.insert_data(message.payload, meta_data)
             else:
-                self._dry_run or self._data_sink.insert_data(message, meta_class())
+                meta_data = meta_class(initial=self._initial)
 
+                if self._data_sink.include_metadata:
+                    message.update(meta_data.dict())
+
+                self._dry_run or self._data_sink.insert_data(message, meta_data)
+
+        self._initial = False # After the first execution, the initial flag is set to False
 
 class ThreadQueryExecutor(_QueryExecutorBase):
     """

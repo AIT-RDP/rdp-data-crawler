@@ -32,6 +32,8 @@ class OPCUA(abstract_sink.AbstractSinkAPI):
 
         self._client.connect()
 
+        self._include_metadata = opcua_config.include_metadata
+
     def __del__(self):
         self._client.disconnect()
 
@@ -80,3 +82,10 @@ class OPCUA(abstract_sink.AbstractSinkAPI):
     @staticmethod
     def metadata_model() -> type[OPCUAMetadata]:
         return OPCUAMetadata
+
+    @property
+    def include_metadata(self) -> bool:
+        """
+        Whether to include metadata in the data.
+        """
+        return self._include_metadata

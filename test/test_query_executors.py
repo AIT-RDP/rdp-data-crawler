@@ -573,3 +573,74 @@ def test_execute_one_shot_batches_override(mockup_executors_config, redis_pool):
     assert api.config["LetTheHammer"] == "Fall"
     assert api.config["some_list"] == [1, 4, 16]
     assert api.config["keep"] == "it"
+
+
+@pytest.mark.parametrize("include_metadata", [False, True])
+@pytest.mark.parametrize("message_metadata", [None, {}], ids=["dict-payload", "message-payload"])
+def test_thread_executor_include_metadata_redis_shorthand(
+        include_metadata, message_metadata, mockup_service_config, redis_pool, redis_stream_name
+):
+    """Tests merging sink metadata into the payload when include_metadata is enabled (redis shorthand)"""
+
+    mockup_service_config["redis"]["stream"] = redis_stream_name
+    mockup_service_config["redis"]["include_metadata"] = include_metadata
+
+    api = mockup.PassiveMockupSourceAPI(
+        source_parameters={}, metadata=message_metadata
+    )
+
+    executor = query_executors.ThreadQueryExecutor(
+        mockup_service_config, redis_pool, source_api=api
+    )
+
+    redis_client = redis.Redis(connection_pool=redis_pool)
+
+    executor.start()
+    time.sleep(0.51)
+    executor.shutdown()
+    executor.join()
+
+    messages = redis_client.xrange(redis_stream_name)
+    assert messages is not None
+    assert 2 <= len(messages) <= 3
+    assert len(messages) == api.fetch_invocations
+
+    if include_metadata:
+        assert messages[0][-1]["initial"] == "true"
+        assert messages[1][-1]["initial"] == "false"
+    else:
+        assert "initial" not in messages[0][-1]
+        assert "initial" not in messages[1][-1]
+
+
+def test_thread_executor_include_metadata_sink_parameters(
+        mockup_service_config_dynamic, redis_pool, redis_stream_name
+):
+    """Tests include_metadata via dynamic sink_parameters and Message metadata for the stream name"""
+
+    mockup_service_config_dynamic["sink_parameters"]["include_metadata"] = True
+
+    api = mockup.PassiveMockupSourceAPI(
+        source_parameters={}, metadata=dict(stream=redis_stream_name)
+    )
+
+    executor = query_executors.ThreadQueryExecutor(
+        mockup_service_config_dynamic, redis_pool, source_api=api
+    )
+
+    redis_client = redis.Redis(connection_pool=redis_pool)
+
+    executor.start()
+    time.sleep(0.51)
+    executor.shutdown()
+    executor.join()
+
+    messages = redis_client.xrange(redis_stream_name)
+    assert messages is not None
+    assert 2 <= len(messages) <= 3
+    assert len(messages) == api.fetch_invocations
+
+    assert messages[0][-1]["initial"] == "true"
+    assert messages[0][-1]["stream"] == f'"{redis_stream_name}"'
+    assert messages[1][-1]["initial"] == "false"
+    assert messages[1][-1]["stream"] == f'"{redis_stream_name}"'
