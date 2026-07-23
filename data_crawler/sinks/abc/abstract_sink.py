@@ -23,6 +23,15 @@ class SinkMetadata(pydantic.BaseModel):
     """
     Base class for metadata expected by the sink
     """
+    force_initial: bool = pydantic.Field(
+        description="Whether the source was triggered immediately after startup.",
+        default=False,
+    )
+
+    initial: bool = pydantic.Field(
+        description="Whether this is the initial execution of the sink.",
+        default=False,
+    )
 
 
 class AbstractSinkAPI(abc.ABC):

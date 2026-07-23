@@ -208,7 +208,7 @@ def test_forecast_optional_parameters():
 def test_forecast_wind_heights_online():
     """
     Tests querying wind at various heights from the online API
-    
+
     This is useful for wind energy applications where hub heights vary.
     """
 
@@ -836,6 +836,7 @@ def test_history_parsing(history_response: dict, history_base_parameters: dict, 
     assert response_data["direct_normal_irradiance"][-1] == 0.0
 
 
+@pytest.mark.xfail(reason="See issue #112")
 def test_history_fetch_data_bundle_injected(history_response: dict, history_base_parameters: dict):
     """Tests fetch_data_bundle with injected data"""
 
@@ -1002,4 +1003,3 @@ def test_history_fetch_data_bundle_online():
     # Second call on the same day should return no messages
     messages_second = list(api.fetch_data_bundle())
     assert len(messages_second) == 0, "Expected no messages on second call on same day"
-

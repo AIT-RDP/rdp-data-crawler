@@ -60,15 +60,25 @@ data sources:
     
     sink_type: <sink_type>  # Type of the sink
     sink_parameters: {}  # Sink-specific parameters are defined here
+    # Optionally attach sink metadata to each payload under the `_metadata` key.
+    metadata:
+      output: false  # When true, sink metadata (e.g. initial, force_initial) is nested under `_metadata`
 
   source.name.1: # Another source
     # ...
 ```
 
-Each section has at lest a source and some sink configuration. Both sources and sinks are dynamically loaded by the 
-respective type. Source- and sink-specific parameters can be passed on in the `source parameter` and `sink_parameters` 
-sections, respectively. In case a Redis sink is used, the configuration can be simplified by omitting the `sink_type` 
-and `sink_parameters` sections and appending a `redis` section, instead:
+Each section has at lest a source and some sink configuration. Both sources and sinks are dynamically loaded by the
+respective type. Source- and sink-specific parameters can be passed on in the `source parameter` and `sink_parameters`
+sections, respectively.
+
+In addition, the optional channel-level `metadata` section controls whether sink metadata is included in the payload.
+When `metadata.output` is `true` (default: `false`), validated sink metadata is nested under the `_metadata` key of
+each payload. The executor also adds the fields `initial` (true only for the first push of a channel) and `force_initial` 
+(taken from `polling.force_initial`, default `false`) to the payload's `_metadata` node.
+
+In case a Redis sink is used, the configuration can be simplified by omitting the `sink_type` and `sink_parameters`
+sections and appending a `redis` section, instead:
 
 ```yaml
 version: 1
