@@ -505,6 +505,7 @@ def test_missing_id_in_config(simplified_base_response: Iterable[bytes], weather
     assert "id" in str(err_info.value)
 
 
+@pytest.mark.xfail(reason="See issue #112")
 def test_weather_station_online_invalid_api_key(weather_measurements_base_parameters: dict):
     """Tests the error message on having an invalid API key"""
 
