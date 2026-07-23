@@ -35,8 +35,6 @@ class ModbusTCP(abstract_sink.AbstractSinkAPI):
         if not modbus_config.transactional_connection:
             self._device.connect()
 
-        self._include_metadata = modbus_config.include_metadata
-
     def __del__(self):
         # Disconnect anyway
         self._device.disconnect()
@@ -82,10 +80,3 @@ class ModbusTCP(abstract_sink.AbstractSinkAPI):
     @staticmethod
     def metadata_model() -> type[ModbusMetadata]:
         return ModbusMetadata
-
-    @property
-    def include_metadata(self) -> bool:
-        """
-        Whether to include metadata in the data.
-        """
-        return self._include_metadata

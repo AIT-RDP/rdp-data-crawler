@@ -94,7 +94,6 @@ class Websocket(abstract_sink.AbstractSinkAPI):
         self.headers = [f"{k}: {v}" for k, v in websocket_config.headers.items()] if websocket_config.headers else []
         self.ws: Optional[websocket.WebSocket] = None
         self.data_format = websocket_config.data_format
-        self._include_metadata = websocket_config.include_metadata
         self._connect()
 
     def _connect(self) -> None:
@@ -188,10 +187,3 @@ class Websocket(abstract_sink.AbstractSinkAPI):
     @staticmethod
     def metadata_model() -> type[abstract_sink.SinkMetadata]:
         return WebsocketMetadata
-
-    @property
-    def include_metadata(self) -> bool:
-        """
-        Whether to include metadata in the data.
-        """
-        return self._include_metadata

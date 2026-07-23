@@ -4,6 +4,7 @@ Test the query executor services
 import asyncio
 import copy
 import datetime
+import json
 import logging
 import time
 from typing import Dict, Any, Optional
@@ -575,15 +576,15 @@ def test_execute_one_shot_batches_override(mockup_executors_config, redis_pool):
     assert api.config["keep"] == "it"
 
 
-@pytest.mark.parametrize("include_metadata", [False, True])
+@pytest.mark.parametrize("metadata_output", [False, True])
 @pytest.mark.parametrize("message_metadata", [None, {}], ids=["dict-payload", "message-payload"])
-def test_thread_executor_include_metadata_redis_shorthand(
-        include_metadata, message_metadata, mockup_service_config, redis_pool, redis_stream_name
+def test_thread_executor_metadata_output(
+        metadata_output, message_metadata, mockup_service_config, redis_pool, redis_stream_name
 ):
-    """Tests merging sink metadata into the payload when include_metadata is enabled (redis shorthand)"""
+    """Tests nesting sink metadata under _metadata when metadata.output is enabled"""
 
     mockup_service_config["redis"]["stream"] = redis_stream_name
-    mockup_service_config["redis"]["include_metadata"] = include_metadata
+    mockup_service_config["metadata"] = {"output": metadata_output}
 
     api = mockup.PassiveMockupSourceAPI(
         source_parameters={}, metadata=message_metadata
@@ -605,20 +606,56 @@ def test_thread_executor_include_metadata_redis_shorthand(
     assert 2 <= len(messages) <= 3
     assert len(messages) == api.fetch_invocations
 
-    if include_metadata:
-        assert messages[0][-1]["initial"] == "true"
-        assert messages[1][-1]["initial"] == "false"
+    if metadata_output:
+        first_meta = json.loads(messages[0][-1]["_metadata"])
+        second_meta = json.loads(messages[1][-1]["_metadata"])
+        assert first_meta["initial"] is True
+        assert first_meta["force_initial"] is False
+        assert second_meta["initial"] is False
+        assert second_meta["force_initial"] is False
     else:
-        assert "initial" not in messages[0][-1]
-        assert "initial" not in messages[1][-1]
+        assert "_metadata" not in messages[0][-1]
+        assert "_metadata" not in messages[1][-1]
 
 
-def test_thread_executor_include_metadata_sink_parameters(
+def test_thread_executor_metadata_output_force_initial(
+        mockup_service_config, redis_pool, redis_stream_name
+):
+    """Tests that polling.force_initial is reflected in outputted metadata"""
+
+    mockup_service_config["redis"]["stream"] = redis_stream_name
+    mockup_service_config["metadata"] = {"output": True}
+    mockup_service_config["polling"]["force_initial"] = True
+
+    api = mockup.PassiveMockupSourceAPI(source_parameters={})
+    executor = query_executors.ThreadQueryExecutor(
+        mockup_service_config, redis_pool, source_api=api
+    )
+
+    redis_client = redis.Redis(connection_pool=redis_pool)
+
+    executor.start()
+    time.sleep(0.51)
+    executor.shutdown()
+    executor.join()
+
+    messages = redis_client.xrange(redis_stream_name)
+    assert messages is not None
+    assert 2 <= len(messages) <= 3
+
+    first_meta = json.loads(messages[0][-1]["_metadata"])
+    second_meta = json.loads(messages[1][-1]["_metadata"])
+    assert first_meta["initial"] is True
+    assert first_meta["force_initial"] is True
+    assert second_meta["initial"] is False
+    assert second_meta["force_initial"] is True
+
+def test_thread_executor_metadata_output_with_message_stream(
         mockup_service_config_dynamic, redis_pool, redis_stream_name
 ):
-    """Tests include_metadata via dynamic sink_parameters and Message metadata for the stream name"""
+    """Tests metadata.output with Message metadata providing the Redis stream name"""
 
-    mockup_service_config_dynamic["sink_parameters"]["include_metadata"] = True
+    mockup_service_config_dynamic["metadata"] = {"output": True}
 
     api = mockup.PassiveMockupSourceAPI(
         source_parameters={}, metadata=dict(stream=redis_stream_name)
@@ -640,7 +677,9 @@ def test_thread_executor_include_metadata_sink_parameters(
     assert 2 <= len(messages) <= 3
     assert len(messages) == api.fetch_invocations
 
-    assert messages[0][-1]["initial"] == "true"
-    assert messages[0][-1]["stream"] == f'"{redis_stream_name}"'
-    assert messages[1][-1]["initial"] == "false"
-    assert messages[1][-1]["stream"] == f'"{redis_stream_name}"'
+    first_meta = json.loads(messages[0][-1]["_metadata"])
+    second_meta = json.loads(messages[1][-1]["_metadata"])
+    assert first_meta["initial"] is True
+    assert first_meta["stream"] == redis_stream_name
+    assert second_meta["initial"] is False
+    assert second_meta["stream"] == redis_stream_name

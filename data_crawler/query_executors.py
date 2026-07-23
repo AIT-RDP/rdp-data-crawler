@@ -201,21 +201,44 @@ class _QueryExecutorBase(abc.ABC):
         for message in messages:
             if isinstance(message, msg.Message):
                 meta_data = meta_class.model_validate(message.metadata, strict=True)
-                meta_data.initial = self._initial
+                self._update_metadata(meta_data)
 
-                if self._data_sink.include_metadata:
-                    message.payload.update(meta_data.model_dump())
+                if self._metadata_config.get("output", False):
+                    message.payload["_metadata"] = meta_data.model_dump()
 
                 self._dry_run or self._data_sink.insert_data(message.payload, meta_data)
             else:
-                meta_data = meta_class(initial=self._initial)
+                meta_data = meta_class()
+                self._update_metadata(meta_data)
 
-                if self._data_sink.include_metadata:
-                    message.update(meta_data.model_dump())
+                if self._metadata_config.get("output", False):
+                    message["_metadata"] = meta_data.model_dump()
 
                 self._dry_run or self._data_sink.insert_data(message, meta_data)
 
         self._initial = False # After the first push to the sink, this flag is set to False
+
+    def _update_metadata(self, meta_data: abstract_sink.SinkMetadata) -> None:
+        """
+        Updates the metadata with the current configuration
+        """
+        meta_data.force_initial = self._timer_config.get("force_initial", False)
+        meta_data.initial = self._initial
+
+    @property
+    def _metadata_config(self) -> dict:
+        """
+        Returns the metadata configuration for the sink
+        """
+        return self._config.get("metadata", {})
+
+    @property
+    def _timer_config(self) -> dict:
+        """
+        Returns the timer configuration for the sink
+        """
+        return self._config.get("polling", {})
+
 
 class ThreadQueryExecutor(_QueryExecutorBase):
     """

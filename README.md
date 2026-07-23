@@ -59,9 +59,10 @@ data sources:
       frequency: 5min
     
     sink_type: <sink_type>  # Type of the sink
-    sink_parameters:
-      include_metadata: false  # Common to all sinks: merge message metadata into the payload
-      # ... sink-specific parameters
+    sink_parameters: {}  # Sink-specific parameters are defined here
+    # Optionally attach sink metadata to each payload under the `_metadata` key.
+    metadata:
+      output: false  # When true, sink metadata (e.g. initial, force_initial) is nested under `_metadata`
 
   source.name.1: # Another source
     # ...
@@ -71,10 +72,10 @@ Each section has at lest a source and some sink configuration. Both sources and 
 respective type. Source- and sink-specific parameters can be passed on in the `source parameter` and `sink_parameters`
 sections, respectively.
 
-In addition, `include_metadata` is a common option for all sink types (Redis, Modbus, MQTT, OPC UA, WebSocket, etc.).
-It can be set in any `sink_parameters` section or under the legacy `redis` shorthand below. When set to `true`, source
-message metadata is merged into the payload sent to the sink (default: `false`). This is useful when the sink or a
-downstream consumer needs that metadata as part of the data itself.
+In addition, the optional channel-level `metadata` section controls whether sink metadata is included in the payload.
+When `metadata.output` is `true` (default: `false`), validated sink metadata is nested under the `_metadata` key of
+each payload. The executor also adds the fields `initial` (true only for the first push of a channel) and `force_initial` 
+(taken from `polling.force_initial`, default `false`) to the payload's `_metadata` node.
 
 In case a Redis sink is used, the configuration can be simplified by omitting the `sink_type` and `sink_parameters`
 sections and appending a `redis` section, instead:

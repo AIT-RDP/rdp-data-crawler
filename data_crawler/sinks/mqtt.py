@@ -23,15 +23,14 @@ class MqttSinkMetadata(SinkMetadata):
 class MqttSink(AbstractSinkAPI):
     """
     MQTT sink implementation.
-
+    
     Publishes data to an MQTT broker using the rdp_mqtt client.
     """
 
-    def __init__(self, mqtt_client: MqttClient, default_topic: str, include_metadata: bool):
+    def __init__(self, mqtt_client: MqttClient, default_topic: str):
         self.mqtt_client = mqtt_client
         self.default_topic = default_topic
         self.logger = logging.getLogger(__name__)
-        self._include_metadata = include_metadata
 
     @classmethod
     def create(cls, sink_parameters: MqttSinkParameters, **kwargs) -> "MqttSink":
@@ -50,7 +49,7 @@ class MqttSink(AbstractSinkAPI):
 
         # Don't try to setup here - let it be done lazily in _async_insert
 
-        return cls(client, sink_parameters.topic, sink_parameters.include_metadata)
+        return cls(client, sink_parameters.topic)
 
     def insert_data(self, data: Dict[str, Any], metadata: MqttSinkMetadata) -> Task[None] | None:
         """Insert data into the MQTT sink"""
@@ -88,10 +87,3 @@ class MqttSink(AbstractSinkAPI):
     def metadata_model() -> type[MqttSinkMetadata]:
         """Return the metadata model for this sink"""
         return MqttSinkMetadata
-
-    @property
-    def include_metadata(self) -> bool:
-        """
-        Whether to include metadata in the data.
-        """
-        return self._include_metadata
