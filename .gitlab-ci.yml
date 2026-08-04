@@ -3,11 +3,19 @@ stages:
   - test
   - release
 
+variables:
+  # Keep in sync with the UV_VERSION build argument of docker/Dockerfile
+  UV_VERSION: "0.12.1"
+  # Version of the tool that derives the package version from the git history
+  DUNAMAI_VERSION: "1.17.0"
+
 include:
   - component: "$CI_SERVER_FQDN/ees/rdp/generic-components/rdp-cicd-components/kaniko@main"
     inputs:
       stage-test-image: test
-      build-args: --build-arg MODBUS_GIT_USER --build-arg MODBUS_GIT_PASSWORD --build-arg TOKEN_PYRDP_COMMONS
+      # No build arguments are needed anymore. All dependencies of the image are publicly available, hence the
+      # MODBUS_GIT_USER, MODBUS_GIT_PASSWORD and TOKEN_PYRDP_COMMONS credentials became obsolete.
+      build-args: ""
 
 # =============================================================================
 # Perform the unit test
@@ -44,16 +52,22 @@ test_python_3_10:
     DATA_CRAWLER_INFLUX_ORG: "ait"
     DATA_CRAWLER_INFLUX_USER: ${DATA_CRAWLER_INFLUX_USER}
     DATA_CRAWLER_INFLUX_PASSWORD: ${DATA_CRAWLER_INFLUX_PASSWORD}
+    UV_CACHE_DIR: "${CI_PROJECT_DIR}/.uv-cache"
+    UV_NO_PROGRESS: "1"
+  cache:  # Reuse the downloaded wheels across pipeline runs
+    key:
+      files:
+        - uv.lock
+    paths:
+      - .uv-cache
   script:
-    - pip install --no-cache-dir -r requirements-dev.txt
-    # Authenticate the third-party dependencies
-    - poetry config repositories.gitlab-intern-ees-lachs-modbus-crawler https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler
-    - poetry config http-basic.gitlab-intern-ees-lachs-modbus-crawler gitlab-ci-token ${CI_JOB_TOKEN}
-    - poetry config http-basic.gitlab-pyrdp-commons gitlab-ci-token ${CI_JOB_TOKEN}
-    # Install the dependencies
-    - poetry install --with dev --all-extras
-    # Test the code
-    - PYTHONPATH="${PYTHONPATH}:.:test" poetry run pytest --cov --cov-report term --cov-report xml:coverage.xml --junitxml=report.xml --log-cli-level=INFO test
+    - pip install --no-cache-dir uv==${UV_VERSION}
+    # Install the exact dependency set of uv.lock. All third-party dependencies are publicly available, hence no
+    # repository credentials are required anymore.
+    - uv sync --locked --all-extras
+    # Test the code. The import paths are configured via [tool.pytest.ini_options] in pyproject.toml.
+    - uv run pytest --cov --cov-report term --cov-report xml:coverage.xml --junitxml=report.xml --log-cli-level=INFO test
+    - uv cache prune --ci
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:  # Collect test results
     when: always
@@ -77,18 +91,22 @@ test_python_3_10:
   image: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/python:3.10
   variables:
     VERSION_FORMAT: "{base}.post{distance}.dev+{commit}"
+    GIT_DEPTH: 0  # The full history including the tags is needed to derive the version
+    UV_NO_PROGRESS: "1"
+    UV_PUBLISH_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi"
+    UV_PUBLISH_USERNAME: "gitlab-ci-token"
+    UV_PUBLISH_PASSWORD: "${CI_JOB_TOKEN}"
   script:
-    - pip install -r requirements-dev.txt
-    # Guess the version number (no versioneer needed)
-    - DST_VERSION=$(dunamai from git --format "${VERSION_FORMAT}")
+    - pip install --no-cache-dir uv==${UV_VERSION}
+    # Derive a unique PEP 440 version from the git history: the base is taken from the latest reachable tag, the
+    # distance to that tag makes the version monotonic and the commit hash makes it unique for every build.
+    - DST_VERSION=$(uvx dunamai@${DUNAMAI_VERSION} from git --format "${VERSION_FORMAT}")
     - echo Write destination version $DST_VERSION
-    - poetry version "$DST_VERSION"
-    # Build the project
-    - poetry build
-    # Push the package
-    - poetry config repositories.gitlab-intern ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi
-    - poetry config http-basic.gitlab-intern gitlab-ci-token ${CI_JOB_TOKEN}
-    - poetry publish --repository gitlab-intern
+    - uv version --frozen "$DST_VERSION"
+    # Build the source distribution and the wheel
+    - uv build
+    # Push the package to the GitLab package registry (credentials are provided via the UV_PUBLISH_* variables)
+    - uv publish
 
 build-package-main:
   extends: .build-package

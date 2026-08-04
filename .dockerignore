@@ -1,0 +1,45 @@
+# Keep the build context small. Only pyproject.toml, uv.lock, data_crawler/ and docker/etc/ are actually copied
+# into the image by docker/Dockerfile.
+
+# Local environments and caches
+.venv/
+env/
+venv/
+.uv-cache/
+__pycache__/
+*.py[cod]
+.eggs/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Version control and IDE settings
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+
+# Local secrets and test artefacts
+.env
+.cache
+.cache-test-persistent
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+report.xml
+
+# Documentation, examples and test data are not part of the runtime image
+docs/
+examples/
+test/
+data/
+*.md
+!README.md
+LICENSE
+_config.yml
+.gitlab-ci.yml

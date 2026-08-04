@@ -1,0 +1,82 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // Runs the complete test suite. Requires a local Redis instance, and optionally an MQTT broker and an
+            // InfluxDB 2 instance (see docs/advanced_installation.md).
+            "name": "Pytest: All Test Cases",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "test",
+                "--log-cli-level=INFO"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": false
+        },
+        {
+            // Runs the test cases of the currently opened editor tab only
+            "name": "Pytest: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}",
+                "--log-cli-level=INFO"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": false
+        },
+        {
+            // Runs the complete test suite and reports the coverage of the data_crawler package
+            "name": "Pytest: All Test Cases with Coverage",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "test",
+                "--cov",
+                "--cov-report=term",
+                "--cov-report=html:htmlcov"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": false
+        },
+        {
+            // Picked up by the "Debug Test" action of the test explorer and the gutter icons
+            "name": "Pytest: Debug Selected Test",
+            "type": "debugpy",
+            "request": "launch",
+            "purpose": [
+                "debug-test"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": false
+        },
+        {
+            // Executes the crawler itself. Adapt the configuration file to the setup that should be debugged.
+            "name": "Data Crawler: run",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "data_crawler.cli",
+            "args": [
+                "--config_file",
+                "${workspaceFolder}/examples/mqtt-redis-roundtrip/datacrawler1-config.yml",
+                "run"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        }
+    ]
+}

@@ -48,9 +48,13 @@ htmlcov/
 .cache-test-persistent
 nosetests.xml
 coverage.xml
+report.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+
+# uv
+.uv-cache/
 
 # Translations
 *.mo
@@ -82,7 +86,7 @@ profile_default/
 ipython_config.py
 
 # pyenv
-.python-version
+# .python-version is intentionally tracked: it pins the interpreter version for uv and pyenv alike
 
 # celery beat schedule file
 celerybeat-schedule
