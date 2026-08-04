@@ -12,7 +12,7 @@ import tenacity
 
 import data_crawler.sources.opc_ua as opc_ua
 
-from asyncua import Server
+from asyncua import Server, ua
 from asyncua.ua.uatypes import NodeId
 
 
@@ -83,6 +83,56 @@ def test_opcua_source(minimal_opcua_config):
     assert "observation_time" in data
     assert time_start <= datetime.datetime.fromisoformat(data["observation_time"]) <= time_end
 
+    assert data["Schalter_1"] == 1234.567
+    assert data["Schalter_2"] == "test_schalter_2"
+    assert data["Schalter_3"] is True
+    assert data["Schalter_4"] == 1
+
+
+@pytest.mark.parametrize("connection_error", [
+    asyncio.TimeoutError(),  # Reported by a dead watchdog or channel renewal task of the client
+    ConnectionError("connection reset"),
+    ua.UaError("some protocol error"),
+])
+def test_opcua_source_reconnect(minimal_opcua_config, monkeypatch, connection_error):
+    """Tests whether a broken connection is transparently re-established before the data is fetched
+
+    Once one of the background tasks of the client has died, check_connection() keeps re-raising the stored exception
+    on every single call. Hence, the source has to replace the entire client instead of reusing the broken one.
+    """
+
+    src_api = opc_ua.OPCUA(source_parameters=minimal_opcua_config, executor_name="<test-opcua-reconnect>")
+
+    try:
+        src_api.start()
+
+        stale_client = src_api._client
+        disconnect_invocations = []
+
+        # Simulate the permanently broken connection check of a client whose background task has died
+        def _failing_check_connection():
+            raise connection_error
+
+        # Record the teardown of the stale client. It needs to be released to avoid leaking its socket and its
+        # background thread loop.
+        stale_disconnect = stale_client.disconnect
+
+        def _recording_disconnect():
+            disconnect_invocations.append(True)
+            stale_disconnect()
+
+        monkeypatch.setattr(stale_client, "check_connection", _failing_check_connection)
+        monkeypatch.setattr(stale_client, "disconnect", _recording_disconnect)
+
+        data = src_api.fetch_data()
+
+        assert src_api._client is not stale_client, "The broken client must be replaced by a fresh one"
+        assert disconnect_invocations == [True], "The stale client must be disconnected exactly once"
+    finally:
+        src_api.stop()
+
+    # The sample must be fetched via the re-established connection
+    assert "observation_time" in data
     assert data["Schalter_1"] == 1234.567
     assert data["Schalter_2"] == "test_schalter_2"
     assert data["Schalter_3"] is True

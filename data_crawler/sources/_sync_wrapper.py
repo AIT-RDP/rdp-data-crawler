@@ -207,12 +207,15 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
                 break
 
             self._log_start_of_cycle(deadline_timer)
+
+            # Init success to False to ensure that the cycle is reported as failed in case the generator raises an exception
+            success = False
             try:
-                result = self._fetch_once()
-                yield from result
+                # The success status is returned by the generator and thus only available once it is exhausted.
+                success = yield from self._fetch_once()
             finally:
                 self._timer.operation_done()
-            self._log_end_of_cycle(result is not None)
+            self._log_end_of_cycle(success)
 
     def _log_start_of_cycle(self, deadline_timer: float):
         """Logs the start of the cycle and performs some basic sanity checks"""
@@ -240,8 +243,14 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
         with self._activity_status_lock:
             self._activity_status.last_cycle_complete = ts_now
 
-    def _fetch_once(self) -> Generator[msg.MessageData, None, None]:
-        """Performs one fetch and insert operation and returns the success status of the operations"""
+    def _fetch_once(self) -> Generator[msg.MessageData, None, bool]:
+        """
+        Performs one fetch and insert operation and returns the success status of the operations
+
+        The status is the return value of the generator. Hence, it needs to be picked up by a 'yield from' statement.
+        Note that a partially completed cycle - some messages were already yielded before the error occurred - is
+        reported as a failure as well.
+        """
 
         try:
             with self._prom_source_duration.labels(source_name=self._source_name).time():
@@ -250,6 +259,9 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
         except Exception as err:
             self._logger.error(f"(Partially) skip one sample due to a "
                                f" {type(err).__name__}: {err}\n{traceback.format_exc()}")
+            return False
+
+        return True
 
     def shutdown(self) -> None:
         """Sets the termination event to shut down the periodic execution"""

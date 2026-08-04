@@ -1,9 +1,9 @@
 import datetime
+import logging
 import time
 from typing import Dict, Any
 from pathlib import Path
 
-from asyncua import ua
 from asyncua.sync import Client
 from asyncua.crypto.security_policies import SecurityPolicyBasic256Sha256
 from asyncua.crypto.validator import CertificateValidator, CertificateValidatorOptions
@@ -26,6 +26,8 @@ class OPCUA(abstract_source.AbstractSourceAPI):
         """
 
         super(OPCUA, self).__init__(source_parameters=source_parameters, executor_name=executor_name, **kwargs)
+
+        self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{executor_name}")
 
         # Validate model which is not validated in AbstractSourceAPI (only in AbstractSyncActiveSourceAPI)
         self._source_parameters = OPCUAParameters.model_validate(source_parameters)
@@ -72,6 +74,26 @@ class OPCUA(abstract_source.AbstractSourceAPI):
     def stop(self):
         self._client.disconnect()
 
+    def _reconnect(self):
+        """
+        Tears down the current client and establishes a fresh connection
+
+        A new client is mandatory here: once one of the background tasks of the client (the server watchdog or the
+        secure channel renewal) has died, check_connection() keeps re-raising the very same stored exception forever,
+        as awaiting an already finished task replays its result. Hence, the old client can never recover.
+        """
+
+        # Best effort teardown. It releases the socket and the background thread loop of the old client. The old
+        # client is broken anyway, so any error while shutting it down must not prevent the reconnect.
+        try:
+            self._client.disconnect()
+        except Exception as err:
+            self._logger.debug(f"Ignoring the failure to disconnect the stale client: {type(err).__name__}: {err}")
+
+        time.sleep(2)  # Don't spam the server
+        self.create_client(self._source_parameters)
+        self._client.connect()
+
     def fetch_data(self) -> Dict[str, Any]:
         """
         Queries the OPC UA device and returns the corresponding message
@@ -81,11 +103,14 @@ class OPCUA(abstract_source.AbstractSourceAPI):
         try:
             # Throws an exception if connection is lost
             self._client.check_connection()
-        except (ConnectionError, ua.UaError):
-            # Reconnect if the connection is lost
-            time.sleep(2)  # Don't spam the server
-            self.create_client(self._source_parameters)
-            self._client.connect()
+        except Exception as err:
+            # Reconnect if the connection is lost. Note that the caught exception is intentionally not narrowed down:
+            # besides ConnectionError and ua.UaError, the check also reports (asyncio) TimeoutError and, depending on
+            # which of the client background tasks failed, potentially other types as well. Any error reported by the
+            # check means that the link is unusable.
+            self._logger.warning(f"The connection check failed with a {type(err).__name__}: {err}. "
+                                 f"Reconnecting to the OPC UA server.")
+            self._reconnect()
 
         nodes = [self._client.get_node(node_id) for node_id in self._source_parameters.register_spec[Datapoint.address]]
         values = self._client.read_values(nodes)
