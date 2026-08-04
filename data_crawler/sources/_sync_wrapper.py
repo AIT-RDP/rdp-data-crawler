@@ -207,6 +207,9 @@ class SyncPollingExecutor(active_source_sync.AbstractSyncActiveSourceAPI,
                 break
 
             self._log_start_of_cycle(deadline_timer)
+
+            # Init success to False to ensure that the cycle is reported as failed in case the generator raises an exception
+            success = False
             try:
                 # The success status is returned by the generator and thus only available once it is exhausted.
                 success = yield from self._fetch_once()
