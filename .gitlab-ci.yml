@@ -128,6 +128,9 @@ test_python_3_13:  # The default interpreter, see .python-version. Collects the 
 
 test_python_3_14:
   extends: .test-python
+  # The newest interpreter is tracked as an early warning only and must not block the pipeline yet. Remove the
+  # allow_failure flag once the test suite is known to pass reliably on 3.14.
+  allow_failure: true
   variables:
     PYTHON_VERSION: "3.14"
 
