@@ -2,8 +2,8 @@ import pandas as pd
 import pydantic
 import pymodbus.constants
 from pydantic import ConfigDict, AliasChoices, field_validator
-import pandera as pa
-from pandera import typing as pt
+import pandera.pandas as pa
+from pandera.pandas import typing as pt
 from typing import Optional
 
 from modbus_crawler.input_data_validation import data_types, register_types, data_type_lookup, register_type_lookup

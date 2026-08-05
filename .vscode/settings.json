@@ -1,0 +1,23 @@
+{
+    // Interpreter of the uv-managed project environment. Recreate it with `uv sync --all-extras`.
+    // On Linux/macOS the path is "${workspaceFolder}/.venv/bin/python".
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    // Provides the DATA_CRAWLER_* settings to the test explorer and the debug configurations.
+    // Copy .env.example to .env and adapt it to your local setup.
+    "python.envFile": "${workspaceFolder}/.env",
+    // Enable the native test explorer. Test discovery options (pythonpath, testpaths, asyncio_mode)
+    // are taken from [tool.pytest.ini_options] in pyproject.toml.
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestArgs": [
+        "test"
+    ],
+    "python.testing.cwd": "${workspaceFolder}",
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
+    "python.terminal.activateEnvironment": true,
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.egg-info": true,
+        ".pytest_cache": true
+    }
+}

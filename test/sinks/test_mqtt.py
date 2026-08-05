@@ -2,6 +2,7 @@ import asyncio
 import json
 import uuid
 import pytest
+import pytest_asyncio
 import paho.mqtt.client as mqtt
 from common.mqtt_environment import MqttBrokerConfig, mqtt_broker_plaintext, mqtt_broker_ssl
 from data_crawler.sinks.mqtt import MqttSink, MqttSinkParameters, MqttSinkMetadata
@@ -80,7 +81,7 @@ async def cleanup_mqtt_connections(subscriber, sink):
         print(f"Cleanup warning: {e}")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def mqtt_subscriber(mqtt_broker_plaintext: MqttBrokerConfig):
     """Fixture that provides a connected MQTT subscriber"""
     client = None

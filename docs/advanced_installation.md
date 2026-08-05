@@ -4,58 +4,69 @@ The RDP Data Crawler is mainly designed to be integrated as Docker container int
 supports an integration as python dependency, in case custom data sources should be implemented. The following section 
 describes the development setup and custom data source installations. 
 
-## Poetry Development Setup
+## Development Setup with uv
 
-On Windows, one may want to manage the python interpreter versions using 
-[pyenv-win](https://pyenv-win.github.io/pyenv-win/).
+The project is managed with [uv](https://docs.astral.sh/uv/). The dependency set is pinned in `uv.lock`, which is 
+committed to the repository and must be kept in sync with `pyproject.toml`. Make sure that uv is properly installed.
+Afterwards, the complete development environment is created with a single command. uv creates a dedicated virtual 
+environment in `.venv`, downloads a matching python interpreter if none is available and installs the locked 
+dependencies:
 ```shell
-# List available interpreter versions
-pyenv install -l
-
-# Install and register the python interpreter
-pyenv install 3.10.11  # Oldest supported version. You may want to choose a newer one
-pyenv local 3.10.11  # Locally activate your python version
-poetry env use $(pyenv which python)  # Create the poetry environment based on the selected interpreter
+# Install all extras and the development dependencies into .venv
+uv sync --all-extras
 ```
 
-If you more into conda, you can install the base environment as follows. However, be aware that sometimes update 
-problems due to the two package managers (poetry, conda) are reported. You are warned, here are the conda snippets:
+The interpreter version is taken from the `.python-version` file, which pins the default development version (3.13). 
+The oldest supported version is declared via `requires-python` in `pyproject.toml` (3.10), and the CI pipeline runs the 
+test suite against every version from 3.10 up to 3.14. To develop against another version, pin it explicitly. uv 
+manages the interpreters itself, so neither pyenv nor conda is needed:
 ```shell
-conda create -n rdp-data-crawler python=3.11
-conda activate rdp-data-crawler
-conda install poetry
+uv python pin 3.10  # Writes .python-version and is picked up by the next uv sync
+uv sync --all-extras
 ```
 
-In case you have a dedicated conda environment that is not shared among poetry projects, make sure to directly install 
-the packages within the conda environment. Otherwise, an additional virtualenv may be created which often creates 
-troubles and redundancies.
+To run a one-off command against a different interpreter without touching `.python-version`, pass `--python`. Note that
+this recreates `.venv` with the requested version:
 ```shell
-poetry config --local virtualenvs.create false
+uv run --python 3.14 pytest test
 ```
 
-Independent of your environment some dependencies are needed. In case your current user does not have access to the
-[PyRDP Commons](https://gitlab-intern.ait.ac.at/ees/rdp/generic-components/pyrdp-commons) repository, use an access
-token.
-Replace `$TOKEN_PYRDP_COMMONS` with the value of the token.
-Furthermore, this token is defined as a group variable of the GitLab group `EES/RDP`.
+Only a subset of the dependencies is needed in most cases. The extras can therefore be selected individually, and the 
+development dependencies can be skipped entirely:
 ```shell
-poetry config http-basic.gitlab-pyrdp-commons __token__ $TOKEN_PYRDP_COMMONS
+uv sync --extra modbus  # The modbus libraries come with the modbus extras
+uv sync --all-extras --no-dev  # Runtime dependencies only
 ```
 
-Having your pyton/poetry base setup ready, one can install the development dependencies as follows.
+Commands are executed within the environment via `uv run`, which implicitly keeps `.venv` in sync with `uv.lock`. 
+Alternatively, the environment can be activated as usual with `.venv\Scripts\activate` respectively 
+`source .venv/bin/activate`:
 ```shell
-# Make sure the correct conda environment is activated, if you have one. For poetry no further preparation is needed.
-poetry install --with dev -E modbus  # The modbus libraries come with the modbus extras
+uv run datacrawler --help
+uv run python -m data_crawler.cli --help
 ```
 
 ## Run the test cases
 
-To run the test cases, a development instance of Redis is needed. E.g. spin up one by using podman or docker:
+To run the test cases, a development instance of Redis is needed. The MQTT and InfluxDB test cases require a broker 
+and an InfluxDB 2 instance respectively, and are skipped if the corresponding environment variables are unset. All 
+three services can be started via docker or podman:
 ```shell
-podman run -p 6379:6379 -it docker.io/redis
+docker run -d -p 6379:6379 docker.io/redis
+docker run -d -p 1883:1883 -p 8883:8883 docker.io/eclipse-mosquitto:2.1-alpine
+docker run -d -p 8086:8086 -e DOCKER_INFLUXDB_INIT_MODE=setup -e DOCKER_INFLUXDB_INIT_ORG=ait ^
+    -e DOCKER_INFLUXDB_INIT_BUCKET=my-bucket -e DOCKER_INFLUXDB_INIT_USERNAME=admin ^
+    -e DOCKER_INFLUXDB_INIT_PASSWORD=<password> docker.io/influxdb:2
 ```
 
-To configure the parameters of the test suite, the following environment variables can be set:
+The parameters of the test suite are configured via environment variables. All supported variables are documented in 
+[`.env.example`](../.env.example), which is the recommended starting point:
+```shell
+copy .env.example .env
+```
+
+The `.env` file is read automatically by the VSCode test explorer and the debug configurations in `.vscode`. On the 
+command line, the variables have to be exported by the shell, since the test suite does not read `.env` on its own:
 ```shell
 REM Your e-mail to send to some public APIs that require contact details 
 set DATA_CRAWLER_CONTACT="<contact details and e-mail>"
@@ -65,34 +76,56 @@ set DATA_CRAWLER_REDIS_HOST=localhost
 set DATA_CRAWLER_REDIS_PORT=6379
 ```
 
-Furthermore, make sure that both the project dicrectory and the testing directory are in the PYTHONPATH. This can 
-usually be done within the GUI by including the content roots and project directory or via the CLI:  
-```shell
-set PYTHONPATH=%PYTHONPATH%;.;./test
-```
+No `PYTHONPATH` setup is required anymore. Both the project directory and the test directory are registered via the 
+`pythonpath` option in the `[tool.pytest.ini_options]` section of `pyproject.toml`, which applies to the command line, 
+the CI pipeline and the IDE alike.
 
 Have fun with testing:
 ```shell
-pytest test
+uv run pytest test
+
+REM Including the coverage report of the data_crawler package
+uv run pytest --cov --cov-report term --cov-report html:htmlcov test
 ```
+
+In VSCode, the test cases are discovered by the native test explorer and can be executed and debugged from the sidebar 
+or the gutter icons. The `Pytest: All Test Cases`, `Pytest: Current File` and `Pytest: All Test Cases with Coverage` 
+entries of the run and debug view provide the same via `F5`. Both rely on the interpreter in `.venv`, so make sure 
+`uv sync --all-extras` has been executed before.
 
 ## Using the Data crawler with Project-Specific Sources
 
 The data crawler is designed to include project-specific API bindings that are not part of the main repository. For such
-cases, there are Python packages that encapsulate the main logic. To include the software in own poetry-managed 
-projects, the dependencies need to be included as follows:
+cases, there are Python packages that encapsulate the main logic. The crawler itself is published to the GitLab package
+registry, whereas its own git-based dependencies (`pyrdp-commons` and, for the extras, `modbus-crawler` and `rdp-mqtt`)
+are recorded as direct references in the package metadata and are resolved from their public repositories.
 
+To include the software in an own uv-managed project, register the registry as an additional index. The credentials are
+supplied via the `UV_INDEX_<NAME>_USERNAME` and `UV_INDEX_<NAME>_PASSWORD` environment variables, where `<NAME>` is the
+upper-case index name:
 ```shell
-# Add the data source of pyrdp-commons, a core dependency of the data crawler
-poetry source add -s gitlab-pyrdp-commons https://gitlab-intern.ait.ac.at/api/v4/projects/3611/packages/pypi/simple
-poetry config http-basic.gitlab-pyrdp-commons __token__ ${TOKEN_PYRDP_COMMONS}
+# Add the index of the rdp-data-crawler and install the package. If you need modbus support, add the modbus extra
+# with --extra modbus.
+set UV_INDEX_GITLAB_RDP_DATA_CRAWLER_USERNAME=__token__
+set UV_INDEX_GITLAB_RDP_DATA_CRAWLER_PASSWORD=%TOKEN_RDP_DATA_CRAWLER%
+uv add --index gitlab-rdp-data-crawler=https://gitlab-intern.ait.ac.at/api/v4/projects/3040/packages/pypi/simple rdp-data-crawler
+```
 
-# Add the data source of the rdp-data-crawler itself 
+The equivalent declaration in the `pyproject.toml` of the consuming project looks as follows:
+```toml
+[[tool.uv.index]]
+name = "gitlab-rdp-data-crawler"
+url = "https://gitlab-intern.ait.ac.at/api/v4/projects/3040/packages/pypi/simple"
+explicit = true  # Only used for the packages that are explicitly assigned to it
+
+[tool.uv.sources]
+rdp-data-crawler = { index = "gitlab-rdp-data-crawler" }
+```
+
+For poetry-managed consumer projects, the corresponding commands are:
+```shell
 poetry source add gitlab-rdp-data-crawler https://gitlab-intern.ait.ac.at/api/v4/projects/3040/packages/pypi/simple
 poetry config http-basic.gitlab-rdp-data-crawler __token__ ${TOKEN_RDP_DATA_CRAWLER}
-
-# Install the data crawler. If you need modbus support make sure that the modbus-crawler repository located at 
-# https://gitlab-intern.ait.ac.at/ees-lachs/modbus-crawler is accessible and add the modbus extra with -E modbus
 poetry add --source gitlab-rdp-data-crawler rdp-data-crawler
 ```
 
