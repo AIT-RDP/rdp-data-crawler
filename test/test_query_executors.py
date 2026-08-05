@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 
 import pytest
 import redis
+import tenacity
 
 import data_crawler.query_executors as query_executors
 import data_crawler.access.storage as storage
@@ -213,7 +214,16 @@ def test_thread_executor_startup_error(mockup_service_config, redis_pool):
     assert api.start_invocations == 0
 
     executor.start()
-    assert not executor.is_alive(), "Crash on startup expected"
+
+    # start() only waits for the startup event, which is deliberately also released when the startup itself crashes
+    # (see ThreadQueryExecutor._run_api). The worker thread therefore still needs a moment to unwind the exception and
+    # to terminate. Since no event that is set inside the thread can signal the thread's own death, poll for it.
+    # reraise keeps the original assertion message instead of masking it with a tenacity.RetryError.
+    @tenacity.retry(stop=tenacity.stop_after_delay(5), wait=tenacity.wait_fixed(0.01), reraise=True)
+    def assert_startup_crashed():
+        assert not executor.is_alive(), "Crash on startup expected"
+
+    assert_startup_crashed()
 
     executor.shutdown()
     executor.join()
