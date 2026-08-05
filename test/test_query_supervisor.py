@@ -9,6 +9,7 @@ from typing import Dict, Union, List
 
 import pyrdp_commons as commons
 import pytest
+import pytest_asyncio
 import yaml
 
 import data_crawler.query_supervisor as query_supervisor
@@ -75,7 +76,7 @@ def mockup_executors_config(passive_mockup_service_config, active_mockup_service
     }
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture()
 async def mockup_executors_config_container(mockup_executors_config) -> commons.ConfigDict:
     """Returns an exemplary executors configuration as a pyrdp-commons container"""
     return await commons.ConfigDict.create(mockup_executors_config)
@@ -98,7 +99,6 @@ def mockup_executors_externals(
 @pytest.mark.asyncio
 async def test_query_supervisor_life_cycle(mockup_executors_config_container, mockup_executors_externals, redis_pool):
     """Tests the standard life cycle of the supervisor"""
-    mockup_executors_config_container = await mockup_executors_config_container
 
     supervisor = query_supervisor.AsyncQuerySupervisor(mockup_executors_config_container, {}, redis_pool,
                                                        mockup_executors_externals)
@@ -145,7 +145,6 @@ async def test_query_supervisor_life_cycle(mockup_executors_config_container, mo
 async def test_query_supervisor_restart_passive(mockup_executors_config_container, mockup_executors_externals,
                                                 redis_pool):
     """Tests the friendly restart policy of the query supervisor targeting a passive source"""
-    mockup_executors_config_container = await mockup_executors_config_container
 
     sup_config = {"dead timeout": "0.1s"}
     supervisor = query_supervisor.AsyncQuerySupervisor(mockup_executors_config_container, sup_config,
@@ -182,7 +181,6 @@ async def test_query_supervisor_restart_passive(mockup_executors_config_containe
 async def test_query_supervisor_restart_active(mockup_executors_config_container, mockup_executors_externals,
                                                redis_pool):
     """Tests the friendly restart policy of the query supervisor targeting an active source"""
-    mockup_executors_config_container = await mockup_executors_config_container
 
     # Custom configuration changes
     mockup_executors_externals["third"].config.track_activity = True
@@ -223,7 +221,6 @@ async def test_query_supervisor_logging(caplog: pytest.LogCaptureFixture, mockup
                                         mockup_executors_externals,
                                         redis_pool):
     """Tests the log messages when restarting some executors"""
-    mockup_executors_config_container = await mockup_executors_config_container
 
     caplog.set_level(logging.DEBUG, logger="data_crawler")
     sup_config = {"dead timeout": "0.1s"}

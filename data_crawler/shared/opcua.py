@@ -3,8 +3,8 @@ from typing import Optional
 import pandas as pd
 import pydantic
 from pydantic import ConfigDict, AliasChoices, SecretStr, field_validator, BaseModel
-import pandera as pa
-from pandera import typing as pt
+import pandera.pandas as pa
+from pandera.pandas import typing as pt
 
 from data_crawler.sinks.abc import abstract_sink
 
