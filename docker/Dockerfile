@@ -1,6 +1,6 @@
 ARG DOCKER_PROXY_PREFIX
 # Do not use the alpine images as it is missing many dependencies
-FROM ${DOCKER_PROXY_PREFIX}python:3.10 AS builder
+FROM ${DOCKER_PROXY_PREFIX}python:3.13 AS builder
 
 # Keep the uv version in sync with the UV_VERSION variable in .gitlab-ci.yml
 ARG UV_VERSION=0.12.1
@@ -21,7 +21,7 @@ RUN uv sync --locked --no-dev --all-extras --no-install-project && \
     rm -rf ${UV_CACHE_DIR}
 
 # Build the runtime image
-FROM ${DOCKER_PROXY_PREFIX}python:3.10-slim
+FROM ${DOCKER_PROXY_PREFIX}python:3.13-slim
 
 # Use the environment variables instead of arguments to specify the config and .env file. This should make both
 # customization and invoking subcommands easier. Additionally, the venv is set without having to use uv

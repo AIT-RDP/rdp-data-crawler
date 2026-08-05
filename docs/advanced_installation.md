@@ -16,11 +16,19 @@ dependencies:
 uv sync --all-extras
 ```
 
-The interpreter version is taken from the `.python-version` file, which pins the oldest supported version. To develop 
-against another version, pin it explicitly. uv manages the interpreters itself, so neither pyenv nor conda is needed:
+The interpreter version is taken from the `.python-version` file, which pins the default development version (3.13). 
+The oldest supported version is declared via `requires-python` in `pyproject.toml` (3.10), and the CI pipeline runs the 
+test suite against every version from 3.10 up to 3.14. To develop against another version, pin it explicitly. uv 
+manages the interpreters itself, so neither pyenv nor conda is needed:
 ```shell
-uv python pin 3.12  # Writes .python-version and is picked up by the next uv sync
+uv python pin 3.10  # Writes .python-version and is picked up by the next uv sync
 uv sync --all-extras
+```
+
+To run a one-off command against a different interpreter without touching `.python-version`, pass `--python`. Note that
+this recreates `.venv` with the requested version:
+```shell
+uv run --python 3.14 pytest test
 ```
 
 Only a subset of the dependencies is needed in most cases. The extras can therefore be selected individually, and the 

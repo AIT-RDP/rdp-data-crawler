@@ -19,9 +19,17 @@ include:
 
 # =============================================================================
 # Perform the unit test
+#
+# The test suite is executed against every supported interpreter. The template below is instantiated once per version
+# via the extends mechanism, the concrete version is injected through the PYTHON_VERSION variable. Only the default
+# version (3.13) additionally collects the coverage report, all versions publish their junit report.
+#
+# The default version 3.13 is defined in three places that have to be kept in sync: .python-version, the base images of
+# docker/Dockerfile and the jobs below. The oldest supported version (3.10) follows from requires-python in
+# pyproject.toml.
 # =============================================================================
 
-test_python_3_10:
+.test-python:
   stage: test
   needs: []  # no dependencies to precious pipelines stages
   services:
@@ -40,7 +48,7 @@ test_python_3_10:
   tags:
     - docker
     - x86_64
-  image: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/python:3.10
+  image: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/python:${PYTHON_VERSION}
   variables:
     DATA_CRAWLER_MQTT_HOST: "mosquitto"
     DATA_CRAWLER_MQTT_PORT: "1883"
@@ -54,10 +62,19 @@ test_python_3_10:
     DATA_CRAWLER_INFLUX_PASSWORD: ${DATA_CRAWLER_INFLUX_PASSWORD}
     UV_CACHE_DIR: "${CI_PROJECT_DIR}/.uv-cache"
     UV_NO_PROGRESS: "1"
+    # Select the interpreter of the job image. UV_PYTHON overrides the .python-version pin of the repository, which
+    # otherwise would request the default version in every job. Disabling the managed interpreters and their downloads
+    # makes uv fail loudly instead of silently fetching another interpreter.
+    UV_PYTHON: "${PYTHON_VERSION}"
+    UV_NO_MANAGED_PYTHON: "1"
+    UV_PYTHON_DOWNLOADS: "never"
+    # Overridden by the default-version job to additionally collect the coverage
+    PYTEST_COVERAGE_ARGS: ""
   cache:  # Reuse the downloaded wheels across pipeline runs
     key:
       files:
         - uv.lock
+      prefix: "py${PYTHON_VERSION}"  # The wheels are interpreter specific
     paths:
       - .uv-cache
   script:
@@ -65,11 +82,41 @@ test_python_3_10:
     # Install the exact dependency set of uv.lock. All third-party dependencies are publicly available, hence no
     # repository credentials are required anymore.
     - uv sync --locked --all-extras
+    - uv run python -c "import sys; print('Testing with python', sys.version)"
     # Test the code. The import paths are configured via [tool.pytest.ini_options] in pyproject.toml.
-    - uv run pytest --cov --cov-report term --cov-report xml:coverage.xml --junitxml=report.xml --log-cli-level=INFO test
+    - uv run pytest ${PYTEST_COVERAGE_ARGS} --junitxml=report.xml --log-cli-level=INFO test
     - uv cache prune --ci
-  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:  # Collect test results
+    when: always
+    paths:
+      - report.xml
+    reports:
+      junit: report.xml
+
+test_python_3_10:  # The oldest supported interpreter, see requires-python in pyproject.toml
+  extends: .test-python
+  variables:
+    PYTHON_VERSION: "3.10"
+
+test_python_3_11:
+  extends: .test-python
+  variables:
+    PYTHON_VERSION: "3.11"
+
+test_python_3_12:
+  extends: .test-python
+  variables:
+    PYTHON_VERSION: "3.12"
+
+test_python_3_13:  # The default interpreter, see .python-version. Collects the coverage report.
+  extends: .test-python
+  variables:
+    # Spelled out instead of referencing DEFAULT_PYTHON_VERSION: the value feeds the `image` keyword, and nesting one
+    # CI variable inside another is not reliably expanded there. Keep in sync with DEFAULT_PYTHON_VERSION.
+    PYTHON_VERSION: "3.13"
+    PYTEST_COVERAGE_ARGS: "--cov --cov-report term --cov-report xml:coverage.xml"
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
     when: always
     paths:
       - report.xml
@@ -78,6 +125,11 @@ test_python_3_10:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
+
+test_python_3_14:
+  extends: .test-python
+  variables:
+    PYTHON_VERSION: "3.14"
 
 # =============================================================================
 # Build the installable package
@@ -88,11 +140,16 @@ test_python_3_10:
   tags:
     - docker
     - x86_64
-  image: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/python:3.10
+  # Keep in sync with DEFAULT_PYTHON_VERSION (spelled out, see the note in test_python_3_13)
+  image: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/python:3.13
   variables:
     VERSION_FORMAT: "{base}.post{distance}.dev+{commit}"
     GIT_DEPTH: 0  # The full history including the tags is needed to derive the version
     UV_NO_PROGRESS: "1"
+    # The wheel is pure python and therefore independent of the building interpreter. Use the image's one nonetheless.
+    UV_PYTHON: "3.13"
+    UV_NO_MANAGED_PYTHON: "1"
+    UV_PYTHON_DOWNLOADS: "never"
     UV_PUBLISH_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi"
     UV_PUBLISH_USERNAME: "gitlab-ci-token"
     UV_PUBLISH_PASSWORD: "${CI_JOB_TOKEN}"
