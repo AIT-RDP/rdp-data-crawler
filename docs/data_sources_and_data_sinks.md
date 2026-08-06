@@ -306,6 +306,9 @@ data fetches to handle large time ranges efficiently.
   will be returned. Defaults to 1 hour.
 * `lag_time`: The lag time to account for late arriving data. The source will query data up to the current time minus 
   this lag time. Defaults to 0 minutes.
+* `overlap`: Optional duration (default `0`) to extend each poll window backwards after the first poll, re-querying 
+  the tail of the previous interval. Useful when late-arriving data may appear after the nominal poll boundary. Note 
+  that overlapping polls return duplicate samples.
 * `batch_duration`: Optional parameter to fetch data in batches of the specified duration. If not set, all data between 
   start and stop time is fetched in a single query. This is useful for handling large time ranges that might exceed 
   query limits or memory constraints.
@@ -326,6 +329,7 @@ data fetches to handle large time ranges efficiently.
           |> filter(fn: (r) => r["location"] == "building_a")
       initial_history: 24h
       lag_time: 5m
+      overlap: 2m
       batch_duration: 1h
     polling:
       frequency: 5m

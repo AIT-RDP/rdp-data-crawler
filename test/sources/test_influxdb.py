@@ -8,6 +8,7 @@ import os
 import time
 from dataclasses import dataclass
 from typing import Optional
+from unittest import mock
 
 import pytest
 import influxdb_client
@@ -308,7 +309,8 @@ def test_influxdb_source_configuration():
         org="test_org",
         query='from(bucket: "test") |> range(start: _start_time, stop: _stop_time)',
         initial_history=datetime.timedelta(hours=2),
-        lag_time=datetime.timedelta(minutes=5)
+        lag_time=datetime.timedelta(minutes=5),
+        overlap=datetime.timedelta(minutes=2),
     )
 
     assert config.url == "http://localhost:8086"
@@ -316,6 +318,86 @@ def test_influxdb_source_configuration():
     assert config.org == "test_org"
     assert config.initial_history == datetime.timedelta(hours=2)
     assert config.lag_time == datetime.timedelta(minutes=5)
+    assert config.overlap == datetime.timedelta(minutes=2)
+
+    config_from_dict = influxdb_source.InfluxDBSourceConfiguration.model_validate({
+        "url": "http://localhost:8086",
+        "token": "test_token",
+        "org": "test_org",
+        "query": 'from(bucket: "test") |> range(start: _start_time, stop: _stop_time)',
+        "overlap": "3m",
+    })
+    assert config_from_dict.overlap == datetime.timedelta(minutes=3)
+
+
+def test_influxdb_source_fetch_data_bundle_overlap_windows():
+    """Tests that overlap extends poll windows on all but the first fetch"""
+    base_time = datetime.datetime(2024, 6, 15, 12, 0, 0, tzinfo=datetime.timezone.utc)
+    lag_time = datetime.timedelta(minutes=5)
+    overlap = datetime.timedelta(minutes=2)
+    poll_interval = datetime.timedelta(minutes=10)
+    initial_start = base_time - datetime.timedelta(hours=1) - lag_time
+
+    config = influxdb_source.InfluxDBSourceConfiguration(
+        url="http://localhost:8086",
+        token="test_token",
+        org="test_org",
+        query='from(bucket: "test") |> range(start: _start_time, stop: _stop_time)',
+        initial_history=datetime.timedelta(hours=1),
+        lag_time=lag_time,
+        overlap=overlap,
+    )
+
+    source = influxdb_source.InfluxDBSource(
+        source_parameters=config,
+        executor_name="test_executor",
+    )
+    # Fix internal state so poll 1 starts from a known cursor, independent of init-time clock.
+    source._start_time = initial_start
+    source._first_fetch = True
+
+    captured_windows = []
+
+    def capture_fetch(start_time, stop_time):
+        # Record query windows without contacting InfluxDB.
+        captured_windows.append((start_time, stop_time))
+        return iter([])
+
+    # Each fetch_data_bundle() call reads datetime.now() once for stop_time = now - lag_time.
+    poll_times = [
+        base_time,
+        base_time + poll_interval,
+        base_time + 2 * poll_interval,
+    ]
+
+    # Replace the real InfluxDB fetch; only the chosen (start, stop) window is under test.
+    # Call "capture_fetch" instead of the real fetch method.
+    with mock.patch.object(source, "_fetch_remote_data", side_effect=capture_fetch):
+        # influxdb.py calls datetime.datetime.now() using its own module-level name; replace that
+        # copy so fetch_data_bundle() sees our fixed poll_times instead of the real clock.
+        with mock.patch("data_crawler.sources.influxdb.datetime.datetime") as mock_datetime:
+            mock_datetime.now.side_effect = poll_times
+            # Keep the real datetime constructor for timedelta comparisons elsewhere.
+            mock_datetime.side_effect = lambda *args, **kwargs: datetime.datetime(*args, **kwargs)
+
+            # Poll 1: overlap must not apply while _first_fetch is still True.
+            list(source.fetch_data_bundle())
+            assert source._first_fetch is False
+
+            # Polls 2 and 3: overlap should extend the start backward on every subsequent poll.
+            list(source.fetch_data_bundle())
+            list(source.fetch_data_bundle())
+
+    assert len(captured_windows) == 3
+
+    poll1_stop = poll_times[0] - lag_time
+    assert captured_windows[0] == (initial_start, poll1_stop)
+
+    poll2_stop = poll_times[1] - lag_time
+    assert captured_windows[1] == (poll1_stop - overlap, poll2_stop)
+
+    poll3_stop = poll_times[2] - lag_time
+    assert captured_windows[2] == (poll2_stop - overlap, poll3_stop)
 
 
 def test_influxdb_source_initialization(influxdb_test_config):
