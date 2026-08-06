@@ -35,6 +35,10 @@ class InfluxDBSourceConfiguration(pydantic.BaseModel):
         default=datetime.timedelta(minutes=0),
         description="Lag time to account for late arriving data"
     )
+    overlap: type_checks.TimedeltaType = pydantic.Field(
+        default=datetime.timedelta(0),
+        description="Duration to extend each poll window backwards after the first poll, re-fetching overlapping data"
+    )
     batch_duration: Optional[type_checks.TimedeltaType] = pydantic.Field(
         default=None,
         description="If set, the source will fetch data in batches of the specified duration"
@@ -48,8 +52,9 @@ class InfluxDBSource(abstract_source.AbstractMultiMessageSourceAPI,
 
     The data source queries the remote InfluxDB instance on request and returns the resulting message data. Per default,
     each table is returned in a separate message. In order to limit the returned data to new samples, only, start and
-    stop time parameters `_start_time` and `_stop_time` are maintained in a rolling horizon fashion. The parameters are
-    updated after each successful query by the latest timestamp found in the returned data.
+    stop time parameters `_start_time` and `_stop_time` are maintained in a rolling horizon fashion. After each
+    successful poll, `_start_time` is set to the stop time of that poll. Optionally, `overlap` extends the query start
+    backwards on every poll after the first, re-fetching data from the tail of the previous interval.
 
     To keep the source simple, it was decided to not implement convenience features such as renaming of fields. A one
     to one mapping of returned columns and message fields is performed. Consider the flux function
@@ -78,6 +83,7 @@ class InfluxDBSource(abstract_source.AbstractMultiMessageSourceAPI,
 
         self._start_time = datetime.datetime.now(tz=datetime.timezone.utc) - self._config.initial_history
         self._start_time -= self._config.lag_time
+        self._first_fetch = True
 
         self._client = None
 
@@ -117,8 +123,12 @@ class InfluxDBSource(abstract_source.AbstractMultiMessageSourceAPI,
         :returns: The function will return a generator that yields one message at a time.
         """
         stop_time = datetime.datetime.now(tz=datetime.timezone.utc) - self._config.lag_time
-        yield from self._fetch_remote_data(self._start_time, stop_time)
+        start_time = self._start_time
+        if not self._first_fetch and self._config.overlap > datetime.timedelta(0):
+            start_time -= self._config.overlap
+        yield from self._fetch_remote_data(start_time, stop_time)
         self._start_time = stop_time
+        self._first_fetch = False
 
     def fetch_timed_historic_data_bundle(self, start_time: datetime.datetime, end_time: datetime.datetime,
                                          filter_clauses: Dict[str, Any]) -> Generator[MessageData, None, None]:
