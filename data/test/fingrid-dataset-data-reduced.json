@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "datasetId": 245,
+      "startTime": "2023-06-28T12:15:00.0000000+00:00",
+      "endTime": "2023-06-28T12:30:00.0000000+00:00",
+      "value": 186.8
+    },
+    {
+      "datasetId": 245,
+      "startTime": "2023-06-28T12:30:00.0000000+00:00",
+      "endTime": "2023-06-28T12:45:00.0000000+00:00",
+      "value": 496.7
+    }
+  ],
+  "pagination": {
+    "total": 2,
+    "lastPage": 1,
+    "prevPage": null,
+    "nextPage": null,
+    "perPage": 10,
+    "currentPage": 1,
+    "from": 0,
+    "to": 2
+  }
+}
