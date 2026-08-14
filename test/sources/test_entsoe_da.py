@@ -233,3 +233,106 @@ def test_fetch_timed_historic_empty_range(mock_entsoe_pandas_client_history):
     # Should yield no messages
     assert len(messages) == 0
 
+
+def test_fetch_data_bundle_without_initial_history(mock_entsoe_pandas_client, mock_timestamp_now, day_ahead_prices):
+    """Without initial_history, polling yields a single tomorrow block."""
+    source = entsoe_da.ENTSOEDATransparency(source_parameters=entsoe_da.ENTSOEDATransparencyModel(
+        api_key="01d12ba5-5350-421f-b32e-19c2e65b9653",
+        day_ahead_prices=[
+            entsoe_da.DayAheadPricesModel(country_code="AT", timezone="Europe/Vienna"),
+            entsoe_da.DayAheadPricesModel(
+                country_code="DE_LU",
+                timezone="Europe/Berlin",
+                resolution=entsoe_da.Resolution.MIN_15,
+            ),
+        ]
+    ).model_dump())
+
+    messages = list(source.fetch_data_bundle())
+
+    assert len(messages) == 1
+    assert messages[0]["location"] == len(day_ahead_prices[0]) * ["AT"] + len(day_ahead_prices[1]) * ["DE_LU"]
+    assert mock_entsoe_pandas_client.return_value.query_day_ahead_prices.call_count == 2
+
+
+def _hourly_prices(start: str) -> pd.Series:
+    return pd.Series(
+        data=50 * np.random.rand(24),
+        index=pd.date_range(start=pd.Timestamp(start, tz="Europe/Vienna"), freq="h", periods=24),
+    )
+
+
+def test_fetch_data_bundle_initial_history_then_live_only(mocker):
+    """First poll backfills initial_history days plus tomorrow; later polls yield tomorrow only."""
+    now = pd.Timestamp("2024-02-21T10:00:00", tz="UTC")
+    mocker.patch("pandas.Timestamp.now", return_value=now)
+
+    prices_day_1 = _hourly_prices("2024-02-20T00:00:00")
+    prices_day_2 = _hourly_prices("2024-02-21T00:00:00")
+    prices_live = _hourly_prices("2024-02-22T00:00:00")
+    prices_live_second = _hourly_prices("2024-02-22T00:00:00")
+
+    mock = mocker.patch("entsoe.EntsoePandasClient")
+    mock.return_value.query_day_ahead_prices.side_effect = [
+        prices_day_1,
+        prices_day_2,
+        prices_live,
+        prices_live_second,
+    ]
+
+    source = entsoe_da.ENTSOEDATransparency(source_parameters=entsoe_da.ENTSOEDATransparencyModel(
+        api_key="01d12ba5-5350-421f-b32e-19c2e65b9653",
+        initial_history="2d",
+        day_ahead_prices=[
+            entsoe_da.DayAheadPricesModel(country_code="AT", timezone="Europe/Vienna"),
+        ]
+    ).model_dump())
+
+    first_messages = list(source.fetch_data_bundle())
+    assert len(first_messages) == 3
+    assert first_messages[0]["observation_time"] == [t.isoformat() for t in prices_day_1.index.to_list()]
+    assert first_messages[1]["observation_time"] == [t.isoformat() for t in prices_day_2.index.to_list()]
+    assert first_messages[2]["observation_time"] == [t.isoformat() for t in prices_live.index.to_list()]
+    assert mock.return_value.query_day_ahead_prices.call_count == 3
+
+    second_messages = list(source.fetch_data_bundle())
+    assert len(second_messages) == 1
+    assert second_messages[0]["observation_time"] == [t.isoformat() for t in prices_live_second.index.to_list()]
+    assert mock.return_value.query_day_ahead_prices.call_count == 4
+
+
+def test_fetch_data_bundle_initial_history_no_duplicate_when_clock_advances(mocker):
+    """Init and first poll on the same UTC day must not query tomorrow twice."""
+    init_now = pd.Timestamp("2024-02-21T10:00:00", tz="UTC")
+    fetch_now = pd.Timestamp("2024-02-21T10:05:00", tz="UTC")
+    now_mock = mocker.patch("pandas.Timestamp.now", return_value=init_now)
+
+    prices_day_1 = _hourly_prices("2024-02-20T00:00:00")
+    prices_day_2 = _hourly_prices("2024-02-21T00:00:00")
+    prices_live = _hourly_prices("2024-02-22T00:00:00")
+
+    mock = mocker.patch("entsoe.EntsoePandasClient")
+    mock.return_value.query_day_ahead_prices.side_effect = [
+        prices_day_1,
+        prices_day_2,
+        prices_live,
+    ]
+
+    source = entsoe_da.ENTSOEDATransparency(source_parameters=entsoe_da.ENTSOEDATransparencyModel(
+        api_key="01d12ba5-5350-421f-b32e-19c2e65b9653",
+        initial_history="2d",
+        day_ahead_prices=[
+            entsoe_da.DayAheadPricesModel(country_code="AT", timezone="Europe/Vienna"),
+        ]
+    ).model_dump())
+
+    now_mock.return_value = fetch_now
+    messages = list(source.fetch_data_bundle())
+
+    assert len(messages) == 3
+    query_mock = mock.return_value.query_day_ahead_prices
+    assert query_mock.call_count == 3
+    starts = [call.kwargs["start"] for call in query_mock.call_args_list]
+    assert starts == [prices_day_1.index[0], prices_day_2.index[0], prices_live.index[0]]
+    assert len(starts) == len(set(starts))
+

@@ -3,7 +3,7 @@ Implements the day-ahead market prices from ENTSO-E Transparency Platform
 """
 import datetime
 from enum import IntEnum
-from typing import Any, Dict, Generator
+from typing import Any, Dict, Generator, Optional
 
 import entsoe
 import pandas as pd
@@ -45,6 +45,11 @@ class ENTSOEDATransparencyModel(pydantic.BaseModel):
     # documentation how to get the API-key:
     # https://transparency.entsoe.eu/content/static_content/Static%20content/web%20api/Guide.html#_authentication_and_authorisation
     api_key: str = pydantic.Field(description="API-key for the ENTSO-E transparency platform")
+    initial_history: Optional[type_checks.TimedeltaType] = pydantic.Field(
+        default=None,
+        description="Optional past duration to backfill on the first poll. After the initial query, only the next "
+                    "day-ahead block is fetched. Omit to keep tomorrow-only polling.",
+    )
     day_ahead_prices: list[DayAheadPricesModel] = pydantic.Field(
         default=[],
         description="List of day-ahead prices to be queried",
@@ -68,6 +73,8 @@ class ENTSOEDATransparency(http_cache.GenericHTTPSourceAPI, history.AbstractTime
 
         self._client: entsoe.EntsoePandasClient = entsoe.EntsoePandasClient(api_key=self._source_parameters.api_key)
 
+        self._initial_history_pending = self._source_parameters.initial_history is not None
+
     def fetch_data(self) -> dict[str, Any]:
         """
         Retrieves the data from the ENTSO-E transparency platform.
@@ -78,6 +85,29 @@ class ENTSOEDATransparency(http_cache.GenericHTTPSourceAPI, history.AbstractTime
 
         start_time = pd.Timestamp.now(tz=datetime.timezone.utc)
         return self._fetch_da_block(start_time)
+
+    def fetch_data_bundle(self) -> Generator[MessageData, None, None]:
+        """
+        Fetches the remote data into a bundle of multiple messages.
+
+        When `initial_history` is configured, the first call backfills one message per day in
+        `[now - initial_history, now)` and then yields the current tomorrow block. Later calls yield only the
+        tomorrow block.
+        """
+
+        # Same now for the initial history backfill and the live data to avoid duplicates responses
+        now = pd.Timestamp.now(tz=datetime.timezone.utc)
+
+        # Backfill the initial history if configured
+        if self._initial_history_pending:
+            initial_history = self._source_parameters.initial_history
+            if initial_history is None: # This check is only there so the type checker accepts "now - initial_history"
+                raise RuntimeError("initial_history backfill is pending but no duration is configured")
+            yield from self.fetch_timed_historic_data_bundle(now - initial_history, now, {})
+            self._initial_history_pending = False
+
+        # Live data
+        yield self._fetch_da_block(now)
 
     def fetch_timed_historic_data_bundle(self, start_time: datetime.datetime, end_time: datetime.datetime,
                                          filter_clauses: Dict[str, Any]) -> Generator[MessageData, None, None]:
