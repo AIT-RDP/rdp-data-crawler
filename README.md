@@ -210,6 +210,8 @@ The following overview lists the main ones. Detailed configurations can be found
 * Energy- and market-related services:
   * ENTSO-E
     * `data_crawler.sources.entsoe_da.ENTSOEDATransparency`: Day-ahead market prices from ENTSO-E
+  * Fingrid
+    * `data_crawler.sources.fingrid.DatasetData`: Timeseries data from Fingrid Open Data
 
 * Device-specific interfaces
   * Fronius

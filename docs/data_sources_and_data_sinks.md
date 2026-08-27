@@ -1,6 +1,6 @@
 # Data Sources and Data Sinks
 
-The AIT RDP Data Crawler is mainly driven by configurable sources and sinks that access remote systems. This section 
+The AIT RDP Data Crawler is mainly driven by configurable sources and sinks that access remote systems. This section
 describes the main configuration options.
 
 ## Meteorological data
@@ -11,7 +11,7 @@ describes the main configuration options.
 
 **Type Name**: `data_crawler.sources.weatherbit.CurrentWeather`
 
-**Description**: The current weather API fetches the actual state estimations from the Weatherbit API. It is not 
+**Description**: The current weather API fetches the actual state estimations from the Weatherbit API. It is not
 recommended by Weatherbit to use these values for archive purpose.
 
 **Parameters**
@@ -30,7 +30,7 @@ recommended by Weatherbit to use these values for archive purpose.
 * `api key`: The API key to access the Weatherbit API. This key is required for all Weatherbit APIs.
 * `latitude`: The latitude of the location to be queried.
 * `longitude`: The longitude of the location to be queried.
-* `horizon hours`: The number of hours in the future to be queried. The maximum value returned by the API is 240 
+* `horizon hours`: The number of hours in the future to be queried. The maximum value returned by the API is 240
   hours (default).
 
 ### Meteorologisk Institutt Norway - met.no
@@ -39,15 +39,15 @@ recommended by Weatherbit to use these values for archive purpose.
 
 **Type Name**: `data_crawler.sources.yr_no.LocationForecast`
 
-**Description**: The location forecast source fetches the numerical weather prediction data from the met.no API for a 
+**Description**: The location forecast source fetches the numerical weather prediction data from the met.no API for a
 single location.
 
 **Parameters**
 * `latitude`: The latitude of the location to be queried.
 * `longitude`: The longitude of the location to be queried.
-* `altitude`: The altitude of the location to be queried. If none is given, the default ground altitude as induced by 
+* `altitude`: The altitude of the location to be queried. If none is given, the default ground altitude as induced by
   the API is used.
-* `contact address`: A contact address that should be sent along with the API request. This is required by the met.no API 
+* `contact address`: A contact address that should be sent along with the API request. This is required by the met.no API
   and should be a valid email address. The address is used to contact you in case of problems with the API.
 
 ### Geosphere Austria
@@ -56,21 +56,21 @@ single location.
 
 **Type Name**: `data_crawler.sources.zamg.MeasurementStationData`
 
-**Description**: The measurement station data source fetches the live and historic measurements from the Geosphere 
-measurement stations. There are two dedicated endpoint types. TAWES and climate. The first one returns the real-time 
-information with less quality control and a shorter historic timeframe and the later returns the quality controlled 
-measurements. Note that both endpoints use different station IDs and therefore may not be easily exchanged. Please 
-consider the [climate data](https://data.hub.geosphere.at/dataset/klima-v1-10min) and 
-[TAWES data](https://data.hub.geosphere.at/dataset/tawes-v1-10min) documentation for further details on the data 
+**Description**: The measurement station data source fetches the live and historic measurements from the Geosphere
+measurement stations. There are two dedicated endpoint types. TAWES and climate. The first one returns the real-time
+information with less quality control and a shorter historic timeframe and the later returns the quality controlled
+measurements. Note that both endpoints use different station IDs and therefore may not be easily exchanged. Please
+consider the [climate data](https://data.hub.geosphere.at/dataset/klima-v1-10min) and
+[TAWES data](https://data.hub.geosphere.at/dataset/tawes-v1-10min) documentation for further details on the data
 sources and station IDs.
 
 **Parameters**
 * `station id`: The station ID to be queried. Note that the station is different for the TAWES and climate endpoints.
-* `initial history`: The past duration to fetch data from. After the initial query, only new samples will be returned. 
+* `initial history`: The past duration to fetch data from. After the initial query, only new samples will be returned.
   Defaults to 48h.
-* `endpoint`: The name of the endpoint to be used. Either `TAWES`, `climate-v2`, or `climate` (deprecated). The 
+* `endpoint`: The name of the endpoint to be used. Either `TAWES`, `climate-v2`, or `climate` (deprecated). The
   default is `climate`, but this will be elevated to `climate-v2` in future releases.
-* `data points`: A list of data points to be fetched. The data point nomenclature corresponds to the Geosphere naming  
+* `data points`: A list of data points to be fetched. The data point nomenclature corresponds to the Geosphere naming
   and not the AIR RDP names. Please consider the Geosphere documentation for further details. Per default, all supported
   data points will be added.
 
@@ -79,8 +79,8 @@ sources and station IDs.
 
 **Type Name**: `data_crawler.sources.zamg.NumericalWeatherPredictionData`
 
-**Description**: The numerical weather prediction data source fetches the weather forecasts from the Geosphere API. The 
-source supports two endpoints, a standard numeric weather prediction data that return a single value for each 
+**Description**: The numerical weather prediction data source fetches the weather forecasts from the Geosphere API. The
+source supports two endpoints, a standard numeric weather prediction data that return a single value for each
 observation and an ensemble forecast that returns some percentiles in addition.
 
 **Parameters**:
@@ -98,16 +98,16 @@ observation and an ensemble forecast that returns some percentiles in addition.
 
 **Type Name**: `data_crawler.sources.knmi.WeatherStationsKNMI`
 
-**Description**: The KNMI weather stations source fetches the live and historic measurements from the KNMI weather 
-stations. For accessing the dataset, an [API Key](https://developer.dataplatform.knmi.nl/open-data-api#token) is 
+**Description**: The KNMI weather stations source fetches the live and historic measurements from the KNMI weather
+stations. For accessing the dataset, an [API Key](https://developer.dataplatform.knmi.nl/open-data-api#token) is
 required.
 
 **Parameters**
 * `api_key`: The API key to access the KNMI API.
 * `stations`: A list of station IDs or a dict-based configuration having an `id` attribute listing the station IDs.
-* `initial_history`: The past duration to fetch data from. After the initial query, only new samples will be returned. 
+* `initial_history`: The past duration to fetch data from. After the initial query, only new samples will be returned.
   The default history for KNMI weather stations is 12h.
-* `drop_missing_observations`: Drop observations that do not contain any valid values. Per default, all returned 
+* `drop_missing_observations`: Drop observations that do not contain any valid values. Per default, all returned
   observations are included, even if they have just NaN values.
 
 
@@ -117,23 +117,23 @@ required.
 
 **Type Name**: `data_crawler.sources.modbus.ModbusTCP` and `data_crawler.sinks.modbus.ModbusTCP`
 
-**Description**: The Modbus TCP source and sink fetches the data from a Modbus TCP server and writes dedicated message 
-fields back. Right now, sink and source are separated and maintain one Modbus TCP connection, each. If this is an issue 
+**Description**: The Modbus TCP source and sink fetches the data from a Modbus TCP server and writes dedicated message
+fields back. Right now, sink and source are separated and maintain one Modbus TCP connection, each. If this is an issue
 (e.g., due to single-connection servers), please open a ticket on GitHub.
 
 **Parameters**:
 * `address`: The address of the Modbus TCP server.
 * `port`: The port of the Modbus TCP server. Defaults to 502.
-* `register_spec`: The register specification to be used. This is a list of dictionaries that define the register 
-  addresses and types. Instead of directly defining the register specification, also an (external CSV) table can be  
-  loaded and processed. If an external table is used, make sure that the column names are properly defined. In general, 
+* `register_spec`: The register specification to be used. This is a list of dictionaries that define the register
+  addresses and types. Instead of directly defining the register specification, also an (external CSV) table can be
+  loaded and processed. If an external table is used, make sure that the column names are properly defined. In general,
   the following columns or dict-entries are supported:
-  * `register_start`: The start address of the register. This is a required field, however, for some rows, it may be 
-    intentionally left empty or NaN. In case an empty or NaN value is observed, the register will be fetched in one 
+  * `register_start`: The start address of the register. This is a required field, however, for some rows, it may be
+    intentionally left empty or NaN. In case an empty or NaN value is observed, the register will be fetched in one
     block with the previous one and a consecutive addressing is assumed.
-  * `name`: The name of the data point to be fetched. This is a required field. The name is used to create the message 
+  * `name`: The name of the data point to be fetched. This is a required field. The name is used to create the message
     field of the output message.
-  * `data_type`: The data type of the register. This is also a required field and will determine the number of 
+  * `data_type`: The data type of the register. This is also a required field and will determine the number of
     consecutive registers to be read or written. The following data types are supported:
     * `int16`: 16-bit signed integer
     * `uint16`: 16-bit unsigned integer
@@ -142,33 +142,33 @@ fields back. Right now, sink and source are separated and maintain one Modbus TC
     * `float16`: 16-bit float
     * `float32`: 32-bit float
     * `float64`: 64-bit float
-    * `stringN`: N-character ASCII String (e.g. `string16` for 16 characters). In case the string is null-terminated 
-      before the maximum number of characters, it will be shortened. Similarly, it will be trimmed, in case it is 
+    * `stringN`: N-character ASCII String (e.g. `string16` for 16 characters). In case the string is null-terminated
+      before the maximum number of characters, it will be shortened. Similarly, it will be trimmed, in case it is
       filled with space characters.
     * `bool`: Boolean value
-  * `register_type`: The modbus type of the register. This is a required field and will determine the access method 
+  * `register_type`: The modbus type of the register. This is a required field and will determine the access method
     (holding register, input register, etc.). The following types are supported:
     * `holdingreg`/`holdingregister`/`h`: Holding register
     * `inputreg`/`inputregister`/`i`: Input register
     * `coils`/`c`: Coils
     * `discreteinput`/`d`: Discrete input
-  * `unit`: An optional unit description of the data point. This is not used for the Modbus TCP interface, but may be 
+  * `unit`: An optional unit description of the data point. This is not used for the Modbus TCP interface, but may be
     useful for documentation purposes.
-  * `scaling`: An optional scaling factor to be applied to the data point. In case an integer is scaled by a double, 
+  * `scaling`: An optional scaling factor to be applied to the data point. In case an integer is scaled by a double,
     then a double message field will be output. Otherwise, the original data type will be kept.
-  * `used`: boolean flag that indicates whether the register is used or not. Per default, it is set to `true` and 
+  * `used`: boolean flag that indicates whether the register is used or not. Per default, it is set to `true` and
     therefore included in the output.
   * `unit_id`: The device ID of the Modbus TCP server. Per default, 1 is assumed.
-  * `description`: A textual description of the data point. This is not used for the Modbus TCP interface, but may be 
+  * `description`: A textual description of the data point. This is not used for the Modbus TCP interface, but may be
     useful for documentation purposes as well.
   * `mode`: The access mode (`r` for reading, `w` for writing and `rw` for read/write). Per default, `r` is assumed. The
      mode modifier can be used to reference the same register description both for a source and a sink.
-* `byte_order`: The byte order of the Modbus TCP server. Per default, big-endian is assumed. `>` indicates big-endian, 
+* `byte_order`: The byte order of the Modbus TCP server. Per default, big-endian is assumed. `>` indicates big-endian,
   `<` indicates little-endian.
-* `word_order`: The word order of the Modbus TCP server. Per default, big-endian is assumed. `>` indicates big-endian, 
+* `word_order`: The word order of the Modbus TCP server. Per default, big-endian is assumed. `>` indicates big-endian,
   `<` indicates little-endian.
 
-**Example**: For instance, the following configuration snippet defines a Modbus TCP source that reads power values from 
+**Example**: For instance, the following configuration snippet defines a Modbus TCP source that reads power values from
 an electricity meter:
 
 ```yaml
@@ -291,26 +291,26 @@ redis:
 
 **Type Name**: `data_crawler.sources.influxdb.InfluxDBSource`
 
-**Description**: The InfluxDB source fetches time-series data from an InfluxDB instance using Flux queries. The source 
-maintains a rolling time window to fetch only new data in subsequent queries. Each table returned by the Flux query is 
-transformed into a separate message, with columns mapped directly to message fields. The source supports batching of 
+**Description**: The InfluxDB source fetches time-series data from an InfluxDB instance using Flux queries. The source
+maintains a rolling time window to fetch only new data in subsequent queries. Each table returned by the Flux query is
+transformed into a separate message, with columns mapped directly to message fields. The source supports batching of
 data fetches to handle large time ranges efficiently.
 
 **Parameters**:
 * `url`: The URL of the InfluxDB instance.
 * `token`: The authentication token for InfluxDB.
 * `org`: The organization name in InfluxDB.
-* `query`: The Flux query to fetch the data. The query can use the parameters `_start_time` and `_stop_time` which are 
+* `query`: The Flux query to fetch the data. The query can use the parameters `_start_time` and `_stop_time` which are
   automatically injected by the source to control the time range of the query.
-* `initial_history`: The past duration to fetch data from on the first query. After the initial query, only new samples 
+* `initial_history`: The past duration to fetch data from on the first query. After the initial query, only new samples
   will be returned. Defaults to 1 hour.
-* `lag_time`: The lag time to account for late arriving data. The source will query data up to the current time minus 
+* `lag_time`: The lag time to account for late arriving data. The source will query data up to the current time minus
   this lag time. Defaults to 0 minutes.
-* `overlap`: Optional duration (default `0`) to extend each poll window backwards after the first poll, re-querying 
-  the tail of the previous interval. Useful when late-arriving data may appear after the nominal poll boundary. Note 
+* `overlap`: Optional duration (default `0`) to extend each poll window backwards after the first poll, re-querying
+  the tail of the previous interval. Useful when late-arriving data may appear after the nominal poll boundary. Note
   that overlapping polls return duplicate samples.
-* `batch_duration`: Optional parameter to fetch data in batches of the specified duration. If not set, all data between 
-  start and stop time is fetched in a single query. This is useful for handling large time ranges that might exceed 
+* `batch_duration`: Optional parameter to fetch data in batches of the specified duration. If not set, all data between
+  start and stop time is fetched in a single query. This is useful for handling large time ranges that might exceed
   query limits or memory constraints.
 
 **Example**: The following configuration snippet defines an InfluxDB source that reads temperature sensor data:
@@ -346,18 +346,61 @@ data fetches to handle large time ranges efficiently.
 
 **Type Name**: `data_crawler.sources.entsoe_da.ENTSOEDATransparency`
 
-**Description**: The ENTSO-E day-ahead market prices source fetches the day-ahead market prices from the ENTSO-E. It 
-requires [registration to the ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) and acquisition of an 
+**Description**: The ENTSO-E day-ahead market prices source fetches the day-ahead market prices from the ENTSO-E. It
+requires [registration to the ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) and acquisition of an
 API token via the portal.
 
 **Parameters**:
 * `api_key`: The API key to access the ENTSO-E API.
-* `initial_history`: Optional past duration to backfill on the first poll (e.g., `7d`). After that poll, only the next 
+* `initial_history`: Optional past duration to backfill on the first poll (e.g., `7d`). After that poll, only the next
   day-ahead block is fetched. Omit the parameter to keep tomorrow-only polling.
-* `day_ahead_prices`: The day-ahead market price configurations to be fetched. Each entry contains a dict with the 
+* `day_ahead_prices`: The day-ahead market price configurations to be fetched. Each entry contains a dict with the
   following attributes:
     * `country_code`: The country code of the market area to be queried. (e.g., `AT` for Austria)
-    * `timezone`: The timezone of the market prices to be queried. This information is used to determine the beginning 
+    * `timezone`: The timezone of the market prices to be queried. This information is used to determine the beginning
       and ending of the next day
-    * `resolution`: The resolution of the market prices to be queried. Right now, `MIN_15`, `MIN_30`, and `MIN_60` are 
+    * `resolution`: The resolution of the market prices to be queried. Right now, `MIN_15`, `MIN_30`, and `MIN_60` are
       supported.
+
+#### Fingrid Open Data
+**Interface Type**: Source
+
+**Type Name**: `data_crawler.sources.fingrid.DatasetData`
+
+**Description**:
+The Fingrid Open Data source fetches a single timeseries dataset from the Fingrid [GetDatasetData](https://developer-data.fingrid.fi/api-details#api=avoindata-api&operation=GetDatasetData) endpoint.
+It requires [registration on the Fingrid Open Data platform](https://data.fingrid.fi/en/instructions) and an API key.
+Each source instance queries one `dataset_id`; configure multiple sources to fetch several datasets.
+Dataset IDs are listed on the [Fingrid datasets page](https://data.fingrid.fi/en/datasets).
+
+**Parameters**:
+* `api_key`:
+  The API key to access the Fingrid Open Data API.
+* `dataset_id`:
+  The numeric ID of the dataset to query.
+* `initial_history`:
+   Optional past duration to fetch on the first query (e.g. `24h`).
+   After the initial query, only new samples will be returned.
+   If omitted, no historic backfill is performed.
+* `page_size`:
+  Optional number of results per API page.
+  Defaults to `20000` (the API maximum).
+  Additional pages are fetched automatically.
+
+**Example**:
+The following configuration snippet fetches Finnish wind power generation (dataset 181) every 15 minutes:
+
+```yaml
+  fingrid.wind_generation:
+    type: "data_crawler.sources.fingrid.DatasetData"
+    source parameter:
+      api_key: "${DATA_CRAWLER_FINGRID_API_KEY}"
+      dataset_id: 181
+      initial_history: 24h
+    polling:
+      frequency: 15min
+    redis:
+      stream: "measurements.fingrid.wind"
+      tags:
+        data_provider: "Fingrid"
+```
