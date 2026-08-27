@@ -352,6 +352,8 @@ API token via the portal.
 
 **Parameters**:
 * `api_key`: The API key to access the ENTSO-E API.
+* `initial_history`: Optional past duration to backfill on the first poll (e.g., `7d`). After that poll, only the next
+  day-ahead block is fetched. Omit the parameter to keep tomorrow-only polling.
 * `day_ahead_prices`: The day-ahead market price configurations to be fetched. Each entry contains a dict with the
   following attributes:
     * `country_code`: The country code of the market area to be queried. (e.g., `AT` for Austria)
