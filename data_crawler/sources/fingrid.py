@@ -46,11 +46,6 @@ class DatasetData(http_cache.GenericHTTPSourceAPI):
         """Returns the rolling query cursor for testing purpose"""
         return self._last_query_ts
 
-    @property
-    def dataset_id(self) -> int:
-        """Returns the configured dataset ID"""
-        return self._dataset_id
-
     def fetch_data(self, raw_data: Optional[dict] = None) -> Dict[str, Any]:
         """
         Fetches the dataset observations and translates them into a common Redis-ready nomenclature
